@@ -1,0 +1,17 @@
+# Build output
+out/
+build/
+
+# Fetched third-party sources, reconstructed by scripts/setup_vendor.sh.
+# uWebSockets is ~1.3 GB with its submodules; the libwebsockets source tree is
+# ~119 MB with its build directory.
+vendor/uWebSockets/
+vendor/lws-src/
+
+# Built by scripts/build_uws.sh
+vendor/libuws_shim.a
+
+# Vendored C3 binding for libwebsockets. Excluded because it carries its own
+# .git and would commit as a gitlink -- a clone would get an empty directory.
+# scripts/setup_vendor.sh re-applies the one edit this project needs to it.
+vendor/libwebsockets.c3l
