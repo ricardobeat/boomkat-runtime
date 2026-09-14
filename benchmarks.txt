@@ -1,0 +1,233 @@
+================================================================================
+BENCHMARK RESULTS
+================================================================================
+
+Machine:  macOS arm64 (Darwin 24.6.0), 8 cores = 4 performance + 4 efficiency
+Toolchain: c3c 0.8.3 -O3, node v26.0.0, bun 1.0.25
+Libraries: libwebsockets 5.0.0 (rebuilt, LWS_MAX_SMP=8), uWebSockets v20.80.0
+Client:   wrk, same machine as the server (see "Measurement caveats" at the end)
+
+All four servers run the identical JS handler:
+
+    function handler(method, url) { return method + " " + url; }
+
+"c3-lws" and "c3-uws" are the same C3 binary logic behind different HTTP
+frontends; the JS half is byte-identical between them. "-2t" is two threads.
+
+
+================================================================================
+1. HEADLINE COMPARISON          wrk -t2 -c512 -d10s
+================================================================================
+
+| server                      |   req/sec |     p50 |       p99 |    RSS |
+|-----------------------------|----------:|--------:|----------:|-------:|
+| c3 + uWebSockets, 2 threads |   254,728 | 1.02 ms |   2.01 ms | 107 MB |
+| c3 + uWebSockets            |   237,251 | 2.05 ms |   4.10 ms | 100 MB |
+| bun                         |   162,322 | 2.92 ms |   5.85 ms |  38 MB |
+| c3 + libwebsockets, 2 thr   |   149,193 |   74 us |    229 us |  49 MB |
+| c3 + libwebsockets          |   103,180 |   57 us |    118 us |  46 MB |
+| node                        |    79,153 | 6.33 ms | 179.76 ms | 131 MB |
+
+uWS wins throughput (~2.3x lws, ~1.5x bun single-threaded).
+lws wins latency by one to three orders of magnitude at the tail, at ~60%
+of uWS throughput, and holds it at 512 concurrent connections.
+
+
+================================================================================
+2. EARLIER HEADLINE RUNS
+================================================================================
+
+2a. First three-way              wrk -t4 -c64 -d10s
+
+| server |  req/sec |    p50 |     p99 |    RSS |
+|--------|---------:|-------:|--------:|-------:|
+| bun    |  125,519 | 405 us | 3.31 ms | 4.5 MB |
+| c3-lws |  100,491 |  57 us |  176 us | 7.6 MB |
+| node   |   79,151 | 709 us | 4.35 ms |  32 MB |
+
+2b. After adding uWebSockets     wrk -t4 -c64 -d10s, two runs
+
+| server |           req/sec |    p50 |             p99 |
+|--------|------------------:|-------:|----------------:|
+| c3-uws | 190,784 / 173,632 | 254 us | 1.13 / 1.99 ms  |
+| bun    | 152,646 / 158,266 | 356 us | 1.28 / 0.86 ms  |
+| c3-lws |  94,862 /  90,079 |  56 us |  270 /  304 us  |
+| node   |  80,561 /  84,793 | 749 us | 1.90 / 1.51 ms  |
+
+2c. Before lws SMP was enabled   wrk -t2 -c512 -d10s
+
+| server    | req/sec |     p50 |       p99 |
+|-----------|--------:|--------:|----------:|
+| c3-uws-2t | 238,703 | 1.04 ms |   3.14 ms |
+| c3-uws    | 237,152 | 2.10 ms |   4.03 ms |
+| bun       | 156,674 | 3.15 ms |   5.53 ms |
+| c3-lws    | 103,276 |   60 us |    120 us |
+| node      |  76,323 | 6.49 ms | 223.49 ms |
+
+
+================================================================================
+3. WHERE THE PER-REQUEST TIME GOES    uWS, 1 thread, wrk -t3 -c128
+================================================================================
+
+| path                      | req/sec |
+|---------------------------|--------:|
+| HTTP only (`nojs` bypass) | 238,525 |
+| HTTP + JS handler         | 214,942 |
+
+The entire JS round-trip -- intern two strings, call the handler, read the
+result back, root and release three values -- costs ~10% of throughput.
+The HTTP frontend dominates, which caps what engine-side tuning can win.
+
+
+================================================================================
+4. THREAD SCALING
+================================================================================
+
+4a. libwebsockets SMP            wrk -t2 -c512 -d8s
+
+| threads | req/sec |    p50 |     p99 |
+|--------:|--------:|-------:|--------:|
+|       1 | 103,959 |  60 us |  127 us |
+|       2 | 157,057 |  72 us |  194 us |   <- +51%
+|       4 | 132,342 | 161 us |  501 us |
+|       8 |  99,806 | 323 us | 2.65 ms |
+
+Uses lws's own count_threads + one lws_service_tsi loop per thread; lws
+distributes accepts itself, so no socket handoff is needed.
+
+4b. uWebSockets, SO_REUSEPORT only    wrk -t4 -c64 -d8s
+
+| threads | req/sec |    p50 |     p99 |
+|--------:|--------:|-------:|--------:|
+|       1 | 220,893 | 233 us |  546 us |
+|       2 | 223,173 | 233 us |  571 us |
+|       4 | 222,689 | 231 us |  541 us |
+|       6 | 220,449 | 233 us |  546 us |
+|       8 | 169,604 | 267 us | 3.83 ms |
+
+Flat. `ps -M` showed one thread at 98.4% and the other three at 0.0%: macOS
+does not balance accepts across SO_REUSEPORT sockets, unlike Linux.
+
+4c. uWebSockets, clustered       wrk -t3 -c128 -d6s
+
+| threads | req/sec |    p50 |     p99 |
+|--------:|--------:|-------:|--------:|
+|       1 | 238,685 | 471 us | 1.02 ms |
+|       2 | 218,470 | 338 us | 1.23 ms |
+|       4 | 195,582 | 404 us | 1.24 ms |
+|       6 | 194,288 | 343 us | 1.89 ms |
+
+All threads now busy (preOpen + round-robin adoptSocket, the technique in
+uWebSockets' own LocalCluster.h). Still no throughput gain at c=128 -- see 5b
+for why that reading was misleading.
+
+4d. node cluster / bun reusePort     wrk -t2 -c512 -d8s
+
+| server                  | req/sec |     p50 |       p99 |
+|-------------------------|--------:|--------:|----------:|
+| node, 1 worker          |  77,149 | 6.49 ms | 848.65 ms |
+| node, 2 workers         | 140,666 | 3.39 ms | 112.56 ms |   <- +82%
+| bun, 1 process          | 163,265 | 3.05 ms |   3.83 ms |
+| bun, 2 processes        | 164,598 | 3.01 ms |   4.09 ms |   <- flat
+
+node's cluster scales because its default SCHED_RR has the primary accept and
+hand out connections in userspace. bun's reusePort is flat for the same reason
+uWS's SO_REUSEPORT was.
+
+
+================================================================================
+5. CLIENT CONFIGURATION (uWebSockets)
+================================================================================
+
+5a. wrk threads, c=128           -d5s
+
+| srv threads |    -t1 |     -t2 |     -t3 |     -t4 |
+|------------:|-------:|--------:|--------:|--------:|
+|           1 | 184,663| 239,988 | 234,695 | 215,802 |
+|           2 | 171,924| 230,330 | 230,100 | 210,237 |
+|           4 | 166,286| 219,452 | 201,803 | 187,919 |
+
+2 client threads win everywhere: 1 cannot saturate the server, 3-4 steal
+cores from it.
+
+5b. Connection count             wrk -t2 -d5s
+
+| srv threads |    c=32 |   c=128 |   c=512 |
+|------------:|--------:|--------:|--------:|
+|           1 | 180,506 | 235,248 | 221,013 |
+|           2 | 239,630 | 237,736 | 246,241 |
+|           4 | 206,435 | 210,158 | 198,322 |
+
+At c=128 a second thread looks useless. At c=32 and c=512 it clearly is not.
+Testing only c=128 is what produced the wrong conclusion in 4c.
+
+5c. Confirmation                 wrk -t2 -d10s, two runs each
+
+| config           |           req/sec |     p50 |            p99 |
+|------------------|------------------:|--------:|---------------:|
+| 1 thread, c=512  | 219,487 / 229,256 | 2.04 ms | 4.69 / 6.76 ms |
+| 2 threads, c=512 | 253,262 / 255,410 | 1.02 ms | 2.07 / 1.96 ms |
+| 3 threads, c=512 | 235,253 / 231,865 | 1.11 ms | 1.70 / 1.95 ms |
+| 1 thread, c=32   | 218,378 / 217,875 |  112 us |  394 /  352 us |
+| 2 threads, c=32  | 209,025 / 207,001 |   89 us |  419 /  428 us |
+
+2 server + 2 client threads = exactly the 4 performance cores. A third
+server thread makes it worse.
+
+
+================================================================================
+6. CPU AFFINITY -- NOT AVAILABLE
+================================================================================
+
+thread_policy_set(THREAD_AFFINITY_POLICY) returns 46, KERN_NOT_SUPPORTED.
+The affinity API is gone on arm64; there is no sched_setaffinity equivalent,
+so the server cannot be pinned to a chosen set of cores.
+
+The only split available is QoS. `taskpolicy -b` clamps a process to the 4
+efficiency cores, but they cannot generate load:
+
+| configuration                   | req/sec |
+|---------------------------------|--------:|
+| 1 server thread, E-core client  |  15,946 |
+| 4 server threads, E-core client |  29,318 |
+| 1 server thread, normal client  | 235,099 |
+| 4 server threads, normal client | 201,831 |
+
+An E-core-clamped wrk is ~15x too slow to be the measuring instrument.
+
+
+================================================================================
+7. MEMORY: UNBOUNDED INTERNING (a real bug, not a tuning result)
+================================================================================
+
+Every distinct URL is interned into the engine's string table and never
+reclaimed. Driving 3.8M unique paths:
+
+| point                     |    RSS |
+|---------------------------|-------:|
+| at startup                | 5.5 MB |
+| after 3.8M unique URLs    | 317 MB |
+| after 10s repeated URLs   | 323 MB |
+
+Memory does not come back. Throughput on unique URLs also falls to ~190k
+from ~231k on a repeated one as the table grows. Invisible in a benchmark
+that hits one path; a leak for any server with unbounded URL space.
+
+
+================================================================================
+8. MEASUREMENT CAVEATS
+================================================================================
+
+- Client and server share one 8-core machine. wrk needs ~2.2 cores, and one
+  server thread already saturates a core, so the two contend. Scaling beyond
+  ~2 threads cannot be measured honestly here -- it needs the client on a
+  separate machine.
+- Response bytes differ between servers. node, bun and uWS add headers the
+  libwebsockets server does not (Date, Connection, and uWS adds
+  "uWebSockets: 20"), so transfer/sec is not comparable even though the
+  bodies are identical.
+- RSS is sampled once after the load run and is noisy; treat it as an order
+  of magnitude, not a measurement.
+- Loopback only: no real network, NIC or TLS cost is included.
+- Most figures are a single run. Where two runs are shown, both are listed
+  rather than averaged. Treat differences under ~10% as noise.
