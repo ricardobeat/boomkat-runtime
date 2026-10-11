@@ -23,22 +23,19 @@ void* g_loop;
 
 // ---- timers ----
 
-struct TimerExt
-{
+struct TimerExt {
     Callback cb;
     void* user;
 }
 
-fn void timer_fired(UsTimer* t)
-{
+fn void timer_fired(UsTimer* t) {
     TimerExt e = *(TimerExt*)us_timer_ext(t);
     us_timer_close(t);
     e.cb(e.user);
 }
 
 // One-shot. The handle is valid until the callback starts or it is cancelled.
-fn UsTimer* timer_start(long ms, Callback cb, void* user)
-{
+fn UsTimer* timer_start(long ms, Callback cb, void* user) {
     UsTimer* t = us_create_timer(g_loop, 0, TimerExt::size);
     *(TimerExt*)us_timer_ext(t) = { cb, user };
     // uSockets reads 0 as disarmed.
@@ -56,17 +53,16 @@ fn void timer_cancel(UsTimer* t) => us_timer_close(t);
 int g_holds;
 UsTimer* g_hold_timer;
 
-fn void hold_tick(UsTimer* t) {}
+fn void hold_tick(UsTimer* t) {
+}
 
-fn void hold()
-{
+fn void hold() {
     if (g_holds++) return;
     g_hold_timer = us_create_timer(g_loop, 0, 0);
     us_timer_set(g_hold_timer, &hold_tick, 1 << 30, 1 << 30);
 }
 
-fn void unhold()
-{
+fn void unhold() {
     if (--g_holds) return;
     us_timer_close(g_hold_timer);
     g_hold_timer = null;
@@ -78,8 +74,7 @@ alias TaskFn = fn void(Task* t);
 
 // `work` runs on a pool thread, `done` back on the loop. A task is owned by
 // whoever submitted it; `done` is where it is usually freed.
-struct Task
-{
+struct Task {
     TaskFn work;
     TaskFn done;
     Task* next;
@@ -87,8 +82,7 @@ struct Task
 
 const POOL_THREADS = 4;
 
-struct Pool
-{
+struct Pool {
     Mutex lock;
     ConditionVariable ready;
     Task* head;
@@ -99,20 +93,16 @@ struct Pool
 
 Pool g_pool;
 
-fn void task_done(void* user)
-{
+fn void task_done(void* user) {
     Task* t = user;
     unhold();
     t.done(t);
 }
 
-fn int pool_thread(void* arg)
-{
-    while (true)
-    {
+fn int pool_thread(void* arg) {
+    while (true) {
         Task* t;
-        g_pool.lock.@in_lock()
-        {
+        g_pool.lock.@in_lock() {
             while (!g_pool.head) g_pool.ready.wait(&g_pool.lock);
             t = g_pool.head;
             g_pool.head = t.next;
@@ -123,14 +113,11 @@ fn int pool_thread(void* arg)
     }
 }
 
-fn void submit(Task* t)
-{
-    if (!g_pool.started)
-    {
+fn void submit(Task* t) {
+    if (!g_pool.started) {
         g_pool.lock.init()!!;
         g_pool.ready.init()!!;
-        foreach (&th : g_pool.threads)
-        {
+        foreach (&th : g_pool.threads) {
             th.create(&pool_thread, null)!!;
             th.detach();
         }
@@ -138,14 +125,10 @@ fn void submit(Task* t)
     }
     hold();
     t.next = null;
-    g_pool.lock.@in_lock()
-    {
-        if (g_pool.tail)
-        {
+    g_pool.lock.@in_lock() {
+        if (g_pool.tail) {
             g_pool.tail.next = t;
-        }
-        else
-        {
+        } else {
             g_pool.head = t;
         }
         g_pool.tail = t;

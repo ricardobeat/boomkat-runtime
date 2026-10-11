@@ -6,10 +6,8 @@ extern fn ZString strerror(CInt err);
 
 fn String errno_text(CInt err) => strerror(err).str_view();
 
-fn String errno_code(CInt err)
-{
-    switch (err)
-    {
+fn String errno_code(CInt err) {
+    switch (err) {
         case Errno.ENOENT: return "ENOENT";
         case Errno.EACCES: return "EACCES";
         case Errno.EPERM: return "EPERM";

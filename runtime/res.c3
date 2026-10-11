@@ -7,8 +7,7 @@ import boomkat;
 import std::collections::list;
 import libc;
 
-enum ResKind
-{
+enum ResKind {
     STDIO,
     FILE,
     SOCKET,
@@ -16,12 +15,11 @@ enum ResKind
     PIPE,
 }
 
-struct Res
-{
+struct Res {
     ResKind kind;
     uint rid;
-    bool closed;        // JS called close
-    bool gone;          // the OS side is gone: socket closed, fd closed
+    bool closed; // JS called close
+    bool gone; // the OS side is gone: socket closed, fd closed
     bool eof;
     CInt error;
     uint read_op;
@@ -31,12 +29,12 @@ struct Res
     List{char} outbox;
 
     CInt fd;
-    bool busy;          // a pool task holds the fd
+    bool busy; // a pool task holds the fd
 
     UsSocket* sock;
     CInt ssl;
     bool paused;
-    String host;        // for TLS verification
+    String host; // for TLS verification
     bool cert_failed;
     uint connect_op;
 
@@ -45,7 +43,7 @@ struct Res
     List{uint} backlog;
     uint accept_op;
 
-    int pid;            // PIPE: the child it belongs to
+    int pid; // PIPE: the child it belongs to
 }
 
 List{Res*} g_res;
@@ -55,15 +53,13 @@ uint g_res_gen;
 const usz READ_CHUNK = 64 * 1024;
 const usz INBOX_HIGH = 256 * 1024;
 
-fn void init_res()
-{
+fn void init_res() {
     g_res.init(mem, 64);
     g_res_free.init(mem, 64);
     for (CInt fd = 0; fd < 3; fd++) res_new(STDIO).fd = fd;
 }
 
-fn Res* res_new(ResKind kind)
-{
+fn Res* res_new(ResKind kind) {
     Res* r = mem::new(Res);
     r.kind = kind;
     r.fd = -1;
@@ -71,13 +67,10 @@ fn Res* res_new(ResKind kind)
     r.outbox.init(mem);
     r.backlog.init(mem);
     uint slot;
-    if (g_res_free.len())
-    {
+    if (g_res_free.len()) {
         slot = g_res_free.pop()!!;
         g_res[slot] = r;
-    }
-    else
-    {
+    } else {
         slot = (uint)g_res.len();
         g_res.push(r);
     }
@@ -88,8 +81,7 @@ fn Res* res_new(ResKind kind)
     return r;
 }
 
-fn Res* res_find(uint rid)
-{
+fn Res* res_find(uint rid) {
     uint slot = rid & SLOT_MASK;
     if (slot >= g_res.len()) return null;
     Res* r = g_res[slot];
@@ -97,8 +89,7 @@ fn Res* res_find(uint rid)
 }
 
 // Freed once both JS and the OS are done with it.
-fn void res_release(Res* r)
-{
+fn void res_release(Res* r) {
     if (!r.closed || !r.gone || r.busy) return;
     uint slot = r.rid & SLOT_MASK;
     g_res[slot] = null;
@@ -110,8 +101,7 @@ fn void res_release(Res* r)
     free(r);
 }
 
-fn Res* JsCtx.res(self, uint i = 0)
-{
+fn Res* JsCtx.res(self, uint i = 0) {
     Res* r = res_find(self.arg(i).id());
     if (!r || r.closed) self.throw_coded("EBADF", "bad resource id");
     return r && !r.closed ? r : null;
@@ -120,12 +110,10 @@ fn Res* JsCtx.res(self, uint i = 0)
 // ---- delivering reads ----
 
 // Settles a pending read from the inbox or the end state.
-fn void Res.deliver(&self)
-{
+fn void Res.deliver(&self) {
     if (!self.read_op) return;
     uint op = self.read_op;
-    if (self.inbox.len())
-    {
+    if (self.inbox.len()) {
         self.read_op = 0;
         char[] data = copy_bytes(self.inbox.array_view());
         self.inbox.clear();
@@ -133,29 +121,25 @@ fn void Res.deliver(&self)
         resolve_bytes(op, data);
         return;
     }
-    if (self.cert_failed && self.gone)
-    {
+    if (self.cert_failed && self.gone) {
         self.read_op = 0;
         reject(op, "CERT_INVALID", string::tformat("TLS certificate for %s failed verification", self.host));
         return;
     }
-    if (self.error)
-    {
+    if (self.error) {
         self.read_op = 0;
         reject_errno(op, self.error, "read");
         return;
     }
-    if (self.eof || self.gone)
-    {
+    if (self.eof || self.gone) {
         self.read_op = 0;
-        resolve(op, g_rt.null_value() ?? {});
+        resolve(op, g_rt.null_value() ?? { });
     }
 }
 
 // ---- pool reads and writes on fds ----
 
-struct FdTask
-{
+struct FdTask {
     inline Task task;
     Res* res;
     uint op;
@@ -164,46 +148,36 @@ struct FdTask
     CInt err;
 }
 
-fn void fd_read_work(Task* t)
-{
+fn void fd_read_work(Task* t) {
     FdTask* f = (FdTask*)t;
     f.buf = mem::alloc_array(char, READ_CHUNK);
     f.n = libc::read(f.res.fd, f.buf.ptr, f.buf.len);
     if (f.n < 0) f.err = libc::errno();
 }
 
-fn void fd_read_done(Task* t)
-{
+fn void fd_read_done(Task* t) {
     FdTask* f = (FdTask*)t;
-    Res* r = f.res;
+    Res* r    = f.res;
     r.busy = false;
     defer free(f);
-    if (f.n < 0)
-    {
+    if (f.n < 0) {
         free(f.buf.ptr);
         reject_errno(f.op, f.err, "read");
-    }
-    else if (f.n == 0)
-    {
+    } else if (f.n == 0) {
         free(f.buf.ptr);
-        resolve(f.op, g_rt.null_value() ?? {});
-    }
-    else
-    {
+        resolve(f.op, g_rt.null_value() ?? { });
+    } else {
         resolve_bytes(f.op, f.buf[:f.n]);
     }
     res_release(r);
 }
 
-fn void fd_write_work(Task* t)
-{
+fn void fd_write_work(Task* t) {
     FdTask* f = (FdTask*)t;
-    char[] b = f.buf;
-    while (b.len)
-    {
+    char[] b  = f.buf;
+    while (b.len) {
         sz n = libc::write(f.res.fd, b.ptr, b.len);
-        if (n < 0)
-        {
+        if (n < 0) {
             if (libc::errno() == Errno.EINTR) continue;
             f.err = libc::errno();
             return;
@@ -213,26 +187,21 @@ fn void fd_write_work(Task* t)
     }
 }
 
-fn void fd_write_done(Task* t)
-{
+fn void fd_write_done(Task* t) {
     FdTask* f = (FdTask*)t;
-    Res* r = f.res;
+    Res* r    = f.res;
     r.busy = false;
     free(f.buf.ptr);
     defer free(f);
-    if (f.err)
-    {
+    if (f.err) {
         reject_errno(f.op, f.err, "write");
-    }
-    else
-    {
+    } else {
         resolve_number(f.op, f.n);
     }
     res_release(r);
 }
 
-fn void fd_task(Res* r, uint op, TaskFn work, TaskFn done, char[] buf = {})
-{
+fn void fd_task(Res* r, uint op, TaskFn work, TaskFn done, char[] buf = { }) {
     FdTask* f = mem::new(FdTask);
     *f = { .task = { .work = work, .done = done }, .res = r, .op = op, .buf = buf };
     r.busy = true;
@@ -242,22 +211,18 @@ fn void fd_task(Res* r, uint op, TaskFn work, TaskFn done, char[] buf = {})
 // ---- natives ----
 
 // read(op, rid) -> Uint8Array, or null at the end
-fn void js_read(JsCtx ctx, void* udata)
-{
+fn void js_read(JsCtx ctx, void* udata) {
     uint op = ctx.arg(0).id();
-    Res* r = res_find(ctx.arg(1).id());
-    if (!r || r.closed)
-    {
+    Res* r  = res_find(ctx.arg(1).id());
+    if (!r || r.closed) {
         reject(op, "EBADF", "bad resource id");
         return;
     }
-    if (r.read_op || r.busy)
-    {
+    if (r.read_op || r.busy) {
         reject(op, "EBUSY", "a read is already pending");
         return;
     }
-    switch (r.kind)
-    {
+    switch (r.kind) {
         case SOCKET:
         case PIPE:
             r.read_op = op;
@@ -271,25 +236,21 @@ fn void js_read(JsCtx ctx, void* udata)
 }
 
 // write(op, rid, bytes) -> bytes written, once all of them are
-fn void js_write(JsCtx ctx, void* udata)
-{
+fn void js_write(JsCtx ctx, void* udata) {
     uint op = ctx.arg(0).id();
-    Res* r = res_find(ctx.arg(1).id());
-    if (!r || r.closed)
-    {
+    Res* r  = res_find(ctx.arg(1).id());
+    if (!r || r.closed) {
         reject(op, "EBADF", "bad resource id");
         return;
     }
     char[] data = ctx.arg(2).bytes();
-    switch (r.kind)
-    {
+    switch (r.kind) {
         case SOCKET:
             r.socket_write(op, data);
         case STDIO:
         case FILE:
         case PIPE:
-            if (r.busy)
-            {
+            if (r.busy) {
                 reject(op, "EBUSY", "a write is already pending");
                 return;
             }
@@ -299,28 +260,24 @@ fn void js_write(JsCtx ctx, void* udata)
     }
 }
 
-fn void js_close(JsCtx ctx, void* udata)
-{
+fn void js_close(JsCtx ctx, void* udata) {
     Res* r = res_find(ctx.arg(0).id());
     if (!r || r.closed) return;
     r.closed = true;
-    switch (r.kind)
-    {
+    switch (r.kind) {
         case SOCKET:
-            if (!r.gone)
-            {
+            if (!r.gone) {
                 us_socket_close(r.ssl, r.sock, 0, null);
                 return;
             }
         case LISTENER:
             if (!r.gone) us_listen_socket_close(0, r.listener);
             r.gone = true;
-            foreach (rid : r.backlog)
-            {
+            foreach (rid : r.backlog) {
                 Res* c = res_find(rid);
                 if (c) us_socket_close(c.ssl, c.sock, 0, null);
             }
-            if (r.accept_op) resolve(r.accept_op, g_rt.null_value() ?? {});
+            if (r.accept_op) resolve(r.accept_op, g_rt.null_value() ?? { });
             r.accept_op = 0;
         case STDIO:
             r.gone = true;

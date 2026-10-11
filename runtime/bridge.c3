@@ -18,42 +18,37 @@ JsValue g_settle;
 // The bytes behind a Uint8Array (any view) or ArrayBuffer, valid until JS
 // runs again. ASCII strings are viewed in place; other strings transcode
 // into tmem.
-fn char[] JsArg.bytes(self)
-{
+fn char[] JsArg.bytes(self) {
     TVal tv = self.tv;
-    if (tv.is_string())
-    {
+    if (tv.is_string()) {
         HString* hs = (HString*)tv.get_heapptr();
         if (hs.is_ascii()) return hs.get_data();
         return (char[])(self.as_string() ?? "");
     }
-    if (!tv.is_object()) return {};
-    HObject* o = (HObject*)tv.get_heapptr();
+    if (!tv.is_object()) return { };
+    HObject* o   = (HObject*)tv.get_heapptr();
     ObjClass cls = o.get_class();
-    if (cls == ARRAYBUFFER)
-    {
+    if (cls == ARRAYBUFFER) {
         HObjectArrayBuffer* ab = &o.extra_ptr().ab;
-        if (ab.byte_length == 0xFFFFFFFF || !ab.data) return {};
+        if (ab.byte_length == 0xFFFFFFFF || !ab.data) return { };
         return ab.data[:ab.byte_length];
     }
-    if (cls != DATAVIEW && !builtins::is_typed_array_class(cls)) return {};
+    if (cls != DATAVIEW && !builtins::is_typed_array_class(cls)) return { };
     uint len = builtins::view_effective_byte_length(o);
-    if (!len) return {};
+    if (!len) return { };
     HObject* buf = o.extra_ptr().view.buffer;
     return buf.extra_ptr().ab.data[o.extra_ptr().view.byte_offset:len];
 }
 
-fn bool JsArg.is_bytes(self)
-{
+fn bool JsArg.is_bytes(self) {
     if (!self.tv.is_object()) return false;
     ObjClass cls = ((HObject*)self.tv.get_heapptr()).get_class();
     return cls == ARRAYBUFFER || cls == DATAVIEW || builtins::is_typed_array_class(cls);
 }
 
 // A Uint8Array that takes ownership of `data`, which must come from `mem`.
-fn HObject*? new_u8(char[] data)
-{
-    Heap* h = g_rt.rt.heap;
+fn HObject*? new_u8(char[] data) {
+    Heap* h      = g_rt.rt.heap;
     HObject* buf = h.alloc_object(ARRAYBUFFER)!;
     h.set_prototype(buf, h.arraybuffer_proto);
     buf.extra_ptr().ab = { .data = data.len ? data.ptr : null, .byte_length = (uint)data.len };
@@ -66,20 +61,17 @@ fn HObject*? new_u8(char[] data)
     return view;
 }
 
-fn char[] copy_bytes(char[] src)
-{
-    if (!src.len) return {};
+fn char[] copy_bytes(char[] src) {
+    if (!src.len) return { };
     char[] out = mem::alloc_array(char, src.len);
     out[..] = src[..];
     return out;
 }
 
-fn JsArg JsCtx.bytes(self, char[] owned)
-{
+fn JsArg JsCtx.bytes(self, char[] owned) {
     JsArg a;
     HObject*? o = new_u8(owned);
-    if (catch o)
-    {
+    if (catch o) {
         free(owned.ptr);
         a.tv.set_undefined();
         return a;
@@ -90,11 +82,9 @@ fn JsArg JsCtx.bytes(self, char[] owned)
 
 fn void JsCtx.ret_bytes(self, char[] owned) => self.ret(self.bytes(owned));
 
-fn JsValue? bytes_value(char[] owned)
-{
+fn JsValue? bytes_value(char[] owned) {
     HObject*? o = new_u8(owned);
-    if (catch err = o)
-    {
+    if (catch err = o) {
         free(owned.ptr);
         return err~;
     }
@@ -108,34 +98,37 @@ fn JsValue? bytes_value(char[] owned)
 // JS starts an op by passing a fresh id to a native; the native finishes it,
 // now or from a later loop callback, through one of these. On the JS side
 // __settle(id, ok, value, code) resolves or rejects the op's promise.
-fn void settle(uint id, bool ok, JsValue value = {}, String code = "")
-{
-    g_rt.@scope()
-    {
+fn void settle(uint id, bool ok, JsValue value = { }, String code = "") {
+    g_rt.@scope() {
         JsValue[4] args = {
-            g_rt.number(id) ?? {},
-            g_rt.boolean(ok) ?? {},
+            g_rt.number(id) ?? { },
+            g_rt.boolean(ok) ?? { },
             value,
-            code.len ? g_rt.string(code) ?? {} : (JsValue){},
+            code.len ? g_rt.string(code) ?? { } : (JsValue) { },
         };
         (void)call_js(g_settle, args[..]);
     };
 }
 
-fn void resolve(uint id, JsValue value = {}) => settle(id, true, value);
-fn void resolve_number(uint id, double n) => settle(id, true, g_rt.number(n) ?? {});
-fn void resolve_string(uint id, String s) => settle(id, true, g_rt.string(s) ?? {});
-fn void resolve_bytes(uint id, char[] owned) => settle(id, true, bytes_value(owned) ?? {});
-fn void reject(uint id, String code, String msg) => settle(id, false, g_rt.string(msg) ?? {}, code);
-fn void reject_errno(uint id, CInt err, String what) => reject(id, errno_code(err), string::tformat("%s: %s", what, errno_text(err)));
+fn void resolve(uint id, JsValue value = { }) => settle(id, true, value);
+fn void resolve_number(uint id, double n) => settle(id, true, g_rt.number(n) ?? { });
+fn void resolve_string(uint id, String s) => settle(id, true, g_rt.string(s) ?? { });
+fn void resolve_bytes(uint id, char[] owned) => settle(id, true, bytes_value(owned) ?? { });
+fn void reject(uint id, String code, String msg) => settle(id, false, g_rt.string(msg) ?? { }, code);
+fn void reject_errno(
+    uint id,
+    CInt err,
+    String what
+) => reject(id, errno_code(err), string::tformat("%s: %s", what, errno_text(err)));
 
-fn void JsCtx.throw_coded(self, String code, String msg)
-{
+fn void JsCtx.throw_coded(self, String code, String msg) {
     JsArg? make = self.get_prop(self.value(g_bk), "error");
-    if (try make)
-    {
+    if (try make) {
         JsArg[2] args = { self.string(code), self.string(msg) };
-        if (try e = self.call(make, args[..])) { self.throw_value(e); return; }
+        if (try e = self.call(make, args[..])) {
+            self.throw_value(e);
+            return;
+        }
     }
     self.throw_error(ERROR, msg);
 }
@@ -145,8 +138,7 @@ fn void JsCtx.throw_coded(self, String code, String msg)
 int g_exit_code;
 
 // An exception escaped into the loop. Like Deno, that ends the process.
-fn void report_uncaught()
-{
+fn void report_uncaught() {
     io::eprintfn("error: %s", g_rt.last_error());
     g_exit_code = 1;
     exit_now();
@@ -156,17 +148,14 @@ fn void report_uncaught()
 
 JsValue g_bk;
 
-struct Native
-{
+struct Native {
     String name;
     JsHostFn f;
     int argc;
 }
 
-fn void? install_natives(Native[] natives)
-{
-    if (g_bk.is_empty())
-    {
+fn void? install_natives(Native[] natives) {
+    if (g_bk.is_empty()) {
         g_bk = g_rt.object()!;
         JsValue global = g_rt.global()!;
         defer g_rt.release(global);

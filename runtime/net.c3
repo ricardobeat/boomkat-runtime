@@ -15,8 +15,7 @@ alias ErrCb = fn UsSocket*(UsSocket*, CInt);
 typedef UsListenSocket = void;
 typedef UsContext = void;
 
-struct UsContextOptions
-{
+struct UsContextOptions {
     ZString key_file_name;
     ZString cert_file_name;
     ZString passphrase;
@@ -36,8 +35,23 @@ extern fn void us_socket_context_on_writable(CInt ssl, UsContext* ctx, SockCb cb
 extern fn void us_socket_context_on_timeout(CInt ssl, UsContext* ctx, SockCb cb);
 extern fn void us_socket_context_on_end(CInt ssl, UsContext* ctx, SockCb cb);
 extern fn void us_socket_context_on_connect_error(CInt ssl, UsContext* ctx, ErrCb cb);
-extern fn UsListenSocket* us_socket_context_listen(CInt ssl, UsContext* ctx, ZString host, CInt port, CInt options, CInt ext_size);
-extern fn UsSocket* us_socket_context_connect(CInt ssl, UsContext* ctx, ZString host, CInt port, ZString source, CInt options, CInt ext_size);
+extern fn UsListenSocket* us_socket_context_listen(
+    CInt ssl,
+    UsContext* ctx,
+    ZString host,
+    CInt port,
+    CInt options,
+    CInt ext_size
+);
+extern fn UsSocket* us_socket_context_connect(
+    CInt ssl,
+    UsContext* ctx,
+    ZString host,
+    CInt port,
+    ZString source,
+    CInt options,
+    CInt ext_size
+);
 extern fn void us_listen_socket_close(CInt ssl, UsListenSocket* ls);
 extern fn CInt us_socket_write(CInt ssl, UsSocket* s, char* data, CInt len, CInt more);
 extern fn void* us_socket_ext(CInt ssl, UsSocket* s);
@@ -61,8 +75,7 @@ UsContext*[2] g_client_ctx;
 
 fn Res* sock_res(CInt ssl, UsSocket* s) => *(Res**)us_socket_ext(ssl, s);
 
-macro @callbacks($ssl, UsContext* ctx)
-{
+macro @callbacks($ssl, UsContext* ctx) {
     us_socket_context_on_open($ssl, ctx, fn (s, is_client, ip, ip_len) => on_sock_open($ssl, s, is_client));
     us_socket_context_on_data($ssl, ctx, fn (s, data, len) => on_sock_data($ssl, s, data[:len]));
     us_socket_context_on_writable($ssl, ctx, fn (s) => on_sock_writable($ssl, s));
@@ -72,10 +85,8 @@ macro @callbacks($ssl, UsContext* ctx)
     us_socket_context_on_timeout($ssl, ctx, fn (s) => s);
 }
 
-fn UsSocket* on_sock_open(CInt ssl, UsSocket* s, CInt is_client)
-{
-    if (is_client)
-    {
+fn UsSocket* on_sock_open(CInt ssl, UsSocket* s, CInt is_client) {
+    if (is_client) {
         Res* r = sock_res(ssl, s);
         r.sock = s;
         if (ssl) tls_client_setup(r);
@@ -89,42 +100,33 @@ fn UsSocket* on_sock_open(CInt ssl, UsSocket* s, CInt is_client)
     r.sock = s;
     r.ssl = ssl;
     *(Res**)us_socket_ext(ssl, s) = r;
-    if (l.accept_op)
-    {
+    if (l.accept_op) {
         uint op = l.accept_op;
         l.accept_op = 0;
         resolve_number(op, r.rid);
-    }
-    else
-    {
+    } else {
         l.backlog.push(r.rid);
     }
     return s;
 }
 
-fn UsSocket* on_sock_data(CInt ssl, UsSocket* s, char[] data)
-{
+fn UsSocket* on_sock_data(CInt ssl, UsSocket* s, char[] data) {
     Res* r = sock_res(ssl, s);
     r.inbox.push_all(data);
-    if (r.read_op)
-    {
+    if (r.read_op) {
         r.deliver();
-    }
-    else if (r.inbox.len() > (sz)INBOX_HIGH)
-    {
+    } else if (r.inbox.len() > (sz)INBOX_HIGH) {
         r.pause();
     }
     return s;
 }
 
-fn UsSocket* on_sock_writable(CInt ssl, UsSocket* s)
-{
+fn UsSocket* on_sock_writable(CInt ssl, UsSocket* s) {
     sock_res(ssl, s).flush();
     return s;
 }
 
-fn UsSocket* on_sock_end(CInt ssl, UsSocket* s)
-{
+fn UsSocket* on_sock_end(CInt ssl, UsSocket* s) {
     Res* r = sock_res(ssl, s);
     r.eof = true;
     r.deliver();
@@ -133,36 +135,27 @@ fn UsSocket* on_sock_end(CInt ssl, UsSocket* s)
     return s;
 }
 
-fn UsSocket* on_sock_close(CInt ssl, UsSocket* s, CInt code)
-{
+fn UsSocket* on_sock_close(CInt ssl, UsSocket* s, CInt code) {
     Res* r = sock_res(ssl, s);
     r.gone = true;
     r.sock = null;
-    if (r.connect_op)
-    {
+    if (r.connect_op) {
         uint op = r.connect_op;
         r.connect_op = 0;
-        if (r.cert_failed)
-        {
+        if (r.cert_failed) {
             reject(op, "CERT_INVALID", string::tformat("TLS certificate for %s failed verification", r.host));
-        }
-        else
-        {
+        } else {
             reject(op, "ECONNRESET", "connection closed during the handshake");
         }
         r.closed = true;
     }
     if (code && !r.eof) r.error = Errno.ECONNRESET;
-    if (r.write_op)
-    {
+    if (r.write_op) {
         uint op = r.write_op;
         r.write_op = 0;
-        if (r.cert_failed)
-        {
+        if (r.cert_failed) {
             reject(op, "CERT_INVALID", string::tformat("TLS certificate for %s failed verification", r.host));
-        }
-        else
-        {
+        } else {
             reject(op, "EPIPE", "connection closed");
         }
     }
@@ -171,8 +164,7 @@ fn UsSocket* on_sock_close(CInt ssl, UsSocket* s, CInt code)
     return s;
 }
 
-fn UsSocket* on_sock_connect_error(CInt ssl, UsSocket* s, CInt code)
-{
+fn UsSocket* on_sock_connect_error(CInt ssl, UsSocket* s, CInt code) {
     Res* r = sock_res(ssl, s);
     r.gone = true;
     r.closed = true;
@@ -183,15 +175,13 @@ fn UsSocket* on_sock_connect_error(CInt ssl, UsSocket* s, CInt code)
     return s;
 }
 
-fn void Res.pause(&self)
-{
+fn void Res.pause(&self) {
     if (self.paused || !self.sock) return;
     self.paused = true;
     us_poll_change(self.sock, g_loop, us_poll_events(self.sock) & ~POLL_READABLE);
 }
 
-fn void Res.resume(&self)
-{
+fn void Res.resume(&self) {
     if (!self.paused || !self.sock) return;
     self.paused = false;
     us_poll_change(self.sock, g_loop, us_poll_events(self.sock) | POLL_READABLE);
@@ -199,23 +189,18 @@ fn void Res.resume(&self)
 
 // ---- writing ----
 
-fn void Res.socket_write(&self, uint op, char[] data)
-{
-    if (self.gone)
-    {
+fn void Res.socket_write(&self, uint op, char[] data) {
+    if (self.gone) {
         reject(op, "EPIPE", "connection closed");
         return;
     }
-    if (self.write_op)
-    {
+    if (self.write_op) {
         reject(op, "EBUSY", "a write is already pending");
         return;
     }
-    if (!self.outbox.len())
-    {
+    if (!self.outbox.len()) {
         CInt n = us_socket_write(self.ssl, self.sock, data.ptr, (CInt)data.len, 0);
-        if (n == data.len)
-        {
+        if (n == data.len) {
             resolve_number(op, n);
             return;
         }
@@ -226,11 +211,10 @@ fn void Res.socket_write(&self, uint op, char[] data)
     self.write_len = data.len;
 }
 
-fn void Res.flush(&self)
-{
+fn void Res.flush(&self) {
     if (!self.outbox.len() || !self.sock) return;
     char[] pending = self.outbox.array_view();
-    CInt n = us_socket_write(self.ssl, self.sock, pending.ptr, (CInt)pending.len, 0);
+    CInt n         = us_socket_write(self.ssl, self.sock, pending.ptr, (CInt)pending.len, 0);
     if (n <= 0) return;
     sz rest = (sz)self.outbox.len() - n;
     mem::move(self.outbox.entries, self.outbox.entries + n, rest);
@@ -243,8 +227,7 @@ fn void Res.flush(&self)
 
 // ---- DNS ----
 
-struct DnsTask
-{
+struct DnsTask {
     inline Task task;
     uint op;
     String host;
@@ -255,8 +238,7 @@ struct DnsTask
     CInt err;
 }
 
-struct AddrInfo
-{
+struct AddrInfo {
     CInt ai_flags;
     CInt ai_family;
     CInt ai_socktype;
@@ -267,8 +249,7 @@ struct AddrInfo
     AddrInfo* ai_next;
 }
 
-struct SockAddrIn
-{
+struct SockAddrIn {
     char sin_len;
     char sin_family;
     ushort sin_port;
@@ -280,12 +261,11 @@ extern fn void freeaddrinfo(AddrInfo* ai);
 extern fn ZString inet_ntop(CInt af, void* src, char* dst, uint size);
 extern fn ZString gai_strerror(CInt err);
 
-const CInt AF_INET = 2;
-const CInt AF_INET6 = 30;
+const CInt AF_INET     = 2;
+const CInt AF_INET6    = 30;
 const CInt SOCK_STREAM = 1;
 
-fn void dns_work(Task* t)
-{
+fn void dns_work(Task* t) {
     DnsTask* d = (DnsTask*)t;
     d.addrs.init(mem);
     AddrInfo hints = { .ai_socktype = SOCK_STREAM };
@@ -293,8 +273,7 @@ fn void dns_work(Task* t)
     d.err = getaddrinfo(d.host.zstr_copy(mem), null, &hints, &res);
     if (d.err) return;
     defer freeaddrinfo(res);
-    for (AddrInfo* a = res; a; a = a.ai_next)
-    {
+    for (AddrInfo* a = res; a; a = a.ai_next) {
         char[64] buf;
         void* src = a.ai_family == AF_INET ? (void*)&a.ai_addr.data[0] : (void*)&a.ai_addr.data[4];
         if (a.ai_family != AF_INET && a.ai_family != AF_INET6) continue;
@@ -306,45 +285,40 @@ fn void dns_work(Task* t)
     }
 }
 
-fn void dns_done(Task* t)
-{
+fn void dns_done(Task* t) {
     DnsTask* d = (DnsTask*)t;
-    defer
-    {
+    defer {
         foreach (a : d.addrs) free(a.ptr);
         d.addrs.free();
         free(d.host.ptr);
         free(d);
     }
-    @pool()
-    {
-        if (d.err)
-        {
+    @pool() {
+        if (d.err) {
             reject(d.op, "ENOTFOUND", string::tformat("cannot resolve %s: %s", d.host, gai_strerror(d.err)));
             return;
         }
-        if (!d.connect)
-        {
-            g_rt.@scope()
-            {
-                JsValue list = g_rt.array() ?? {};
-                foreach (i, a : d.addrs) (void)g_rt.set_index(list, (uint)i, g_rt.string(a) ?? {});
+        if (!d.connect) {
+            g_rt.@scope() {
+                JsValue list = g_rt.array() ?? { };
+                foreach (i, a : d.addrs) (void)g_rt.set_index(list, (uint)i, g_rt.string(a) ?? { });
                 resolve(d.op, list);
             };
             return;
         }
         // A grant by name covers what it resolves to, except internal
         // addresses, which need their own grant (see check_net_addr).
-        foreach (ip : d.addrs)
-        {
-            if (!check_net_addr(d.host, ip, d.port))
-            {
-                reject(d.op, "PERMISSION_DENIED", string::tformat("net access to %s (%s) denied", describe(d.host, d.port), ip));
+        foreach (ip : d.addrs) {
+            if (!check_net_addr(d.host, ip, d.port)) {
+                reject(
+                    d.op,
+                    "PERMISSION_DENIED",
+                    string::tformat("net access to %s (%s) denied", describe(d.host, d.port), ip)
+                );
                 return;
             }
         }
-        if (!d.addrs.len())
-        {
+        if (!d.addrs.len()) {
             reject(d.op, "ENOTFOUND", string::tformat("no addresses for %s", d.host));
             return;
         }
@@ -352,19 +326,14 @@ fn void dns_done(Task* t)
     };
 }
 
-fn void start_connect(uint op, String host, String ip, int port, CInt ssl)
-{
-    if (!g_client_ctx[ssl])
-    {
+fn void start_connect(uint op, String host, String ip, int port, CInt ssl) {
+    if (!g_client_ctx[ssl]) {
         UsContextOptions opts;
         UsContext* ctx = us_create_socket_context(ssl, g_loop, 0, opts);
         if (ssl) tls_client_init(ctx);
-        if (ssl)
-        {
+        if (ssl) {
             @callbacks(1, ctx);
-        }
-        else
-        {
+        } else {
             @callbacks(0, ctx);
         }
         g_client_ctx[ssl] = ctx;
@@ -374,8 +343,7 @@ fn void start_connect(uint op, String host, String ip, int port, CInt ssl)
     r.host = host.copy(mem);
     r.connect_op = op;
     UsSocket* s = us_socket_context_connect(ssl, g_client_ctx[ssl], ip.zstr_tcopy(), port, null, 0, (CInt)8);
-    if (!s)
-    {
+    if (!s) {
         r.closed = r.gone = true;
         res_release(r);
         reject(op, "ECONNREFUSED", string::tformat("cannot connect to %s", describe(host, port)));
@@ -385,33 +353,38 @@ fn void start_connect(uint op, String host, String ip, int port, CInt ssl)
     r.sock = s;
 }
 
-fn void dns_start(uint op, String host, int port, CInt ssl, bool connect)
-{
+fn void dns_start(uint op, String host, int port, CInt ssl, bool connect) {
     DnsTask* d = mem::new(DnsTask);
-    *d = { .task = { .work = &dns_work, .done = &dns_done }, .op = op, .host = host.copy(mem), .port = port, .ssl = ssl, .connect = connect };
+    *d = {
+        .task = { .work = &dns_work, .done = &dns_done },
+        .op = op,
+        .host = host.copy(mem),
+        .port = port,
+        .ssl = ssl,
+        .connect = connect
+    };
     submit(d);
 }
 
 // ---- natives ----
 
-fn String denied_msg(String host, int port) => string::tformat("net access to \"%s\" denied; run with --allow-net", describe(host, port));
+fn String denied_msg(
+    String host,
+    int port
+) => string::tformat("net access to \"%s\" denied; run with --allow-net", describe(host, port));
 
 // connect(op, host, port, tls) -> rid
-fn void js_connect(JsCtx ctx, void* udata)
-{
+fn void js_connect(JsCtx ctx, void* udata) {
     uint op = ctx.arg(0).id();
-    @pool()
-    {
+    @pool() {
         String host = ctx.arg(1).as_string() ?? "";
-        int port = ctx.arg(2).as_int(-1);
-        CInt ssl = ctx.arg(3).as_bool() ?? false ? 1 : 0;
-        if (port < 0 || port > 65535)
-        {
+        int port    = ctx.arg(2).as_int(-1);
+        CInt ssl    = ctx.arg(3).as_bool() ?? false ? 1 : 0;
+        if (port < 0 || port > 65535) {
             reject(op, "EINVAL", "invalid port");
             return;
         }
-        if (!check_net(host, port))
-        {
+        if (!check_net(host, port)) {
             reject(op, "PERMISSION_DENIED", denied_msg(host, port));
             return;
         }
@@ -420,14 +393,11 @@ fn void js_connect(JsCtx ctx, void* udata)
 }
 
 // resolve(op, host) -> [address]
-fn void js_resolve(JsCtx ctx, void* udata)
-{
+fn void js_resolve(JsCtx ctx, void* udata) {
     uint op = ctx.arg(0).id();
-    @pool()
-    {
+    @pool() {
         String host = ctx.arg(1).as_string() ?? "";
-        if (!check_net(host, -1))
-        {
+        if (!check_net(host, -1)) {
             reject(op, "PERMISSION_DENIED", denied_msg(host, -1));
             return;
         }
@@ -436,14 +406,11 @@ fn void js_resolve(JsCtx ctx, void* udata)
 }
 
 // listen(host, port) -> rid
-fn void js_listen(JsCtx ctx, void* udata)
-{
-    @pool()
-    {
+fn void js_listen(JsCtx ctx, void* udata) {
+    @pool() {
         String host = ctx.arg(0).as_string() ?? "0.0.0.0";
-        int port = ctx.arg(1).as_int(0);
-        if (!check_net(host, port))
-        {
+        int port    = ctx.arg(1).as_int(0);
+        if (!check_net(host, port)) {
             ctx.throw_coded("PERMISSION_DENIED", denied_msg(host, port));
             return;
         }
@@ -454,8 +421,7 @@ fn void js_listen(JsCtx ctx, void* udata)
         l.ctx = uc;
         *(Res**)us_socket_context_ext(0, uc) = l;
         l.listener = us_socket_context_listen(0, uc, host.zstr_tcopy(), port, 0, (CInt)8);
-        if (!l.listener)
-        {
+        if (!l.listener) {
             l.closed = l.gone = true;
             res_release(l);
             ctx.throw_coded("EADDRINUSE", string::tformat("could not listen on %s", describe(host, port)));
@@ -466,39 +432,32 @@ fn void js_listen(JsCtx ctx, void* udata)
 }
 
 // accept(op, lid) -> rid, or null once the listener is closed
-fn void js_accept(JsCtx ctx, void* udata)
-{
+fn void js_accept(JsCtx ctx, void* udata) {
     uint op = ctx.arg(0).id();
-    Res* l = res_find(ctx.arg(1).id());
-    if (!l || l.kind != LISTENER || l.closed)
-    {
+    Res* l  = res_find(ctx.arg(1).id());
+    if (!l || l.kind != LISTENER || l.closed) {
         reject(op, "EBADF", "bad listener id");
         return;
     }
-    if (l.backlog.len())
-    {
+    if (l.backlog.len()) {
         resolve_number(op, l.backlog.pop_first()!!);
         return;
     }
     l.accept_op = op;
 }
 
-fn void js_close_write(JsCtx ctx, void* udata)
-{
+fn void js_close_write(JsCtx ctx, void* udata) {
     Res* r = ctx.res();
     if (!r || r.kind != SOCKET || r.gone) return;
     us_socket_shutdown(r.ssl, r.sock);
 }
 
 // addr(rid) -> [localPort, remoteAddress, remotePort]
-fn void js_addr(JsCtx ctx, void* udata)
-{
+fn void js_addr(JsCtx ctx, void* udata) {
     Res* r = ctx.res();
     if (!r) return;
-    @pool()
-    {
-        if (r.kind == LISTENER)
-        {
+    @pool() {
+        if (r.kind == LISTENER) {
             ctx.ret_string(string::tformat("%d", us_socket_local_port(0, (UsSocket*)r.listener)));
             return;
         }
@@ -507,9 +466,11 @@ fn void js_addr(JsCtx ctx, void* udata)
         CInt len = 64;
         us_socket_remote_address(r.ssl, r.sock, &raw, &len);
         char[64] text;
-        CInt af = len == 4 ? AF_INET : AF_INET6;
+        CInt af   = len == 4 ? AF_INET : AF_INET6;
         String ip = inet_ntop(af, &raw, &text, 64) ? ((ZString)&text).str_view() : "";
-        ctx.ret_string(string::tformat("%d %s %d", us_socket_local_port(r.ssl, r.sock), ip, us_socket_remote_port(r.ssl, r.sock)));
+        ctx.ret_string(
+            string::tformat("%d %s %d", us_socket_local_port(r.ssl, r.sock), ip, us_socket_remote_port(r.ssl, r.sock))
+        );
     };
 }
 
