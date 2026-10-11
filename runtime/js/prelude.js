@@ -1132,6 +1132,11 @@ const BLOB_JSON = "content-type\n" + CT_JSON + "\n";
 // content-type as a constant blob and never builds a Headers.
 class Response {
     constructor(body, init) {
+        if (init === undefined && body instanceof Uint8Array) {
+            this._ct = null;
+            this._body = body;
+            return;
+        }
         if (typeof body === "string" && init === undefined) {
             this._body = body;
             return;
