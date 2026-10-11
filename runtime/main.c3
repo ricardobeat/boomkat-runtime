@@ -288,7 +288,7 @@ fn void? boot() {
 
 fn void usage() {
     io::eprintn(
-        "usage: bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] script.js [args...]"
+        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] script.js [args...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
 }
@@ -333,6 +333,10 @@ fn void? parse_args(String[] argv) {
 }
 
 fn int main(String[] argv) {
+    if (argv.len == 3 && argv[1] == "check") {
+        init_perms();
+        return check_main(argv[2]);
+    }
     init_perms();
     g_perms.prompt = libc::isatty(0) != 0 && libc::isatty(2) != 0;
     if (catch parse_args(argv)) {
