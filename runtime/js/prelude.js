@@ -196,6 +196,30 @@ def("EventTarget", EventTarget);
 def("AbortSignal", AbortSignal);
 def("AbortController", AbortController);
 
+// ---- the global scope as an event target ----
+
+const globalEvents = new EventTarget();
+def("addEventListener", globalEvents.addEventListener.bind(globalEvents));
+def("removeEventListener", globalEvents.removeEventListener.bind(globalEvents));
+def("dispatchEvent", globalEvents.dispatchEvent.bind(globalEvents));
+
+class PromiseRejectionEvent extends Event {
+    constructor(type, init) {
+        super(type, init);
+        this.promise = init.promise;
+        this.reason = init.reason;
+    }
+}
+def("PromiseRejectionEvent", PromiseRejectionEvent);
+
+bk.unhandled = function (reason, promise) {
+    const ev = new PromiseRejectionEvent("unhandledrejection", { reason, promise, cancelable: true });
+    globalEvents.dispatchEvent(ev);
+    return ev.defaultPrevented;
+};
+
+bk.describe = (v) => v instanceof Error && v.stack ? v.stack : typeof v === "string" ? v : JSON.stringify(v) ?? String(v);
+
 // ---- timers ----
 
 const timers = new Map();

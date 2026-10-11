@@ -118,8 +118,7 @@ fn void settle(uint id, bool ok, JsValue value = {}, String code = "")
             value,
             code.len ? g_rt.string(code) ?? {} : (JsValue){},
         };
-        JsValue? r = g_rt.call(g_settle, args[..]);
-        if (catch r) report_uncaught();
+        (void)call_js(g_settle, args[..]);
     };
 }
 

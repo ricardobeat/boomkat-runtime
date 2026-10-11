@@ -6,7 +6,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 - [x] `serve` on uWS, streaming responses, byte bodies
 - [x] Permissions: deny by default, `--allow-*`/`--deny-*`, `boomkat.toml`, TTY prompts
 - [x] Uint8Array access from C3 (no engine change needed)
-- [ ] Unhandled rejections and CPU-time interrupts (engine hooks landing on boomkat main)
+- [x] Unhandled rejections (`unhandledrejection` event, else exit 1) and `--time-limit` watchdog
 - [ ] Resource table: `read`/`write`/`close` on rids, stdio as rids 0-2
 - [ ] `net`: `connect`, `listen`, `resolve`, with the DNS re-check
 - [ ] `file`: `open`, `read`/`write`, `readText`/`writeText`, `stat`, `list`, `mkdir`, `remove`, `rename`

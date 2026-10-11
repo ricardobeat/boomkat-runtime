@@ -24,6 +24,7 @@ const Builtin[] BUILTINS = {
 };
 
 List{String} g_args;
+long g_time_limit_ms;
 String g_main;
 
 fn void exit_now() => libc::exit(g_exit_code);
@@ -46,8 +47,7 @@ fn void on_js_timer(void* user)
     g_rt.@scope()
     {
         JsValue[1] args = { g_rt.number(id) ?? {} };
-        JsValue? r = g_rt.call(g_timer_fire, args[..]);
-        if (catch r) report_uncaught();
+        (void)call_js(g_timer_fire, args[..]);
     };
 }
 
@@ -305,12 +305,15 @@ fn void? boot()
     g_dispatch = bk_get("dispatch")!;
     g_drain = bk_get("drain")!;
     g_aborted = bk_get("aborted")!;
+    g_unhandled = bk_get("unhandled")!;
+    g_describe = bk_get("describe")!;
+    init_guard();
     init_http()!;
 }
 
 fn void usage()
 {
-    io::eprintn("usage: bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--config file] script.js [args...]");
+    io::eprintn("usage: bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--config file] [--time-limit=ms] script.js [args...]");
     io::eprintn("permissions: net read write env run ffi sys import");
 }
 
@@ -325,6 +328,11 @@ fn void? parse_args(String[] argv)
         if (a == "--config" && i + 1 < argv.len)
         {
             config = argv[++i];
+            continue;
+        }
+        if (a.starts_with("--time-limit="))
+        {
+            g_time_limit_ms = a[13..].to_long() ?? USAGE~!;
             continue;
         }
         if (!parse_perm_flag(a)!) return USAGE~;
@@ -347,7 +355,7 @@ fn void? parse_args(String[] argv)
             io::eprintfn("error: bad config %s: %s", config, err);
             return USAGE~;
         }
-        for (usz j = 1; j < i; j++) if (argv[j] != "--config") (void)parse_perm_flag(argv[j]);
+        for (usz j = 1; j < i; j++) (void)parse_perm_flag(argv[j]);
     }
 }
 
@@ -378,6 +386,8 @@ fn int main(String[] argv)
         return 1;
     }
     g_rt.release(ns);
+    flush_rejections();
+    if (g_time_limit_ms) start_watchdog(g_time_limit_ms);
     uws_loop_run();
     return g_exit_code;
 }

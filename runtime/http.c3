@@ -246,8 +246,10 @@ fn void dispatch(Conn* c, String method, char[] body, bool has_body)
             m,
             has_body ? bytes_value(copy_bytes(body)) ?? {} : (JsValue){},
         };
-        JsValue? r = g_rt.call(g_dispatch, args[..]);
-        if (catch r) report_uncaught();
+        if (catch call_js(g_dispatch, args[..]))
+        {
+            if (conn_find(c.id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
+        }
     };
 }
 
@@ -432,8 +434,7 @@ fn void call_conn(JsValue f, uint id)
     g_rt.@scope()
     {
         JsValue[1] args = { g_rt.number(id) ?? {} };
-        JsValue? r = g_rt.call(f, args[..]);
-        if (catch r) report_uncaught();
+        (void)call_js(f, args[..]);
     };
 }
 
