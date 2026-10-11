@@ -324,6 +324,8 @@ fn void? boot() {
     g_settle = bk_get("settle")!;
     g_timer_fire = bk_get("timerFire")!;
     g_dispatch = bk_get("dispatch")!;
+    g_handled = bk_get("handled")!;
+    g_failed = bk_get("failed")!;
     g_drain = bk_get("drain")!;
     g_aborted = bk_get("aborted")!;
     g_unhandled = bk_get("unhandled")!;

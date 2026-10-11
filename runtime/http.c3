@@ -3,6 +3,10 @@
 module bkr;
 
 import boomkat;
+import boomkat::heap;
+import boomkat::hobject;
+import boomkat::hstring;
+import boomkat::types;
 import std::io;
 import std::collections::list;
 import std::collections::map;
@@ -53,6 +57,8 @@ struct Server {
     JsValue index_value;
     bool stopped;
     HashMap{String, Static} statics;
+    JsValue fetch;
+    JsValue server_value;
 }
 
 // A response fixed at serve() time, answered without entering JS.
@@ -93,6 +99,27 @@ uint g_generation;
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
 JsValue[METHODS.len] g_methods;
 JsValue g_dispatch;
+JsValue g_handled;
+JsValue g_failed;
+
+// What the native request path needs to build a Request and read a
+// Response without running the prelude's JS.
+struct FastTypes {
+    HObject* request_proto;
+    HObject* response_proto;
+    TVal ct_text;
+    TVal ct_json;
+    HString* k_method;
+    HString* k_id;
+    HString* k_body;
+    HString* k_headers;
+    HString* k_used;
+    HString* k_status;
+    HString* k_ct;
+    JsValue[7] keep;
+}
+
+FastTypes g_fast;
 JsValue g_drain;
 JsValue g_aborted;
 
@@ -212,7 +239,109 @@ fn void Conn.capture(&self, String method) {
 
 // ---- dispatch ----
 
+fn HString* fast_key(usz i, String name) {
+    JsValue v = g_rt.string(name)!!;
+    g_fast.keep[i] = v;
+    TVal tv;
+    g_rt.load(v, &tv);
+    return (HString*)tv.get_heapptr();
+}
+
+// fastTypes(Request.prototype, Response.prototype, ctText, ctJson)
+fn void js_fast_types(JsCtx ctx, void* udata) {
+    if (!ctx.arg(0).tv.is_object() || !ctx.arg(1).tv.is_object()) return;
+    g_fast.request_proto = (HObject*)ctx.arg(0).tv.get_heapptr();
+    g_fast.response_proto = (HObject*)ctx.arg(1).tv.get_heapptr();
+    g_fast.ct_text = ctx.arg(2).tv;
+    g_fast.ct_json = ctx.arg(3).tv;
+    for (uint i = 0; i < 4; i++) (void)ctx.persist(ctx.arg(i));
+    g_fast.k_method = fast_key(0, "method");
+    g_fast.k_id = fast_key(1, "_id");
+    g_fast.k_body = fast_key(2, "_body");
+    g_fast.k_headers = fast_key(3, "_headers");
+    g_fast.k_used = fast_key(4, "_used");
+    g_fast.k_status = fast_key(5, "status");
+    g_fast.k_ct = fast_key(6, "_ct");
+}
+
+// fetchFor(index, fetch, server): call this server's handler straight from C3.
+fn void js_fetch_for(JsCtx ctx, void* udata) {
+    uint index = ctx.arg(0).id();
+    foreach (s : g_servers) {
+        if (s.index != index) continue;
+        s.fetch = ctx.persist(ctx.arg(1)) ?? { };
+        s.server_value = ctx.persist(ctx.arg(2)) ?? { };
+    }
+}
+
+fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
+    Heap* h      = g_rt.rt.heap;
+    HObject* req = h.alloc_object(OBJECT)!;
+    h.set_prototype(req, g_fast.request_proto);
+    TVal m;
+    g_rt.load(method, &m);
+    TVal id;
+    id.set_number((double)c.id);
+    req.put_prop(g_fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
+    req.put_prop(g_fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
+    if (has_body) {
+        TVal b;
+        b.set_object(new_u8(copy_bytes(body))!);
+        req.put_prop(g_fast.k_body, b, hobject::PROP_FLAGS_WEC, h);
+    }
+    TVal rv;
+    rv.set_object(req);
+    return g_rt.root(rv);
+}
+
+fn TVal fast_get(HObject* o, HString* key) {
+    TVal v = o.get_prop_proto(key, g_rt.rt.heap) ?? (TVal) { };
+    return v;
+}
+
+// A plain 200 Response with a string, bytes or empty body and no Headers
+// object is written from C3; anything else goes back to the prelude.
+fn bool respond_fast(Conn* c, JsValue result) {
+    TVal rv;
+    if (!g_rt.load(result, &rv) || !rv.is_object()) return false;
+    HObject* o = (HObject*)rv.get_heapptr();
+    if (o.prototype != g_fast.response_proto) return false;
+    if (!fast_get(o, g_fast.k_headers).is_null()) return false;
+    TVal used = fast_get(o, g_fast.k_used);
+    if (!used.is_boolean() || used.get_boolean()) return false;
+    TVal status = fast_get(o, g_fast.k_status);
+    if (!status.is_fastint() || status.get_fastint() != 200) return false;
+    TVal ct = fast_get(o, g_fast.k_ct);
+    String blob;
+    if (ct.is_null()) {
+        blob = "";
+    } else if (ct.is_string() && ct.get_heapptr() == g_fast.ct_text.get_heapptr()) {
+        blob = BLOB_TEXT;
+    } else if (ct.is_string() && ct.get_heapptr() == g_fast.ct_json.get_heapptr()) {
+        blob = BLOB_JSON;
+    } else {
+        return false;
+    }
+    TVal b     = fast_get(o, g_fast.k_body);
+    JsArg body = { .tv = b };
+    if (!b.is_null() && !b.is_string() && !body.is_bytes()) return false;
+    TVal t;
+    t.set_boolean(true);
+    o.put_prop(g_fast.k_used, t, hobject::PROP_FLAGS_WEC, g_rt.rt.heap);
+    @pool() {
+        finish(c, 200, "", blob, b.is_null() ? (char[]) { } : body.bytes());
+    };
+    return true;
+}
+
+const String BLOB_TEXT = "content-type\ntext/plain;charset=UTF-8\n";
+const String BLOB_JSON = "content-type\napplication/json\n";
+
 fn void dispatch(Conn* c, String method, char[] body, bool has_body) {
+    if (!c.server.fetch.is_empty() && g_fast.request_proto) {
+        dispatch_fast(c, method, body, has_body);
+        return;
+    }
     JsValue m;
     bool cached;
     foreach (i, name : METHODS) {
@@ -232,6 +361,41 @@ fn void dispatch(Conn* c, String method, char[] body, bool has_body) {
         };
         if (catch call_js(g_dispatch, args[..])) {
             if (conn_find(c.id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
+        }
+    };
+}
+
+fn JsValue method_value(String method) {
+    foreach (i, name : METHODS) if (name == method) return g_methods[i];
+    return g_rt.string(method) ?? { };
+}
+
+fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
+    Server* s = c.server;
+    uint id   = c.id;
+    g_rt.@scope() {
+        JsValue? req = new_request(c, method_value(method), body, has_body);
+        if (catch req) return;
+        JsValue thrown;
+        JsValue[2] args = { req, s.server_value };
+        JsValue? r      = call_catch(s.fetch, args[..], &thrown);
+        if (catch err = r) {
+            if (thrown.is_empty()) {
+                if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
+                return;
+            }
+            JsValue[3] fa = { s.index_value, g_rt.number(id) ?? { }, thrown };
+            if (catch call_js(g_failed, fa[..])) {
+                if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
+            }
+            return;
+        }
+        defer if (g_depth == 0 && g_rejections.len()) flush_rejections();
+        if (conn_find(id) != c || !c.res) return;
+        if (respond_fast(c, r)) return;
+        JsValue[3] ha = { s.index_value, g_rt.number(id) ?? { }, r };
+        if (catch call_js(g_handled, ha[..])) {
+            if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
         }
     };
 }
@@ -542,6 +706,8 @@ fn void js_stop(JsCtx ctx, void* udata) {
 const Native[] HTTP_NATIVES = {
     { "serve", &js_serve, 3 },
     { "staticRoute", &js_static_route, 6 },
+    { "fastTypes", &js_fast_types, 4 },
+    { "fetchFor", &js_fetch_for, 3 },
     { "stop", &js_stop, 2 },
     { "respond", &js_respond, 5 },
     { "streamStart", &js_stream_start, 4 },

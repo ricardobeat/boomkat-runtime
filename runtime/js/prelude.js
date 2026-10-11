@@ -1294,7 +1294,7 @@ function joinChunks(parts, size) {
 // feeds a local batch instead of the stream's queue and promises.
 function directSource(stream) {
     const src = stream._source;
-    return stream._reader === null && stream._state === "readable" && stream._queue.length === 0 && !src.start && typeof src.pull === "function";
+    return stream._reader === null && stream._state === "readable" && !stream._pulling && !src.start && typeof src.pull === "function";
 }
 
 const isThenable = (r) => r !== undefined && r !== null && typeof r.then === "function";
@@ -1338,6 +1338,10 @@ function pump(id, res) {
     stream._reader = stream;
     const src = stream._source;
     const sink = new Sink();
+    // The stream may have pulled once already, before the response reached us.
+    for (const c of stream._queue) sink.enqueue(c);
+    stream._queue = [];
+    if (stream._closeRequested) sink.closed = true;
     // Chunks that arrive together go out as one write; a source that
     // produces synchronously never leaves this loop or makes a promise.
     try {
@@ -1432,6 +1436,16 @@ function send(id, res) {
     if (b instanceof ReadableStream) { pump(id, res); return; }
     bk.respond(id, st, st === 200 ? "" : res.statusText, res._blob(), b === null ? "" : b);
 }
+
+bk.handled = function (index, id, r) {
+    const h = handlers[index];
+    if (r instanceof Response) { send(id, r); return; }
+    Promise.resolve(r).then((res) => send(id, res), (e) => fail(id, e, h));
+};
+
+bk.failed = function (index, id, e) { fail(id, e, handlers[index]); };
+
+bk.fastTypes(Request.prototype, Response.prototype, CT_TEXT, CT_JSON);
 
 bk.dispatch = function (index, id, method, body) {
     const h = handlers[index];

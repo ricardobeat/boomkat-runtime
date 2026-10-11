@@ -154,6 +154,41 @@ fn void JsCtx.throw_coded(self, String code, String msg) {
 int g_exit_code;
 
 // An exception escaped into the loop. Like Deno, that ends the process.
+// Calls `f` like call_js, but a JS throw comes back as the thrown value in
+// `thrown` instead of ending the process. Rejections are left for the
+// caller to flush once it has handled the result.
+fn JsValue? call_catch(JsValue f, JsValue[] args, JsValue* thrown) {
+    g_depth++;
+    defer g_depth--;
+    TVal fv;
+    if (!g_rt.load(f, &fv)) return boomkat::STALE_VALUE~;
+    TVal[4] argv;
+    foreach (i, a : args) if (!g_rt.load(a, &argv[i])) argv[i].set_undefined();
+    TVal this_tv;
+    this_tv.set_undefined();
+    Heap* h = g_rt.rt.heap;
+    h.has_error = false;
+    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, now_ns());
+    TVal res = h.call_fn((void*)g_rt.rt.vm, fv, &argv, (uint)args.len, this_tv);
+    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, (ulong)0);
+    if (h.uncatchable_throw) {
+        g_rt.clear_interrupt();
+        io::eprintfn("error: script ran past the %d ms time limit", g_time_limit_ns / 1_000_000);
+        h.has_error = false;
+        return TIMED_OUT~;
+    }
+    if (h.has_error) {
+        h.has_error = false;
+        Vm* vm = (Vm*)g_rt.rt.vm;
+        vm.has_error = false;
+        vm.throw_pending = false;
+        *thrown = g_rt.root(h.error_value)!;
+        h.error_value.set_undefined();
+        return boomkat::JS_EXCEPTION~;
+    }
+    return g_rt.root(res);
+}
+
 fn void report_uncaught() {
     io::eprintfn("error: %s", g_rt.last_error());
     g_exit_code = 1;

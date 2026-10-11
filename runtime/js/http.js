@@ -32,6 +32,7 @@ export function serve(opts, fetch) {
         },
     };
     h.server = server;
+    bk.fetchFor(index, fetch, server);
     if (opts.onListen) opts.onListen(server);
     return server;
 }
