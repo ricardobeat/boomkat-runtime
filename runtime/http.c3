@@ -975,6 +975,8 @@ const Native[] HTTP_NATIVES = {
     { "streamStart", &js_stream_start, 4 },
     { "streamWrite", &js_stream_write, 2 },
     { "streamFinish", &js_stream_finish, 2 },
+    { "sinkTypes", &js_sink_types, 4 },
+    { "sinkEnqueue", &js_sink_enqueue, 1 },
     { "streamEnd", &js_stream_end, 1 },
     { "reqUrl", &js_req_url, 1 },
     { "reqHeaders", &js_req_headers, 1 },

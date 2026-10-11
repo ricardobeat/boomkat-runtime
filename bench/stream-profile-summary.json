@@ -1,0 +1,34 @@
+{
+  "engine": "2bdab09b",
+  "runtime": "f73129c plus constant stream checks committed with report",
+  "method": "3 x2s macOS sample captures of actual /stream,1ms interval,main-thread exclusive samples",
+  "total_samples": 4787,
+  "categories_percent": {
+    "VM dispatch/handlers, including cached property operations": 44.5,
+    "Property lookup helpers": 7.8,
+    "Heap/GC and object allocation/destruction": 10.4,
+    "sendto/recvfrom system calls": 21.9
+  },
+  "top_self_samples": {
+    "__sendto": 763,
+    "boomkat.vm.vm_dispatch": 413,
+    "__recvfrom": 284,
+    "boomkat.hobject.HObject.find_prop_idx": 249,
+    "boomkat.vm.th_getpropc_cached": 159,
+    "boomkat.vm.th_ldreg": 147,
+    "boomkat.vm.th_call": 128,
+    "boomkat.vm.th_if": 121,
+    "_platform_memmove": 97,
+    "_platform_memset": 93,
+    "boomkat.vm.th_ldconst": 84,
+    "boomkat.hobject.hobject_free_impl": 77,
+    "boomkat.vm.th_return_general": 72,
+    "boomkat.vm.dispatch_calls": 71,
+    "boomkat.vm.th_getvar": 70,
+    "boomkat.vm.th_getcap": 69,
+    "boomkat.vm.th_ldthis": 61,
+    "boomkat.hobject.HObject.find_accessor_proto": 61,
+    "boomkat.hobject.hobject_free_step": 56,
+    "boomkat.vm.dispatch_misc": 55
+  }
+}

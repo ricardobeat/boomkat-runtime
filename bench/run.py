@@ -62,7 +62,9 @@ def parse(out):
     v, u = re.search(r"Latency\s+[\d.]+\w+\s+[\d.]+\w+\s+([\d.]+)(us|ms|s)", out).groups()
     lat["max"] = ms(v, u)
     errs = re.search(r"Non-2xx or 3xx responses: (\d+)", out)
-    return rps, lat, int(errs.group(1)) if errs else 0
+    socket_errs = re.search(r"Socket errors: connect (\d+), read (\d+), write (\d+), timeout (\d+)", out)
+    errors = (int(errs.group(1)) if errs else 0) + (sum(map(int, socket_errs.groups())) if socket_errs else 0)
+    return rps, lat, errors
 
 results = {}
 for name in CMD:
@@ -90,11 +92,17 @@ for name in CMD:
     proc.terminate(); proc.wait()
 
 print(f"\nwrk -t2 -c{CONNS} -d{SECS}s, loopback, one server process each\n")
-print("| workload | runtime | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MB |")
-print("|---|---|---:|---:|---:|---:|---:|---:|")
+print("Values in each cell: Boomkat / Node / Bun. Error counts include socket and HTTP errors.\n")
+print("| workload | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MiB |")
+print("|---|---:|---:|---:|---:|---:|---:|")
 for label, _, _ in WORKLOADS:
+    cells = [[] for _ in range(6)]
     for name in CMD:
-        if (label, name) not in results: continue
+        if (label, name) not in results:
+            for cell in cells: cell.append("—")
+            continue
         rps, lat, cpu, rss, errs = results[(label, name)]
         flag = f" ({errs} errors)" if errs else ""
-        print(f"| {label} | {name} | {rps:,.0f}{flag} | {lat['50']:.2f} | {lat['99']:.2f} | {lat['max']:.1f} | {cpu:.0f} | {rss:.0f} |")
+        values = [f"{rps:,.0f}{flag}", f"{lat['50']:.2f}", f"{lat['99']:.2f}", f"{lat['max']:.1f}", f"{cpu:.0f}", f"{rss:.0f}"]
+        for cell, value in zip(cells, values): cell.append(value)
+    print(f"| {label} | " + " | ".join(" / ".join(cell) for cell in cells) + " |")

@@ -308,12 +308,12 @@ class ReadableStream {
         this._queue = [];
         this._reads = [];
         this._reader = null;
-        this._error = undefined;
+        this._error = void 0;
         this._closeRequested = false;
         this._pulling = false;
         this._repull = false;
         this._started = false;
-        this._hwm = strategy.highWaterMark === undefined ? 1 : strategy.highWaterMark;
+        this._hwm = strategy.highWaterMark === void 0 ? 1 : strategy.highWaterMark;
         this._controller = new ReadableStreamDefaultController(this);
         this._closed = null;
         const begun = () => { this._started = true; this._pullIfNeeded(); };
@@ -342,7 +342,7 @@ class ReadableStream {
         let r;
         try { r = this._source.pull(this._controller); }
         catch (e) { this._pulling = false; this._fail(e); return; }
-        if (r !== undefined && r !== null && typeof r.then === "function") {
+        if (r !== void 0 && r !== null && typeof r.then === "function") {
             r.then(() => this._pullDone(), (e) => this._fail(e));
         } else {
             this._pullDone();
@@ -1230,7 +1230,7 @@ function directSource(stream) {
     return stream._reader === null && stream._state === "readable" && !stream._pulling && !src.start && typeof src.pull === "function";
 }
 
-const isThenable = (r) => r !== undefined && r !== null && typeof r.then === "function";
+const isThenable = (r) => r !== void 0 && r !== null && typeof r.then === "function";
 
 // Stands in for the stream controller while a direct source is pumped.
 class Sink {
@@ -1266,6 +1266,9 @@ class Sink {
     }
 }
 
+bk.sinkTypes(Sink.prototype.enqueue, globalThis, Uint8Array, Symbol.hasInstance);
+Object.defineProperty(Sink.prototype, "enqueue", { value: bk.sinkEnqueue, writable: true, configurable: true });
+
 function pump(id, res) {
     const stream = res._body;
     if (!bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob())) {
@@ -1287,8 +1290,8 @@ function pump(id, res) {
         while (!sink.closed && sink.size < BATCH) {
             const size = sink.size;
             const r = src.pull(sink);
-            if (!sink.closed && sink.size === size && (r === undefined || !isThenable(r))) { pumpSource(id, stream, sink, undefined); return; }
-            if (r !== undefined && isThenable(r)) { pumpSource(id, stream, sink, r); return; }
+            if (!sink.closed && sink.size === size && (r === void 0 || !isThenable(r))) { pumpSource(id, stream, sink, undefined); return; }
+            if (r !== void 0 && isThenable(r)) { pumpSource(id, stream, sink, r); return; }
         }
         if (!sink.hasError && sink.parts.length > 0 && !sink.closed) { pumpSource(id, stream, sink, undefined); return; }
         if (!sink.hasError && sink.parts.length > 0) {
@@ -1345,7 +1348,7 @@ async function pumpSource(id, stream, sink, waiting) {
             while (!sink.closed && !pulling && sink.size < BATCH && !s.aborted) {
                 const size = sink.size;
                 const r = src.pull(sink);
-                if (r !== undefined && isThenable(r)) track(r);
+                if (r !== void 0 && isThenable(r)) track(r);
                 else if (!sink.closed && sink.size === size) await s.wait(new Promise((resolve) => setImmediate(resolve)));
             }
             if (s.aborted) break;

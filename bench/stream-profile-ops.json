@@ -1,0 +1,20 @@
+{
+  "zero": {
+    "total_dispatches": 3868
+  },
+  "bytes": {
+    "total_dispatches": 74868
+  },
+  "one": {
+    "total_dispatches": 659870
+  },
+  "batch": {
+    "total_dispatches": 1319870
+  },
+  "stream": {
+    "total_dispatches": 1162869
+  },
+  "many": {
+    "total_dispatches": 5140869
+  }
+}

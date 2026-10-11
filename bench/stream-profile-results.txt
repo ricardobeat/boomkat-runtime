@@ -1,0 +1,96 @@
+Profile of the remaining 8 KiB streaming gap
+
+This captures the JS controller before native enqueue. The subsequent change,
+paired measurements and latest full suite are in server-stream-native-results.txt.
+
+Code sampled: engine 2bdab09b, runtime f73129c plus constant stream checks.
+Three independent macOS sample captures, 2s each, at 1ms intervals after 1s warm-up.
+Actual bench/servers/bkr.js /stream, optimized threaded bkr-perf, wrk -t2 -c128.
+Main-thread exclusive samples only; worker-thread waits are excluded. Sampling and
+opcode instrumentation are separate from timed benchmarks. Symbol attribution can
+include inlined code and is not a JavaScript source-level timing profile.
+
+Total main-thread samples: 4787
+VM dispatch/handlers, including cached property operations: 44.5%
+Property lookup helpers: 7.8%
+Heap/GC and object allocation/destruction: 10.4%
+sendto/recvfrom system calls: 21.9%
+
+Top exclusive native symbols:
+15.9%  __sendto
+8.6%  boomkat.vm.vm_dispatch
+5.9%  __recvfrom
+5.2%  boomkat.hobject.HObject.find_prop_idx
+3.3%  boomkat.vm.th_getpropc_cached
+3.1%  boomkat.vm.th_ldreg
+2.7%  boomkat.vm.th_call
+2.5%  boomkat.vm.th_if
+2.0%  _platform_memmove
+1.9%  _platform_memset
+1.8%  boomkat.vm.th_ldconst
+1.6%  boomkat.hobject.hobject_free_impl
+
+Fixed-body diagnostics (always 8192 bytes):
+A fresh server per runtime/case; 1s warm-up +2s measured; wrk -t2 -c128.
+These ablations ran before the constant-check change, with the new engine caches.
+Handlers mirror the benchmark structure and preallocate chunks. All Boomkat/Bun
+cases had zero reported socket/HTTP errors. They are single samples, not paired
+optimization measurements. Node's Web Stream cases use Readable.fromWeb(...).pipe(res).
+
+| Body form | Boomkat req/s | p50 / p99 ms | Bun req/s | p50 / p99 ms | VM instructions / request |
+|---|---:|---:|---:|---:|---:|
+| Byte body | 194,280 | 0.62 / 1.25 | 174,818 | 0.68 / 1.40 | 71 |
+| 1 chunk, 2 pulls | 76,186 | 1.53 / 2.97 | 123,241 | 1.00 / 1.60 | 656 |
+| 8 chunks in one pull | 57,759 | 2.05 / 3.47 | 121,787 | 1.03 / 1.42 | 1,316 |
+| 8 chunks, 9 pulls | 58,561 | 2.02 / 3.31 | 102,121 | 1.20 / 2.04 | 1,159 |
+| 64 chunks, 65 pulls | 23,167 | 5.46 / 6.38 | 45,989 | 2.71 / 3.46 | 5,137 |
+
+Instruction counts use a separately built, non-threaded OP_PROFILE executable:
+  c3c build bkr-perf-prof
+  python3 bench/profile_stream.py ops
+They count structural VM work, not CPU cost of the production threaded handlers.
+Each case sends 1000 requests; the zero-request startup/stop count is subtracted.
+The opcode diagnostics use the final constant-check code. Per extra chunk, the
+1/8/64-chunk cases add about 71–72 instructions, 3 CALL opcodes, 15 LDREG register
+copies, and 9 GETPROPC_CACHED reads. The 8-chunk path has about 41 CALL opcodes and
+6 NEWARR instructions per request; a threaded CALL need not create a full frame.
+
+The constant change removes global undefined lookups: 12,003 ->1,003 reads and
+7,999 ->0 scope-cache head misses across 1000 requests. void 0 emits more cheap
+instructions in this compiler, while eliminating the expensive name lookup.
+
+Interpretation:
+- Most of the fixed overhead is present before adding seven more chunks: a single
+  chunk stream is much slower than a byte body. Stream/controller initialization,
+  queue bookkeeping, the startup microtask and first pull are the major fixed path.
+  This is an inference from ablations and code inspection, not per-function timing.
+- Additional chunks add repeatable VM work in pull/enqueue/push, property reads,
+  register copies and type checks. The VM/lookup sample share exceeds socket time.
+- Batching all eight chunks in the first pull does not remove the startup queue:
+  fetch invocation drains microtasks, so the initial pull runs through the normal
+  controller before the HTTP direct pump takes over. It then transfers queued
+  chunks into Sink. Changing microtask order would change observable behavior.
+- The next larger lever is stream-state/controller initialization and the first
+  queued pull, followed by reducing per-chunk interpreter work in Sink.enqueue.
+
+Node API diagnostic:
+bytes: 117,723 req/s, p50/p99 1.04/2.05 ms, socket errors 0
+one: 71,741 req/s, p50/p99 1.72/4.92 ms, socket errors 0
+batch: 27,986 req/s, p50/p99 4.49/162.06 ms, socket errors 94
+stream: 27,407 req/s, p50/p99 4.53/174.22 ms, socket errors 0
+many: 4,803 req/s, p50/p99 22.71/1290.00 ms, socket errors 1292
+direct: 83,509 req/s, p50/p99 1.51/7.62 ms, socket errors 0
+The batch and many Node runs reported socket errors and are invalid throughput
+comparisons. The direct-write case was about 83.5k req/s versus 27.4k for the
+8-chunk Web Streams adapter case in this diagnostic. Node's published benchmark
+uses the direct-write API, so its gap includes differing stream abstractions.
+Bun uses Web Streams in the published benchmark and is the closer API comparison.
+
+Reproduction:
+  python3 bench/profile_stream.py sample
+  python3 bench/profile_stream.py ops
+  python3 bench/profile_stream.py ablate
+Raw exclusive samples: stream-profile-sample.json
+Ablation timings/error counts: stream-profile-ablate.json
+Opcode totals: stream-profile-ops.json; full dumps: stream-opcodes-*.txt
+Measured optimization effects and latest full suite: server-stream-vm-results.txt

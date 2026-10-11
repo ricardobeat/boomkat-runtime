@@ -1,0 +1,65 @@
+{
+  "before": "runtime f73129c; engine 6c144acd",
+  "after": "engine 2bdab09b plus runtime constant stream checks",
+  "method": "2 reversed-order repetitions; precondition hello/json/async/timer/echo 1s each; stream 1s warm-up +2s measured;wrk -t2 -c128",
+  "measurements": {
+    "stream": {
+      "before": [
+        {
+          "req_s": 60083.48,
+          "latency": {
+            "50": [
+              "1.98",
+              "ms"
+            ],
+            "99": [
+              "2.67",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 54007.16,
+          "latency": {
+            "50": [
+              "2.17",
+              "ms"
+            ],
+            "99": [
+              "4.87",
+              "ms"
+            ]
+          }
+        }
+      ],
+      "after": [
+        {
+          "req_s": 61951.26,
+          "latency": {
+            "50": [
+              "1.92",
+              "ms"
+            ],
+            "99": [
+              "2.60",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 55399.14,
+          "latency": {
+            "50": [
+              "2.08",
+              "ms"
+            ],
+            "99": [
+              "5.13",
+              "ms"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

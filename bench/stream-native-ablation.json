@@ -1,0 +1,127 @@
+{
+  "before": "runtime f73129c plus seven void 0 checks; JS Sink.enqueue; engine 2bdab09b",
+  "after": "final native guarded Sink.enqueue and unchanged source pump; engine 2bdab09b",
+  "method": "2 reversed-order repetitions;1s warm-up +2s measured;wrk -t2 -c128",
+  "binary_sha256": {
+    "before": "8e40d115cbd12bed64dae3a127c6ab6f2a88ad55c5d5622fe12b563b76906e66",
+    "after": "3930b77bca711adc1d8a38e66f46e9891f05e8473c252799090f611bba22a4cd"
+  },
+  "measurements": {
+    "stream": {
+      "before": [
+        {
+          "req_s": 59606.6,
+          "latency": {
+            "50": [
+              "1.99",
+              "ms"
+            ],
+            "99": [
+              "2.98",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 61347.01,
+          "latency": {
+            "50": [
+              "1.94",
+              "ms"
+            ],
+            "99": [
+              "2.92",
+              "ms"
+            ]
+          }
+        }
+      ],
+      "after": [
+        {
+          "req_s": 66478.74,
+          "latency": {
+            "50": [
+              "1.78",
+              "ms"
+            ],
+            "99": [
+              "2.88",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 66322.12,
+          "latency": {
+            "50": [
+              "1.78",
+              "ms"
+            ],
+            "99": [
+              "3.41",
+              "ms"
+            ]
+          }
+        }
+      ]
+    },
+    "hello": {
+      "before": [
+        {
+          "req_s": 211266.2,
+          "latency": {
+            "50": [
+              "573.00",
+              "us"
+            ],
+            "99": [
+              "1.11",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 204846.91,
+          "latency": {
+            "50": [
+              "577.00",
+              "us"
+            ],
+            "99": [
+              "1.80",
+              "ms"
+            ]
+          }
+        }
+      ],
+      "after": [
+        {
+          "req_s": 210847.46,
+          "latency": {
+            "50": [
+              "573.00",
+              "us"
+            ],
+            "99": [
+              "1.12",
+              "ms"
+            ]
+          }
+        },
+        {
+          "req_s": 213990.78,
+          "latency": {
+            "50": [
+              "571.00",
+              "us"
+            ],
+            "99": [
+              "1.09",
+              "ms"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

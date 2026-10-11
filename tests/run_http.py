@@ -62,6 +62,10 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             assert {k.lower(): v for k, v in headers.items()}["content-length"] == "8192"
             assert request("/stream-short", method="HEAD")[2] == b""
             assert request("/stream-views")[2] == "café😀ABAB".encode()
+            guarded = request("/stream-native-guards")[2]
+            if guarded != b"A" * 14:
+                log.seek(0)
+                raise AssertionError(f"native guard body {guarded!r}: {log.read()}")
             assert request("/stream-bulk")[2] == b"x" * (96 * 1024)
             if os.environ.get("BKR_HTTP_STRESS"):
                 def rss():

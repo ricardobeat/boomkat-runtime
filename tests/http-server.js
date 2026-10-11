@@ -24,6 +24,97 @@ serve({ port: Number(port), hostname: "127.0.0.1", onListen() {},
             let n = 0;
             return stream({ pull(c) { if (n++ === 8) c.close(); else c.enqueue(enc.encode("x".repeat(1024))); } });
         }
+        if (path === "/stream-native-guards") return stream({ pull(c) {
+            const check = (ok, message) => { if (!ok) throw new Error(message); };
+            const byte = new Uint8Array([65]);
+            c.enqueue(byte); c.enqueue(byte);
+            const originalPush = Array.prototype.push;
+            let pushes = 0;
+            Array.prototype.push = function (value) { pushes++; return originalPush.call(this, value); };
+            try { c.enqueue(byte); check(pushes === 1, "replaced push bypassed"); }
+            finally { Array.prototype.push = originalPush; }
+            let lengths = 0;
+            const taProto = Object.getPrototypeOf(Uint8Array.prototype);
+            const descriptor = Object.getOwnPropertyDescriptor(taProto, "length");
+            Object.defineProperty(taProto, "length", { ...descriptor, get() { lengths++; return 1; } });
+            try { c.enqueue(byte); check(lengths === 1, "replaced length getter bypassed"); }
+            finally { Object.defineProperty(taProto, "length", descriptor); }
+            let count = c.size, reads = 0, writes = 0;
+            Object.defineProperty(c, "size", { configurable: true, get() { reads++; return count; }, set(v) { writes++; count = v; } });
+            c.enqueue(byte);
+            check(reads === 1 && writes === 1, "controller accessor bypassed");
+            Object.defineProperty(c, "size", { value: count, writable: true, configurable: true, enumerable: true });
+            let nudges = 0;
+            c.nudge = () => nudges++;
+            c.enqueue(byte);
+            check(nudges === 1 && c.nudge === null, "wake callback lost");
+            const before = c.parts.length;
+            Object.defineProperty(c, "size", { writable: false });
+            let threw = false;
+            try { c.enqueue(byte); } catch (e) { threw = e instanceof TypeError; }
+            check(threw && c.parts.length === before + 1, "readonly size changed mutation order");
+            Object.defineProperty(c, "size", { writable: true });
+            const ctor = Uint8Array;
+            let instances = 0;
+            Object.defineProperty(ctor, Symbol.hasInstance, { configurable: true, value(value) { instances++; return true; } });
+            try { c.enqueue(byte); check(instances === 1, "custom instanceof bypassed"); }
+            finally { delete ctor[Symbol.hasInstance]; }
+            let conversions = 0;
+            class Replacement extends ctor {
+                constructor(...args) { super(...args); conversions++; }
+                static [Symbol.hasInstance]() { return false; }
+            }
+            globalThis.Uint8Array = Replacement;
+            try { c.enqueue(byte); check(conversions === 1, "replaced global constructor bypassed"); }
+            finally { globalThis.Uint8Array = ctor; }
+            const globalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Uint8Array");
+            let globals = 0;
+            Object.defineProperty(globalThis, "Uint8Array", { configurable: true, get() { globals++; return ctor; } });
+            try { c.enqueue(byte); check(globals > 0, "global accessor bypassed"); }
+            finally { Object.defineProperty(globalThis, "Uint8Array", globalDescriptor); }
+            lengths = 0;
+            Object.defineProperty(byte, "length", { configurable: true, get() { lengths++; return 1; } });
+            try { c.enqueue(byte); check(lengths === 1, "own length getter bypassed"); }
+            finally { delete byte.length; }
+            c.enqueue(byte);
+            // A failed layout fill must not poison the previously valid layout.
+            const fake = { closed: false, parts: [], get size() { return 0; }, set size(v) {}, nudge: null };
+            c.enqueue.call(fake, byte);
+            c.enqueue(byte);
+            let traps = 0;
+            const target = { closed: false, parts: [], size: 0, nudge: null };
+            const proxy = new Proxy(target, { get(obj, key, recv) { traps++; return Reflect.get(obj, key, recv); } });
+            c.enqueue.call(proxy, byte);
+            check(traps > 0 && target.parts.length === 1 && target.size === 1, "proxy controller bypassed");
+            const buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            const tracking = new ctor(buffer);
+            const state = { closed: false, parts: [], size: 0, nudge: null };
+            buffer.resize(0);
+            c.enqueue.call(state, tracking);
+            check(state.size === 0, "resized view length cached");
+            buffer.resize(8);
+            c.enqueue.call(state, tracking);
+            check(state.size === 8, "grown view length cached");
+            buffer.transfer();
+            c.enqueue.call(state, tracking);
+            check(state.size === 8, "detached view length cached");
+            const fixedParts = [];
+            Object.defineProperty(fixedParts, "length", { writable: false });
+            const referenceParts = [];
+            Object.defineProperty(referenceParts, "length", { writable: false });
+            let referenceThrew = false;
+            try { originalPush.call(referenceParts, byte); } catch (e) { referenceThrew = e instanceof TypeError; }
+            const fixed = { closed: false, parts: fixedParts, size: 0, nudge: null };
+            threw = false;
+            try { c.enqueue.call(fixed, byte); } catch (e) { threw = e instanceof TypeError; }
+            check(threw === referenceThrew && fixedParts.length === referenceParts.length && fixed.size === 0, "readonly array fallback changed");
+            c.enqueue(byte);
+            const beforeClose = c.parts.length;
+            c.close();
+            threw = false;
+            try { c.enqueue(byte); } catch (e) { threw = e instanceof TypeError; }
+            check(threw && c.parts.length === beforeClose, "closed enqueue mutated parts");
+        } }, { highWaterMark: 0 });
         if (path === "/stream-views") return stream({ pull(c) {
             c.enqueue("café😀");
             const bytes = new Uint8Array([0, 65, 66, 0]);

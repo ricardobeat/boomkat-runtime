@@ -61,6 +61,10 @@ one native response call with a known content length. Larger and asynchronous
 streams retain the backpressure path. Native file bodies resolve the working
 directory only for relative paths.
 
+Direct stream sources enqueue ordinary byte chunks through a native controller
+method with cached state slots and native array growth. Modified methods or
+descriptors, conversions and wake callbacks fall back to the original JS method.
+
 `bkr check script.js` lists the built-ins a module graph imports and the
 flags it will probably need.
 
@@ -140,28 +144,33 @@ The optional workload argument selects a single workload, such as `"stream 8KB"`
 Apple M3, Node v24.13.0, Bun 1.3.13; 2s warm-up and 2s measured per workload,
 128 connections. Client and server share the machine. Each runtime reuses one
 server process, so peak RSS can reflect earlier workloads. Latencies are in ms.
+Absolute rates vary with background load; paired measurements provide the
+optimization evidence. This suite uses the native byte-enqueue path.
 
 | Workload | Boomkat req/s | p50 / p99 ms | Node req/s | p50 / p99 ms | Bun req/s | p50 / p99 ms | RSS MiB (Boomkat / Node / Bun) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| hello | 217,411 | 0.57 / 1.07 | 123,956 | 1.00 / 1.40 | 223,394 | 0.56 / 0.82 | 12 / 103 / 43 |
-| json | 179,223 | 0.69 / 1.21 | 121,119 | 1.07 / 1.19 | 201,612 | 0.62 / 0.98 | 13 / 104 / 44 |
-| async immediate | 143,705 | 0.75 / 1.71 | 141,104 | 0.89 / 1.74 | 182,952 | 0.63 / 1.33 | 14 / 186 / 48 |
-| async timer | 113,364 | 1.08 / 1.44 | 74,601 | 1.44 / 2.76 | 114,616 | 1.10 / 1.53 | 14 / 186 / 49 |
-| echo 1KB | 142,473 | 0.84 / 1.46 | 95,308 | 1.34 / 1.67 | 164,916 | 0.76 / 1.22 | 16 / 203 / 53 |
-| stream 8KB | 60,855 | 1.95 / 2.54 | 85,087 | 1.49 / 2.88 | 109,847 | 1.14 / 1.49 | 16 / 204 / 84 |
-| file 4KB | 94,738 | 1.18 / 2.75 | 53,928 | 2.31 / 3.07 | 51,511 | 2.45 / 2.85 | 18 / 224 / 86 |
+| hello | 207,071 | 0.59 / 1.14 | 122,447 | 1.03 / 1.51 | 201,918 | 0.60 / 1.17 | 12 / 103 / 41 |
+| json | 167,716 | 0.71 / 1.41 | 120,749 | 1.05 / 1.45 | 187,158 | 0.66 / 1.25 | 13 / 104 / 42 |
+| async immediate | 132,885 | 0.82 / 2.01 | 131,796 | 0.94 / 1.87 | 171,582 | 0.66 / 1.43 | 14 / 185 / 45 |
+| async timer | 107,246 | 1.11 / 2.06 | 78,608 | 1.28 / 2.68 | 119,657 | 1.05 / 1.28 | 14 / 186 / 46 |
+| echo 1KB | 133,038 | 0.87 / 1.94 | 95,123 | 1.33 / 1.91 | 159,034 | 0.78 / 1.32 | 16 / 202 / 50 |
+| stream 8KB | 62,023 | 1.88 / 4.10 | 84,156 | 1.50 / 2.41 | 106,059 | 1.17 / 1.66 | 16 / 202 / 78 |
+| file 4KB | 84,844 | 1.31 / 3.10 | 48,432 | 2.56 / 3.98 | 50,855 | 2.48 / 3.08 | 18 / 223 / 81 |
 
-The [full report](bench/server-stream-file-results.txt) includes maximum latency,
-CPU usage, implementation differences between runtimes, and the profiling findings.
-These are single full-suite samples. The [repeated before/after comparison](bench/stream-file-ablation.json)
-uses the same engine and reverses measurement order across two repetitions.
+The [native enqueue report](bench/server-stream-native-results.txt) includes maximum
+latency, CPU usage, validation and paired measurements. Native byte enqueue removes
+19% of VM instructions from the 8-chunk workload (1,159 ->943/request). Final
+reversed-order runs gained 8–12% stream throughput; earlier pairs gained 9–13%.
+The source pump, controller setup and initial queue still run in JS.
 
-Streaming improved about 4% in the repeated comparison, but still trails Node and
-Bun. Remaining streaming costs are mostly VM execution and property access.
-File throughput more than doubled after removing an unnecessary working-directory
-lookup for absolute paths; p50 fell from 3.00 ms to 1.18 ms in the full-suite runs.
-Permission and symlink checks remain in place.
+Before native enqueue, the [stream profile](bench/stream-profile-results.txt) attributed
+44.5% of main-thread samples to VM handlers, 7.8% to property lookup helpers,
+10.4% to heap/GC work and 21.9% to socket system calls. [The diagnostic driver](bench/profile_stream.py)
+reproduces CPU sampling, opcode counts and fixed-body chunk/pull ablations.
+The [earlier VM report](bench/server-stream-vm-results.txt) records the preceding
+3–4% gain from absent-property caches, intrinsic length getters and constant checks.
 
 Node precomputes its JSON body; Node/Bun async handlers also await
-`Promise.resolve`, while Boomkat uses `.then` after the yield. Bun serves files
-with `Bun.file`, and Boomkat uses native `file.body`.
+`Promise.resolve`, while Boomkat uses `.then` after the yield. Node streams use
+direct HTTP writes, while Boomkat and Bun use Web `ReadableStream`. Bun serves
+files with `Bun.file`, and Boomkat uses native `file.body`.

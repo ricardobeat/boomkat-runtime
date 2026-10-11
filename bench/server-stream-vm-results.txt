@@ -1,0 +1,62 @@
+Engine: boomkat-perf 2bdab09b, on main 229e7b7a (parent 6c144acd)
+Runtime: f73129c plus constant checks committed with this report
+Node v24.13.0; Bun 1.3.13; Apple M3; loopback; shared client/server machine
+Single full-suite sample: 2s warm-up +2s measured, wrk -t2 -c128
+One process per runtime, reused across workloads; sampled RSS can reflect earlier workloads.
+CPU 100% = one core. This run was slower across all three runtimes than the prior report.
+Background UI/photo-analysis tasks were active; macOS reported no recorded thermal warning.
+These single-run absolute rates do not establish the optimization's effect.
+
+Repeated comparisons against runtime f73129c / engine 6c144acd:
+- Fresh servers, reversed order: 60,168 ->62,416 and 60,410 ->62,652 req/s (+3.7%).
+- Warm hello/json/async/timer/echo first, reversed order: 60,083 ->61,951 and
+  54,007 ->55,399 req/s (+3.1% and +2.6%). Both versions slowed together.
+Data: stream-vm-ablation.json and stream-vm-conditioned-ablation.json.
+
+Node precomputes JSON; Node/Bun async handlers also await Promise.resolve,
+while Boomkat uses .then after yielding. Node's stream workload uses direct
+res.write calls; Boomkat and Bun construct Web ReadableStreams. Bun file uses
+Bun.file; Boomkat uses native file.body. These API differences affect the comparison.
+
+Validation: engine Rosetta 42/42, local scripts 598/598, ESM 28/28 plus the local
+syntax/rejection/robustness/TypeScript/private-field suites; optimized, standard,
+and freshly rebuilt sanitizer stream/timer/HTTP checks; VM retention stress passed.
+
+| Workload | Boomkat req/s | p50 / p99 ms | Node req/s | p50 / p99 ms | Bun req/s | p50 / p99 ms | RSS MiB (Boomkat / Node / Bun) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| hello | 203,273 | 0.59 / 1.18 | 120,041 | 1.03 / 2.22 | 203,160 | 0.60 / 1.19 | 12 / 101 / 41 |
+| json | 166,289 | 0.71 / 1.62 | 118,728 | 1.05 / 3.22 | 179,471 | 0.67 / 1.35 | 13 / 102 / 42 |
+| async immediate | 133,948 | 0.82 / 1.99 | 133,092 | 0.93 / 1.87 | 165,373 | 0.67 / 1.49 | 14 / 184 / 46 |
+| async timer | 109,634 | 1.09 / 1.73 | 73,481 | 2.00 / 3.42 | 105,672 | 1.08 / 3.10 | 14 / 184 / 46 |
+| echo 1KB | 136,622 | 0.86 / 1.81 | 94,509 | 1.33 / 2.66 | 134,911 | 0.84 / 2.40 | 16 / 201 / 50 |
+| stream 8KB | 54,061 | 2.19 / 3.96 | 82,471 | 1.52 / 3.01 | 90,445 | 1.29 / 2.88 | 16 / 201 / 77 |
+| file 4KB | 86,229 | 1.29 / 2.96 | 39,794 | 3.06 / 6.52 | 43,290 | 2.77 / 5.84 | 18 / 222 / 79 |
+
+Additional metrics:
+
+| Workload | Max latency ms (Boomkat / Node / Bun) | CPU % (Boomkat / Node / Bun) |
+|---|---:|---:|
+| hello | 2.5 / 49.8 / 3.1 | 90 / 92 / 92 |
+| json | 3.9 / 48.8 / 3.3 | 90 / 91 / 91 |
+| async immediate | 3.3 / 39.5 / 2.4 | 91 / 91 / 92 |
+| async timer | 3.5 / 7.2 / 7.5 | 84 / 62 / 81 |
+| echo 1KB | 4.3 / 60.2 / 6.0 | 91 / 92 / 89 |
+| stream 8KB | 7.0 / 60.6 / 5.2 | 90 / 90 / 90 |
+| file 4KB | 4.0 / 20.0 / 15.2 | 284 / 241 / 117 |
+
+Sequential full-suite baseline/after check (not reversed):
+
+| Workload | Before req/s | p50 / p99 ms | After req/s | p50 / p99 ms | Max ms (before / after) | CPU % (before / after) | RSS MiB (before / after) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| hello | 215,182 | 0.57 / 1.10 | 207,023 | 0.59 / 1.15 | 2.2 / 1.9 | 91 / 90 | 12 / 12 |
+| json | 176,439 | 0.70 / 1.23 | 177,063 | 0.69 / 1.26 | 2.2 / 2.3 | 91 / 91 | 13 / 13 |
+| async immediate | 128,733 | 0.85 / 2.56 | 140,942 | 0.77 / 1.76 | 8.8 / 2.2 | 90 / 92 | 14 / 14 |
+| async timer | 110,076 | 1.09 / 1.65 | 109,507 | 1.08 / 1.51 | 2.5 / 2.4 | 84 / 83 | 14 / 14 |
+| echo 1KB | 138,079 | 0.86 / 1.66 | 136,113 | 0.85 / 2.24 | 2.7 / 6.3 | 91 / 90 | 16 / 16 |
+| stream 8KB | 58,791 | 2.02 / 3.08 | 49,703 | 2.14 / 38.36 | 5.4 / 63.9 | 92 / 83 | 16 / 16 |
+| file 4KB | 88,104 | 1.26 / 2.96 | 69,340 | 1.48 / 6.08 | 4.1 / 15.6 | 278 / 245 | 18 / 18 |
+
+The sequential after run had large stream tails and a simultaneous file slowdown.
+The subsequent reversed-order, preconditioned comparisons above retain a 2.6–3.1%
+stream improvement across both the fast and slower periods. No consistent file or
+hello regression is established by these noisy single samples.
