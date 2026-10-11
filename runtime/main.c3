@@ -21,6 +21,7 @@ const Builtin[] BUILTINS = {
     { "path", $embed("js/path.js") },
     { "net", $embed("js/net.js") },
     { "file", $embed("js/file.js") },
+    { "process", $embed("js/process.js") },
     { "permissions", $embed("js/permissions.js") },
 };
 
@@ -268,6 +269,7 @@ fn void? boot() {
     install_natives(RES_NATIVES)!;
     install_natives(NET_NATIVES)!;
     install_natives(FS_NATIVES)!;
+    install_natives(PROC_NATIVES)!;
     g_rt.exec(PRELUDE, "<prelude>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
     g_settle = bk_get("settle")!;

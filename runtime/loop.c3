@@ -80,7 +80,7 @@ struct Task {
     Task* next;
 }
 
-const POOL_THREADS = 4;
+const POOL_THREADS = 16;
 
 struct Pool {
     Mutex lock;

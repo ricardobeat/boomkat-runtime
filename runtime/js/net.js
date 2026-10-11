@@ -1,34 +1,14 @@
 const bk = __bk;
 
-class Conn {
-    #rid;
+class Conn extends bk.Handle {
     constructor(rid) {
-        this.#rid = rid;
+        super(rid);
         const [local, remote, port] = bk.addr(rid).split(" ");
         this.localPort = Number(local);
         this.remoteAddress = remote;
         this.remotePort = Number(port);
-        this.readable = new ReadableStream({
-            pull: async (c) => {
-                const chunk = await bk.op(bk.read, rid);
-                if (chunk === null) c.close();
-                else c.enqueue(chunk);
-            },
-            cancel: () => this.close(),
-        });
-        this.writable = new WritableStream({
-            write: (chunk) => bk.op(bk.write, rid, chunk),
-            close: () => bk.closeWrite(rid),
-            abort: () => this.close(),
-        });
     }
-    read() { return bk.op(bk.read, this.#rid); }
-    write(data) {
-        if (typeof data === "string") data = new TextEncoder().encode(data);
-        return bk.op(bk.write, this.#rid, data);
-    }
-    closeWrite() { bk.closeWrite(this.#rid); }
-    close() { bk.close(this.#rid); }
+    closeWrite() { bk.closeWrite(this.rid); }
 }
 
 export async function connect({ hostname, port, tls = false }) {

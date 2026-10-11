@@ -148,6 +148,12 @@ struct FdTask {
     CInt err;
 }
 
+fn void fd_finish(Res* r) {
+    if (!r.closed || r.gone) return;
+    libc::close(r.fd);
+    r.gone = true;
+}
+
 fn void fd_read_work(Task* t) {
     FdTask* f = (FdTask*)t;
     f.buf = mem::alloc_array(char, READ_CHUNK);
@@ -159,6 +165,7 @@ fn void fd_read_done(Task* t) {
     FdTask* f = (FdTask*)t;
     Res* r    = f.res;
     r.busy = false;
+    fd_finish(r);
     defer free(f);
     if (f.n < 0) {
         free(f.buf.ptr);
@@ -191,6 +198,7 @@ fn void fd_write_done(Task* t) {
     FdTask* f = (FdTask*)t;
     Res* r    = f.res;
     r.busy = false;
+    fd_finish(r);
     free(f.buf.ptr);
     defer free(f);
     if (f.err) {
@@ -224,11 +232,11 @@ fn void js_read(JsCtx ctx, void* udata) {
     }
     switch (r.kind) {
         case SOCKET:
-        case PIPE:
             r.read_op = op;
             r.deliver();
         case STDIO:
         case FILE:
+        case PIPE:
             fd_task(r, op, &fd_read_work, &fd_read_done);
         case LISTENER:
             reject(op, "EINVAL", "cannot read a listener");

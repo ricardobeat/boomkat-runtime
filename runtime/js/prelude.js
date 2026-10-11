@@ -1173,4 +1173,34 @@ bk.dispatch = function (index, id, method, body) {
     Promise.resolve(r).then((res) => send(id, res), (e) => fail(id, e, h));
 };
 
+// ---- resource handles ----
+
+bk.Handle = class Handle {
+    #rid;
+    constructor(rid) {
+        this.#rid = rid;
+        this.readable = new ReadableStream({
+            pull: async (c) => {
+                const chunk = await bk.op(bk.read, rid);
+                if (chunk === null) c.close();
+                else c.enqueue(chunk);
+            },
+            cancel: () => this.close(),
+        });
+        this.writable = new WritableStream({
+            write: (chunk) => bk.op(bk.write, rid, chunk),
+            close: () => this.closeWrite(),
+            abort: () => this.close(),
+        });
+    }
+    get rid() { return this.#rid; }
+    read() { return bk.op(bk.read, this.#rid); }
+    write(data) {
+        if (typeof data === "string") data = new TextEncoder().encode(data);
+        return bk.op(bk.write, this.#rid, data);
+    }
+    closeWrite() { this.close(); }
+    close() { bk.close(this.#rid); }
+};
+
 })(__bk);
