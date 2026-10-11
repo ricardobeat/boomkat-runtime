@@ -108,7 +108,9 @@ fn int pool_thread(void* arg) {
             g_pool.head = t.next;
             if (!g_pool.head) g_pool.tail = null;
         };
-        t.work(t);
+        @pool_init(mem, 64 * 1024) {
+            t.work(t);
+        };
         uws_loop_defer(g_loop, &task_done, t);
     }
 }
