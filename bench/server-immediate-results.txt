@@ -1,0 +1,60 @@
+Engine: boomkat-perf 6c144acd on main 229e7b7a
+Runtime: ed3f5f8; timer scheduler unchanged
+Node: v24.13.0; Bun: 1.3.13
+Each workload: 2s warm-up +2s measured; wrk -t2 -c128; loopback
+Async immediate: setImmediate-based yield in all three servers.
+Async timer: original setTimeout(0) workload, kept separately.
+CPU: 100% = one core; RSS is sampled peak per measurement.
+One sample per workload; client and server share the machine.
+Existing implementation differences remain: Node JSON is precomputed;
+Node/Bun async handlers await Promise.resolve before the yield, bkr uses .then;
+Bun file uses Bun.file, bkr uses native file.body.
+The server process persists across workloads, so RSS reflects earlier activity too.
+
+Running bkr: hello
+Running bkr: json
+Running bkr: async immediate
+Running bkr: async timer
+Running bkr: echo 1KB
+Running bkr: stream 8KB
+Running bkr: file 4KB
+Running node: hello
+Running node: json
+Running node: async immediate
+Running node: async timer
+Running node: echo 1KB
+Running node: stream 8KB
+Running node: file 4KB
+Running bun: hello
+Running bun: json
+Running bun: async immediate
+Running bun: async timer
+Running bun: echo 1KB
+Running bun: stream 8KB
+Running bun: file 4KB
+
+wrk -t2 -c128 -d2s, loopback, one server process each
+
+| workload | runtime | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MB |
+|---|---|---:|---:|---:|---:|---:|---:|
+| hello | bkr | 214,340 | 0.57 | 1.10 | 2.3 | 91 | 12 |
+| hello | node | 122,933 | 1.04 | 1.31 | 50.2 | 93 | 104 |
+| hello | bun | 210,456 | 0.59 | 1.09 | 2.0 | 92 | 41 |
+| json | bkr | 175,926 | 0.70 | 1.28 | 2.3 | 91 | 13 |
+| json | node | 121,803 | 1.05 | 1.27 | 45.7 | 92 | 104 |
+| json | bun | 194,208 | 0.64 | 1.16 | 1.7 | 93 | 42 |
+| async immediate | bkr | 140,896 | 0.77 | 1.75 | 2.4 | 92 | 14 |
+| async immediate | node | 141,439 | 0.88 | 1.75 | 38.9 | 92 | 185 |
+| async immediate | bun | 174,735 | 0.65 | 1.40 | 1.9 | 93 | 46 |
+| async timer | bkr | 46,835 | 2.69 | 3.38 | 4.8 | 49 | 14 |
+| async timer | node | 78,132 | 1.44 | 2.52 | 3.2 | 59 | 185 |
+| async timer | bun | 119,700 | 1.05 | 1.28 | 1.8 | 80 | 46 |
+| echo 1KB | bkr | 139,721 | 0.85 | 1.61 | 2.9 | 92 | 16 |
+| echo 1KB | node | 95,233 | 1.34 | 1.67 | 61.2 | 93 | 202 |
+| echo 1KB | bun | 130,689 | 0.83 | 2.97 | 9.4 | 88 | 50 |
+| stream 8KB | bkr | 57,647 | 2.08 | 2.82 | 5.0 | 91 | 16 |
+| stream 8KB | node | 84,058 | 1.51 | 2.90 | 64.6 | 91 | 202 |
+| stream 8KB | bun | 83,915 | 1.25 | 4.47 | 9.3 | 87 | 76 |
+| file 4KB | bkr | 42,042 | 2.98 | 5.05 | 7.1 | 156 | 18 |
+| file 4KB | node | 51,162 | 2.44 | 3.33 | 25.1 | 255 | 224 |
+| file 4KB | bun | 45,921 | 2.62 | 5.67 | 10.4 | 118 | 77 |

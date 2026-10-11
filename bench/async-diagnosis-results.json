@@ -1,0 +1,78 @@
+{
+  "before_engine": "acb26573 (ce3b5b96 + external strings)",
+  "after_engine": "6c144acd (229e7b7a + external strings)",
+  "runtime": "ed3f5f8 identical for both",
+  "http": {
+    "/sync": {
+      "before": [
+        189947.68,
+        188990.0
+      ],
+      "after": [
+        189096.83,
+        189603.19
+      ]
+    },
+    "/promise": {
+      "before": [
+        174597.92,
+        175956.47
+      ],
+      "after": [
+        172756.1,
+        174231.14
+      ]
+    },
+    "/await": {
+      "before": [
+        106083.2,
+        105687.83
+      ],
+      "after": [
+        113634.31,
+        113836.93
+      ]
+    },
+    "/timer": {
+      "before": [
+        46014.29,
+        46514.78
+      ],
+      "after": [
+        46419.24,
+        46800.24
+      ]
+    }
+  },
+  "frames": {
+    "before": {
+      "narrow": 14,
+      "wide": 38
+    },
+    "after": {
+      "narrow": 10,
+      "wide": 20
+    }
+  },
+  "timers": {
+    "boomkat": {
+      "min": 1.0105839967727661,
+      "p50": 2.091250002384186,
+      "p99": 2.5561669915914536,
+      "max": 2.7429579943418503
+    },
+    "node": {
+      "min": 0.03454200000001606,
+      "p50": 1.2065000000000055,
+      "p99": 1.5587920000000004,
+      "max": 1.5900420000000004
+    },
+    "bun": {
+      "min": 1.0206659999999985,
+      "p50": 1.178750000000008,
+      "p99": 1.3910420000000006,
+      "max": 1.4260000000000002
+    }
+  },
+  "method": "7 fresh-process frame samples (100000 awaits); HTTP 2 repetitions, reversed order, each 1s warm-up +2s measured, wrk -t2 -c128; timer latency 100 batches of 128 setTimeout(0)"
+}

@@ -6,7 +6,7 @@ const [port, payload] = args;
 const chunk = new TextEncoder().encode("x".repeat(1024));
 const data = { id: 1, name: "boomkat", tags: ["a", "b", "c"], nested: { ok: true, n: 42.5 } };
 
-const later = () => new Promise((r) => setTimeout(r, 0));
+const later = () => new Promise((r) => setImmediate(r));
 
 serve({
     port: Number(port),
@@ -17,6 +17,7 @@ serve({
             case "/hello": return new Response("hello world");
             case "/json": return Response.json(data);
             case "/async": return later().then(() => Response.json({ ok: true }));
+            case "/timer": return new Promise((r) => setTimeout(r, 0)).then(() => Response.json({ ok: true }));
             case "/echo": return req.bytes().then((b) => new Response(b));
             case "/stream": {
                 let n = 0;

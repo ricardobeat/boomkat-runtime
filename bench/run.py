@@ -21,7 +21,8 @@ CMD = {
 WORKLOADS = [
     ("hello", "/hello", None),
     ("json", "/json", None),
-    ("async", "/async", None),
+    ("async immediate", "/async", None),
+    ("async timer", "/timer", None),
     ("echo 1KB", "/echo", "POST"),
     ("stream 8KB", "/stream", None),
     ("file 4KB", "/file", None),
