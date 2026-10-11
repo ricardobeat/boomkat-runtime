@@ -133,6 +133,12 @@ fn void Res.deliver(&self)
         resolve_bytes(op, data);
         return;
     }
+    if (self.cert_failed && self.gone)
+    {
+        self.read_op = 0;
+        reject(op, "CERT_INVALID", string::tformat("TLS certificate for %s failed verification", self.host));
+        return;
+    }
     if (self.error)
     {
         self.read_op = 0;

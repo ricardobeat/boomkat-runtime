@@ -157,7 +157,14 @@ fn UsSocket* on_sock_close(CInt ssl, UsSocket* s, CInt code)
     {
         uint op = r.write_op;
         r.write_op = 0;
-        reject(op, "EPIPE", "connection closed");
+        if (r.cert_failed)
+        {
+            reject(op, "CERT_INVALID", string::tformat("TLS certificate for %s failed verification", r.host));
+        }
+        else
+        {
+            reject(op, "EPIPE", "connection closed");
+        }
     }
     r.deliver();
     res_release(r);
