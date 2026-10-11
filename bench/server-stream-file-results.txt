@@ -1,0 +1,52 @@
+Engine: boomkat-perf 6c144acd on main 229e7b7a
+Runtime: 47a3659 plus streaming/file changes committed with this report
+Node: v24.13.0; Bun: 1.3.13
+Each workload: 2s warm-up +2s measured; wrk -t2 -c128; loopback
+One process per runtime, reused across workloads; RSS can reflect earlier workloads.
+CPU 100% = one core; RSS is sampled peak MiB. Client and server share the machine.
+Single full-suite sample; repeated same-engine before/after throughput in stream-file-ablation.json.
+Node JSON is precomputed; Node/Bun async handlers also await Promise.resolve;
+bkr uses .then after the yield. Bun file uses Bun.file; bkr uses native file.body.
+Standard and performance timer/stream/HTTP tests, retention stress, and sanitizer checks passed.
+
+File diagnosis: native_file_start eagerly called tcwd() for every request, including
+absolute paths. macOS sample captured 98 request-handler samples in tcwd/getcwd,
+out of 151 total request-handler samples. File workers were mostly waiting.
+canonical(raw_path) already resolves cwd lazily for relative paths. Removing the
+redundant eager call preserves canonicalization and permission checks. Relative-path,
+denied-file, missing-file, slow-reader, and disconnect regression checks pass.
+
+Streaming: a synchronously closed batch up to 64 KiB finishes through a native end
+with Content-Length rather than multiple chunk writes and a separate end. The JS
+controller skips redundant wake calls and thenable checks for undefined results.
+Larger and async sources retain backpressure handling. Mixed strings/byte views,
+HEAD, oversized batches, an 8 MiB slow-reader stream, cancellation, and retention
+are covered. Repeated gains are about 4%; remaining streaming samples are dominated
+by VM execution and property access. Native enqueue and constructor experiments
+were slower and are excluded from the final implementation.
+
+wrk -t2 -c128 -d2s, loopback, one server process each
+
+| workload | runtime | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MB |
+|---|---|---:|---:|---:|---:|---:|---:|
+| hello | bkr | 217,411 | 0.57 | 1.07 | 1.7 | 99 | 12 |
+| hello | node | 123,956 | 1.00 | 1.40 | 48.7 | 101 | 103 |
+| hello | bun | 223,394 | 0.56 | 0.82 | 1.8 | 91 | 43 |
+| json | bkr | 179,223 | 0.69 | 1.21 | 2.1 | 99 | 13 |
+| json | node | 121,119 | 1.07 | 1.19 | 49.5 | 100 | 104 |
+| json | bun | 201,612 | 0.62 | 0.98 | 1.7 | 100 | 44 |
+| async immediate | bkr | 143,705 | 0.75 | 1.71 | 2.0 | 99 | 14 |
+| async immediate | node | 141,104 | 0.89 | 1.74 | 39.4 | 91 | 186 |
+| async immediate | bun | 182,952 | 0.63 | 1.33 | 1.8 | 100 | 48 |
+| async timer | bkr | 113,364 | 1.08 | 1.44 | 1.9 | 84 | 14 |
+| async timer | node | 74,601 | 1.44 | 2.76 | 3.3 | 58 | 186 |
+| async timer | bun | 114,616 | 1.10 | 1.53 | 2.0 | 66 | 49 |
+| echo 1KB | bkr | 142,473 | 0.84 | 1.46 | 2.8 | 91 | 16 |
+| echo 1KB | node | 95,308 | 1.34 | 1.67 | 58.5 | 91 | 203 |
+| echo 1KB | bun | 164,916 | 0.76 | 1.22 | 2.4 | 91 | 53 |
+| stream 8KB | bkr | 60,855 | 1.95 | 2.54 | 4.8 | 90 | 16 |
+| stream 8KB | node | 85,087 | 1.49 | 2.88 | 63.4 | 100 | 204 |
+| stream 8KB | bun | 109,847 | 1.14 | 1.49 | 2.7 | 91 | 84 |
+| file 4KB | bkr | 94,738 | 1.18 | 2.75 | 4.0 | 282 | 18 |
+| file 4KB | node | 53,928 | 2.31 | 3.07 | 24.3 | 280 | 224 |
+| file 4KB | bun | 51,511 | 2.45 | 2.85 | 5.5 | 122 | 86 |

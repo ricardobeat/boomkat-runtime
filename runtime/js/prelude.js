@@ -1245,10 +1245,10 @@ class Sink {
     get desiredSize() { return 1; }
     enqueue(value) {
         if (this.closed) throw new TypeError("stream is not readable");
-        const chunk = typeof value === "string" ? encoder.encode(value) : asBytes(value);
+        const chunk = typeof value === "string" ? encoder.encode(value) : value instanceof Uint8Array ? value : asBytes(value);
         this.parts.push(chunk);
         this.size += chunk.length;
-        this._wake();
+        if (this.nudge !== null) this._wake();
     }
     close() { if (this.closed) throw new TypeError("stream is not readable"); this.closed = true; this._wake(); }
     error(e) { this.failed = e; this.hasError = true; this.closed = true; this._wake(); }
@@ -1287,11 +1287,15 @@ function pump(id, res) {
         while (!sink.closed && sink.size < BATCH) {
             const size = sink.size;
             const r = src.pull(sink);
-            if (!sink.closed && sink.size === size && !isThenable(r)) { pumpSource(id, stream, sink, undefined); return; }
-            if (isThenable(r)) { pumpSource(id, stream, sink, r); return; }
+            if (!sink.closed && sink.size === size && (r === undefined || !isThenable(r))) { pumpSource(id, stream, sink, undefined); return; }
+            if (r !== undefined && isThenable(r)) { pumpSource(id, stream, sink, r); return; }
         }
         if (!sink.hasError && sink.parts.length > 0 && !sink.closed) { pumpSource(id, stream, sink, undefined); return; }
-        if (!sink.hasError && sink.parts.length > 0) bk.streamWrite(id, sink.take());
+        if (!sink.hasError && sink.parts.length > 0) {
+            const parts = sink.take();
+            if (sink.closed && bk.streamFinish(id, parts)) { stream._finish(); return; }
+            bk.streamWrite(id, parts);
+        }
     } catch (e) {
         stream._fail(e);
         report(e);
@@ -1341,7 +1345,7 @@ async function pumpSource(id, stream, sink, waiting) {
             while (!sink.closed && !pulling && sink.size < BATCH && !s.aborted) {
                 const size = sink.size;
                 const r = src.pull(sink);
-                if (isThenable(r)) track(r);
+                if (r !== undefined && isThenable(r)) track(r);
                 else if (!sink.closed && sink.size === size) await s.wait(new Promise((resolve) => setImmediate(resolve)));
             }
             if (s.aborted) break;

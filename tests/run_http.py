@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
         port = probe.getsockname()[1]
     with (Path(temp) / "server.log").open("w+") as log:
         proc = subprocess.Popen([BIN, "--no-sandbox", "--allow-net", f"--allow-read={temp}",
-                                 str(ROOT / "tests/http-server.js"), str(port), str(payload)], stdout=log, stderr=log)
+                                 str(ROOT / "tests/http-server.js"), str(port), str(payload)], cwd=temp, stdout=log, stderr=log)
         def request(path, method="GET", body=None, headers=None):
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
             try:
@@ -57,6 +57,12 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             assert request("/rejected")[::2] == (500, b"rejected")
             assert request("/stream-error")[2] == b""
             assert request("/stream-error-state")[2] == b"errored"
+            status, headers, short = request("/stream-short")
+            assert status == 200 and short == b"x" * 8192
+            assert {k.lower(): v for k, v in headers.items()}["content-length"] == "8192"
+            assert request("/stream-short", method="HEAD")[2] == b""
+            assert request("/stream-views")[2] == "café😀ABAB".encode()
+            assert request("/stream-bulk")[2] == b"x" * (96 * 1024)
             if os.environ.get("BKR_HTTP_STRESS"):
                 def rss():
                     return int(subprocess.check_output(["ps", "-o", "rss=", "-p", str(proc.pid)]))
@@ -78,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             for path in ["/stream", "/stream-queued"]:
                 assert request(path)[2] == b"x" * (128 * 1024), path
                 assert request(path, method="HEAD")[2] == b"", "HEAD stream sent a body"
-            for path in ["/file", "/file-custom", "/file-consume", "/file-clone"]:
+            for path in ["/file", "/file-relative", "/file-custom", "/file-consume", "/file-clone"]:
                 status, headers, actual = request(path)
                 assert actual == data, path
                 if path == "/file-custom":
@@ -89,15 +95,16 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             assert request("/echo", method="POST", body=b"hello")[2] == b"hello"
             disconnect("/late")
             assert request("/finish-late")[2] == b"finished", "late completion affected another response"
-            # A small receive window forces native file backpressure before draining.
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-            conn.connect()
-            conn.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8192)
-            conn.request("GET", "/file")
-            time.sleep(.1)
-            response = conn.getresponse()
-            assert response.read() == data, "backpressure dropped file bytes"
-            conn.close()
+            # A small receive window forces file and JS stream backpressure.
+            for path, expected in [("/file", data), ("/stream-large", b"x" * (8 * 1024 * 1024))]:
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                conn.connect()
+                conn.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8192)
+                conn.request("GET", path)
+                time.sleep(.1)
+                response = conn.getresponse()
+                assert response.read() == expected, f"backpressure dropped bytes: {path}"
+                conn.close()
             # Reuse connections after disconnects, including outstanding file reads.
             for _ in range(100):
                 disconnect("/", upload=True)

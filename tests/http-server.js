@@ -20,6 +20,27 @@ serve({ port: Number(port), hostname: "127.0.0.1", onListen() {},
             return new Response(failedStream);
         }
         if (path === "/stream-error-state") return new Response(failedStream._state);
+        if (path === "/stream-short") {
+            let n = 0;
+            return stream({ pull(c) { if (n++ === 8) c.close(); else c.enqueue(enc.encode("x".repeat(1024))); } });
+        }
+        if (path === "/stream-views") return stream({ pull(c) {
+            c.enqueue("café😀");
+            const bytes = new Uint8Array([0, 65, 66, 0]);
+            c.enqueue(bytes.subarray(1, 3));
+            c.enqueue(new DataView(bytes.buffer, 1, 2));
+            c.close();
+        } }, { highWaterMark: 0 });
+        if (path === "/stream-bulk") return stream({ pull(c) {
+            c.enqueue(enc.encode("x".repeat(48 * 1024)));
+            c.enqueue(enc.encode("x".repeat(48 * 1024)));
+            c.close();
+        } }, { highWaterMark: 0 });
+        if (path === "/stream-large") {
+            let n = 0;
+            const piece = enc.encode("x".repeat(8192));
+            return stream({ pull(c) { if (n++ === 1024) c.close(); else c.enqueue(piece); } });
+        }
         if (path === "/empty") {
             let n = 0;
             return stream({ async pull(c) { if (++n === 1) return; c.enqueue(enc.encode("done")); c.close(); } }, { highWaterMark: 0 });
@@ -61,6 +82,7 @@ serve({ port: Number(port), hostname: "127.0.0.1", onListen() {},
             return p;
         }
         if (path === "/file") return new Response(file.body(payload));
+        if (path === "/file-relative") return new Response(file.body("./" + payload.slice(payload.lastIndexOf("/") + 1)));
         if (path === "/file-custom") return new Response(file.body(payload), { status: 201, headers: { "x-file": "yes" } });
         if (path === "/file-missing") return new Response(file.body(payload + ".missing"));
         if (path === "/file-denied") return new Response(file.body("/etc/passwd"));

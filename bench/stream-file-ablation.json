@@ -1,0 +1,27 @@
+{
+  "before": "47a3659",
+  "after": "closed-stream finish + JS controller reductions + absolute-path cwd fix",
+  "method": "same engine 6c144acd; 2 reversed-order repetitions;1s warm-up +2s measured;wrk -t2 -c128",
+  "rps": {
+    "stream": {
+      "before": [
+        58510.66,
+        58579.7
+      ],
+      "after": [
+        60837.92,
+        60969.11
+      ]
+    },
+    "file": {
+      "before": [
+        42452.32,
+        42478.45
+      ],
+      "after": [
+        96235.4,
+        96027.55
+      ]
+    }
+  }
+}

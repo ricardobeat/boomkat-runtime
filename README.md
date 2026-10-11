@@ -56,6 +56,11 @@ JS timers use nanosecond native re-arms on kqueue/epoll while retaining the
 1 ms minimum JS delay. Each batch uses a fixed deadline cutoff so repeating
 timers yield to another loop turn.
 
+HTTP streams that close synchronously within a 64 KiB batch finish through
+one native response call with a known content length. Larger and asynchronous
+streams retain the backpressure path. Native file bodies resolve the working
+directory only for relative paths.
+
 `bkr check script.js` lists the built-ins a module graph imports and the
 flags it will probably need.
 
@@ -65,6 +70,7 @@ Regression checks:
 bash scripts/build_uws.sh
 c3c build bkr-perf
 ./out/bkr-perf --no-sandbox tests/timers.js
+./out/bkr-perf --no-sandbox tests/streams.js
 BKR_HTTP_STRESS=1 BKR_BIN="$PWD/out/bkr-perf" python3 tests/run_http.py
 c3c build bkr-perf-asan
 BKR_BIN="$PWD/out/bkr-perf-asan" python3 tests/run_http.py
@@ -127,51 +133,35 @@ the same read as close_notify).
 
 ## Benchmarks
 
-`bench/run.py [seconds] [connections]` starts each runtime on a loopback port
-and drives it with `wrk -t2`. CPU is server CPU time over wall time (100% is
-one core); memory is peak RSS sampled during the run. One server process each,
-Apple M3 (4 performance cores shared with wrk), node 24, bun, noisy machine.
+`BKR_BIN="$PWD/out/bkr-perf" python3 bench/run.py [seconds] [connections] [workload]`
+starts each runtime on a loopback port and drives it with `wrk -t2`.
+The optional workload argument selects a single workload, such as `"stream 8KB"`.
 
-wrk -t2 -c128 -d3s, loopback, one server process each
+Apple M3, Node v24.13.0, Bun 1.3.13; 2s warm-up and 2s measured per workload,
+128 connections. Client and server share the machine. Each runtime reuses one
+server process, so peak RSS can reflect earlier workloads. Latencies are in ms.
 
-| workload | runtime | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MB |
-|---|---|---:|---:|---:|---:|---:|---:|
-| hello | bkr | 126,354 | 0.95 | 1.53 | 3.4 | 98 | 13 |
-| hello | node | 123,966 | 1.03 | 1.18 | 48.0 | 99 | 103 |
-| hello | bun | 209,232 | 0.59 | 1.08 | 2.3 | 99 | 43 |
-| json | bkr | 107,381 | 1.12 | 1.73 | 3.5 | 98 | 13 |
-| json | node | 124,397 | 1.02 | 1.23 | 44.3 | 98 | 130 |
-| json | bun | 194,020 | 0.64 | 1.14 | 2.2 | 98 | 43 |
-| async | bkr | 50,162 | 2.29 | 4.96 | 6.7 | 84 | 43 |
-| async | node | 74,299 | 1.62 | 2.75 | 8.3 | 63 | 131 |
-| async | bun | 115,438 | 1.08 | 1.47 | 3.8 | 75 | 46 |
-| echo 1KB | bkr | 67,527 | 1.50 | 5.97 | 10.5 | 98 | 48 |
-| echo 1KB | node | 95,933 | 1.33 | 1.59 | 55.5 | 99 | 204 |
-| echo 1KB | bun | 161,385 | 0.77 | 1.36 | 2.3 | 98 | 52 |
-| stream 8KB | bkr | 40,728 | 2.61 | 8.69 | 16.0 | 98 | 67 |
-| stream 8KB | node | 84,022 | 1.50 | 2.96 | 67.8 | 97 | 203 |
-| stream 8KB | bun | 108,250 | 1.16 | 1.54 | 3.0 | 99 | 86 |
-| file 4KB | bkr | 27,731 | 4.04 | 10.90 | 21.0 | 148 | 90 |
-| file 4KB | node | 50,901 | 2.45 | 3.40 | 16.8 | 269 | 224 |
-| file 4KB | bun | 52,006 | 2.44 | 2.92 | 6.1 | 130 | 88 |
+| Workload | Boomkat req/s | p50 / p99 ms | Node req/s | p50 / p99 ms | Bun req/s | p50 / p99 ms | RSS MiB (Boomkat / Node / Bun) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| hello | 217,411 | 0.57 / 1.07 | 123,956 | 1.00 / 1.40 | 223,394 | 0.56 / 0.82 | 12 / 103 / 43 |
+| json | 179,223 | 0.69 / 1.21 | 121,119 | 1.07 / 1.19 | 201,612 | 0.62 / 0.98 | 13 / 104 / 44 |
+| async immediate | 143,705 | 0.75 / 1.71 | 141,104 | 0.89 / 1.74 | 182,952 | 0.63 / 1.33 | 14 / 186 / 48 |
+| async timer | 113,364 | 1.08 / 1.44 | 74,601 | 1.44 / 2.76 | 114,616 | 1.10 / 1.53 | 14 / 186 / 49 |
+| echo 1KB | 142,473 | 0.84 / 1.46 | 95,308 | 1.34 / 1.67 | 164,916 | 0.76 / 1.22 | 16 / 203 / 53 |
+| stream 8KB | 60,855 | 1.95 / 2.54 | 85,087 | 1.49 / 2.88 | 109,847 | 1.14 / 1.49 | 16 / 204 / 84 |
+| file 4KB | 94,738 | 1.18 / 2.75 | 53,928 | 2.31 / 3.07 | 51,511 | 2.45 / 2.85 | 18 / 224 / 86 |
 
-Reading it:
+The [full report](bench/server-stream-file-results.txt) includes maximum latency,
+CPU usage, implementation differences between runtimes, and the profiling findings.
+These are single full-suite samples. The [repeated before/after comparison](bench/stream-file-ablation.json)
+uses the same engine and reverses measurement order across two repetitions.
 
-- On this machine `wrk` and the kernel loopback cap a single server near
-  210k req/s: bun's hello and a bare `serve` handler in bkr (213k) both sit
-  there. Higher figures need more server threads and a separate load
-  generator host; bkr runs JavaScript on one thread.
-- bkr uses 8-10x less memory than node on every workload and a third to a
-  half of bun's.
-- bkr is level with node on hello, behind it on json, async, echo, stream and
-  file, and behind bun everywhere. The gap is JavaScript executed by the
-  interpreter per request (the engine has no JIT); node and bun run that
-  code compiled.
-- `async` is bound by timer granularity (1 ms) as much as by CPU; `file` by
-  the cost of `open` on macOS.
+Streaming improved about 4% in the repeated comparison, but still trails Node and
+Bun. Remaining streaming costs are mostly VM execution and property access.
+File throughput more than doubled after removing an unnecessary working-directory
+lookup for absolute paths; p50 fell from 3.00 ms to 1.18 ms in the full-suite runs.
+Permission and symlink checks remain in place.
 
-The first column of costs is in `runtime/js/prelude.js`: `new URL` on the
-server's plain-URL path is one native call, `Response.json` and byte bodies
-skip header setup, untouched streams are driven from their source without
-promises, timers share one kernel timer, and path checks cache resolved
-directories.
+Node precomputes its JSON body; Node/Bun async handlers also await
+`Promise.resolve`, while Boomkat uses `.then` after the yield. Bun serves files
+with `Bun.file`, and Boomkat uses native `file.body`.

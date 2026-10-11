@@ -683,6 +683,61 @@ fn void write_batch(void* user) {
     }
 }
 
+struct StreamFinish {
+    UwsRes* res;
+    char[] bytes;
+}
+
+fn void write_stream_finish(void* user) {
+    StreamFinish* f = user;
+    uws_res_end(f.res, f.bytes.ptr, f.bytes.len);
+}
+
+// A source that closed within one bounded batch can end with a known length
+// instead of framing every part as a chunk and making another call to end.
+fn void js_stream_finish(JsCtx ctx, void* user) {
+    Conn* c = ctx.conn();
+    if (!c) {
+        ctx.ret_bool(true);
+        return;
+    }
+    JsArg arg = ctx.arg(1);
+    if (!arg.tv.is_object() || ((HObject*)arg.tv.get_heapptr()).get_class() != ARRAY) {
+        ctx.throw_error(TYPE, "stream batch must be an array");
+        return;
+    }
+    @pool() {
+        HObject* parts  = arg.tv.get_heapptr();
+        char[][] chunks = mem::temp_array(char[], *parts.array_len_ptr());
+        usz length      = 0;
+        foreach (i, &bytes : chunks) {
+            JsArg part = { .tv = parts.get_array_idx((uint)i) ?? (TVal) { } };
+            if (!part.is_bytes()) {
+                ctx.throw_error(TYPE, "stream chunk must be bytes");
+                return;
+            }
+            *bytes = part.bytes();
+            if (bytes.len > 65536 - length) {
+                ctx.ret_bool(false);
+                return;
+            }
+            length += bytes.len;
+        }
+        char[] body = chunks.len == 1 ? chunks[0] : mem::temp_array(char, (sz)length);
+        if (chunks.len > 1) {
+            usz at = 0;
+            foreach (bytes : chunks) {
+                if (bytes.len) body[at:bytes.len] = bytes[..];
+                at += bytes.len;
+            }
+        }
+        StreamFinish f = { c.res, body };
+        corked(c, &write_stream_finish, &f);
+        done(c);
+        ctx.ret_bool(true);
+    };
+}
+
 // stream_write(id, bytes) -> false once the client is behind; JS then
 // waits for __drain(id).
 fn void js_stream_write(JsCtx ctx, void* udata) {
@@ -919,6 +974,7 @@ const Native[] HTTP_NATIVES = {
     { "respond", &js_respond, 5 },
     { "streamStart", &js_stream_start, 4 },
     { "streamWrite", &js_stream_write, 2 },
+    { "streamFinish", &js_stream_finish, 2 },
     { "streamEnd", &js_stream_end, 1 },
     { "reqUrl", &js_req_url, 1 },
     { "reqHeaders", &js_req_headers, 1 },

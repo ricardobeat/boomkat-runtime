@@ -136,7 +136,8 @@ fn void native_file_done(Task* task) {
 }
 
 fn void native_file_start(Conn* c, String raw_path, int status, String status_text, String headers) {
-    String path = canonical(raw_path, (String)(path::tcwd() ?? (Path)"/"));
+    // absolute() resolves cwd only when the supplied path is relative.
+    String path = canonical(raw_path);
     if (!check_path(READ, path)) {
         response_error(c, "PERMISSION_DENIED", denied_path(READ, raw_path));
         return;
