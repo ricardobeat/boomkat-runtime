@@ -3,7 +3,7 @@
 # gives it an extern "C" surface C3 can bind.
 #
 # Kept out of project.json because c3c's c-sources drive a C compiler, and the
-# shim needs a C++ one. Run this before `c3c build test-server-uws`.
+# shim needs a C++ one. Run this before `c3c build bkr`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

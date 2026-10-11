@@ -45,4 +45,4 @@ fi
 ./scripts/build_uws.sh
 
 echo
-echo "vendor/ ready. Now:  c3c build test-server && c3c build test-server-uws"
+echo "vendor/ ready. Now:  c3c build test-server && c3c build bkr"

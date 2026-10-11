@@ -1,8 +1,11 @@
 // Exercises the fetch-style API: run with
-//   ./out/test-server-uws 8080 1 examples/api.js
+//   ./out/bkr --allow-net examples/api.js
+import { serve } from "http";
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-({
+serve({
+    port: 8080,
     async fetch(req) {
         const url = new URL(req.url);
         switch (url.pathname) {
@@ -37,4 +40,4 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 return new Response("not found: " + url.pathname, { status: 404 });
         }
     },
-})
+});
