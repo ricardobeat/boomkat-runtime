@@ -222,15 +222,76 @@ bk.describe = (v) => v instanceof Error && v.stack ? v.stack : typeof v === "str
 
 // ---- timers ----
 
+// Every timer lives in one heap; a single native timer is armed for the
+// earliest, so a burst of timers costs one kernel timer, not one each.
 const timers = new Map();
+const heap = [];
 let nextTimer = 1;
+let armed = 0;
+let armedDue = 0;
 
-bk.timerFire = function (id) {
-    const t = timers.get(id);
-    if (t === undefined) return;
-    if (t.interval >= 0) t.handle = bk.timerStart(t.interval, id);
-    else timers.delete(id);
-    t.fn.apply(undefined, t.args);
+const before = (a, b) => a.due < b.due || (a.due === b.due && a.id < b.id);
+
+function heapPush(e) {
+    let i = heap.push(e) - 1;
+    while (i > 0) {
+        const parent = (i - 1) >> 1;
+        if (!before(e, heap[parent])) break;
+        heap[i] = heap[parent];
+        i = parent;
+    }
+    heap[i] = e;
+}
+
+function heapPop() {
+    const top = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+        let i = 0;
+        for (;;) {
+            let c = 2 * i + 1;
+            if (c >= heap.length) break;
+            if (c + 1 < heap.length && before(heap[c + 1], heap[c])) c++;
+            if (!before(heap[c], last)) break;
+            heap[i] = heap[c];
+            i = c;
+        }
+        heap[i] = last;
+    }
+    return top;
+}
+
+function arm(now) {
+    while (heap.length > 0 && !timers.has(heap[0].id)) heapPop();
+    if (heap.length === 0) {
+        if (armed !== 0) { bk.timerCancel(armed); armed = 0; }
+        return;
+    }
+    const due = heap[0].due;
+    if (armed !== 0) {
+        if (due >= armedDue) return;
+        bk.timerCancel(armed);
+    }
+    armedDue = due;
+    armed = bk.timerStart(Math.max(1, Math.round(due - now)), 0);
+}
+
+bk.timerFire = function () {
+    armed = 0;
+    const now = bk.now();
+    while (heap.length > 0 && heap[0].due <= now + 0.5) {
+        const e = heapPop();
+        const t = timers.get(e.id);
+        if (t === undefined) continue;
+        if (t.interval >= 0) {
+            e.due = now + Math.max(t.interval, 1);
+            heapPush(e);
+        } else {
+            timers.delete(e.id);
+        }
+        t.fn.apply(undefined, t.args);
+    }
+    arm(bk.now());
 };
 
 function addTimer(fn, ms, args, repeat) {
@@ -238,15 +299,19 @@ function addTimer(fn, ms, args, repeat) {
     ms = +ms;
     if (!(ms >= 0)) ms = 0;
     const id = nextTimer++;
-    timers.set(id, { fn, args, interval: repeat ? ms : -1, handle: bk.timerStart(ms, id) });
+    const now = bk.now();
+    timers.set(id, { fn, args, interval: repeat ? ms : -1 });
+    heapPush({ id, due: now + Math.max(ms, 1) });
+    arm(now);
     return id;
 }
 
 function clearTimer(id) {
-    const t = timers.get(id);
-    if (t === undefined) return;
-    timers.delete(id);
-    bk.timerCancel(t.handle);
+    if (!timers.delete(id)) return;
+    if (timers.size === 0) {
+        heap.length = 0;
+        arm(0);
+    }
 }
 
 def("setTimeout", (fn, ms, ...args) => addTimer(fn, ms, args, false));

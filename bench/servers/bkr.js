@@ -6,21 +6,18 @@ const [port, payload] = args;
 const chunk = new TextEncoder().encode("x".repeat(1024));
 const data = { id: 1, name: "boomkat", tags: ["a", "b", "c"], nested: { ok: true, n: 42.5 } };
 
+const later = () => new Promise((r) => setTimeout(r, 0));
+
 serve({
     port: Number(port),
     hostname: "127.0.0.1",
     onListen() {},
-    async fetch(req) {
-        const path = new URL(req.url).pathname;
-        switch (path) {
+    fetch(req) {
+        switch (new URL(req.url).pathname) {
             case "/hello": return new Response("hello world");
             case "/json": return Response.json(data);
-            case "/async": {
-                await Promise.resolve();
-                await new Promise((r) => setTimeout(r, 0));
-                return Response.json({ ok: true });
-            }
-            case "/echo": return new Response(await req.bytes());
+            case "/async": return later().then(() => Response.json({ ok: true }));
+            case "/echo": return req.bytes().then((b) => new Response(b));
             case "/stream": {
                 let n = 0;
                 return new Response(new ReadableStream({
@@ -30,7 +27,7 @@ serve({
                     },
                 }));
             }
-            case "/file": return new Response(await file.read(payload));
+            case "/file": return file.read(payload).then((b) => new Response(b));
         }
         return new Response("not found", { status: 404 });
     },
