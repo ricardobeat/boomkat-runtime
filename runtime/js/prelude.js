@@ -279,7 +279,7 @@ function arm(now) {
 bk.timerFire = function () {
     armed = 0;
     const now = bk.now();
-    while (heap.length > 0 && heap[0].due <= now + 0.5) {
+    while (heap.length > 0 && heap[0].due <= now + 1) {
         const e = heapPop();
         const t = timers.get(e.id);
         if (t === undefined) continue;
@@ -318,6 +318,33 @@ def("setTimeout", (fn, ms, ...args) => addTimer(fn, ms, args, false));
 def("setInterval", (fn, ms, ...args) => addTimer(fn, ms, args, true));
 def("clearTimeout", clearTimer);
 def("clearInterval", clearTimer);
+// Immediates run on the next loop turn, after I/O, all in one entry into JS.
+// Ones added while a batch runs wait for the next turn.
+let immediates = new Map();
+let running = null;
+let nextImmediate = 1;
+
+bk.immediateFire = function () {
+    running = immediates;
+    immediates = new Map();
+    for (const [id, t] of running) {
+        running.delete(id);
+        t.fn.apply(undefined, t.args);
+    }
+    running = null;
+};
+
+def("setImmediate", (fn, ...args) => {
+    if (typeof fn !== "function") throw new TypeError("callback must be a function");
+    const id = nextImmediate++;
+    if (immediates.size === 0) bk.immediateArm();
+    immediates.set(id, { fn, args });
+    return id;
+});
+def("clearImmediate", (id) => {
+    immediates.delete(id);
+    if (running !== null) running.delete(id);
+});
 def("queueMicrotask", (fn) => { Promise.resolve().then(fn); });
 
 const origin = bk.now();

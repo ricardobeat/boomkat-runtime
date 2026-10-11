@@ -56,6 +56,23 @@ fn void on_js_timer(void* user) {
     };
 }
 
+JsValue g_immediate_fire;
+bool g_immediate_armed;
+
+fn void on_immediates(void* user) {
+    g_immediate_armed = false;
+    unhold();
+    (void)call_js(g_immediate_fire, { });
+}
+
+// immediateArm(): run __bk.immediateFire on the next loop turn.
+fn void js_immediate_arm(JsCtx ctx, void* udata) {
+    if (g_immediate_armed) return;
+    g_immediate_armed = true;
+    hold();
+    uws_loop_defer(g_loop, &on_immediates, null);
+}
+
 // timerStart(ms, id) -> handle, a pointer a double holds exactly.
 fn void js_timer_start(JsCtx ctx, void* udata) {
     JsTimer* t = mem::new(JsTimer);
@@ -283,6 +300,7 @@ fn HostPort split_host_port(String s) {
 const Native[] CORE_NATIVES = {
     { "timerStart", &js_timer_start, 2 },
     { "timerCancel", &js_timer_cancel, 1 },
+    { "immediateArm", &js_immediate_arm, 0 },
     { "now", &js_now, 0 },
     { "urlFast", &js_url_fast, 1 },
     { "random", &js_random, 1 },
@@ -323,6 +341,7 @@ fn void? boot() {
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
     g_settle = bk_get("settle")!;
     g_timer_fire = bk_get("timerFire")!;
+    g_immediate_fire = bk_get("immediateFire")!;
     g_dispatch = bk_get("dispatch")!;
     g_handled = bk_get("handled")!;
     g_failed = bk_get("failed")!;
