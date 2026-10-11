@@ -123,12 +123,16 @@ code runs (Seatbelt `sandbox_init` on macOS, Landlock + seccomp-bpf on Linux,
 `pledge`/`unveil` on OpenBSD), so a bug in our ops code still cannot reach
 anything not granted.
 
-## Open decisions
+## Decisions (settled)
 
-1. Prompting or flags only? Prompts conflict with locking the OS sandbox at
-   startup: a prompt cannot grant what the OS policy did not already allow.
-2. Default posture: deny-all (Deno) or allow-all with opt-in restrictions?
-3. `net` granularity: host:port only, or listen vs. connect separately?
+1. Flags, a `boomkat.toml`, and TTY prompts. The OS sandbox is applied only
+   when prompting is off, since a prompt cannot grant what the OS policy
+   did not already allow.
+2. Deny-all by default.
+3. One `net` permission with allowlists; no listen/connect split.
+
+`read` returns chunks (`Uint8Array` or `null` at the end) rather than filling
+a caller-supplied BYOB buffer.
 
 ## Engine prerequisites (boomkat)
 
