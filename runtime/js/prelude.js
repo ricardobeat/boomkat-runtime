@@ -1132,7 +1132,7 @@ const BLOB_JSON = "content-type\n" + CT_JSON + "\n";
 // content-type as a constant blob and never builds a Headers.
 class Response {
     constructor(body, init) {
-        if (init === undefined && body instanceof Uint8Array) {
+        if (init === undefined && (body instanceof Uint8Array || body instanceof ReadableStream)) {
             this._ct = null;
             this._body = body;
             return;
@@ -1260,13 +1260,105 @@ function joinChunks(parts, size) {
     return out;
 }
 
-// Chunks already queued go out as one write, so a stream that produces
-// synchronously costs one syscall per batch rather than one per chunk.
-async function pump(id, res) {
+// A stream nobody else touched is driven straight from its source: pull
+// feeds a local batch instead of the stream's queue and promises.
+function directSource(stream) {
+    const src = stream._source;
+    return stream._reader === null && stream._state === "readable" && stream._queue.length === 0 && !src.start && typeof src.pull === "function";
+}
+
+const isThenable = (r) => r !== undefined && r !== null && typeof r.then === "function";
+
+// Stands in for the stream controller while a direct source is pumped.
+class Sink {
+    constructor() {
+        this.parts = [];
+        this.size = 0;
+        this.closed = false;
+        this.failed = null;
+        this.nudge = null;
+    }
+    get desiredSize() { return 1; }
+    enqueue(value) {
+        const chunk = typeof value === "string" ? encoder.encode(value) : asBytes(value);
+        this.parts.push(chunk);
+        this.size += chunk.length;
+        this._wake();
+    }
+    close() { this.closed = true; this._wake(); }
+    error(e) { this.failed = e; this.closed = true; this._wake(); }
+    _wake() {
+        if (this.nudge === null) return;
+        const n = this.nudge;
+        this.nudge = null;
+        n();
+    }
+    take() {
+        const out = this.parts.length === 1 ? this.parts[0] : joinChunks(this.parts, this.size);
+        this.parts = [];
+        this.size = 0;
+        return out;
+    }
+}
+
+function pump(id, res) {
+    const stream = res._body;
+    bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob());
+    if (!directSource(stream)) { pumpQueued(id, stream); return; }
+    stream._reader = stream;
+    const src = stream._source;
+    const sink = new Sink();
+    // Chunks that arrive together go out as one write; a source that
+    // produces synchronously never leaves this loop or makes a promise.
+    try {
+        while (!sink.closed && sink.size < BATCH) {
+            const r = src.pull(sink);
+            if (isThenable(r)) { pumpSource(id, stream, sink, r); return; }
+        }
+        if (sink.failed === null && sink.parts.length > 0 && !sink.closed) { pumpSource(id, stream, sink, undefined); return; }
+        if (sink.failed === null && sink.parts.length > 0) bk.streamWrite(id, sink.take());
+    } catch (e) {
+        report(e);
+        bk.streamEnd(id);
+        return;
+    }
+    if (sink.failed !== null) report(sink.failed);
+    stream._state = "closed";
+    bk.streamEnd(id);
+}
+
+// The general case: pulls that take time, big or endless sources, or a peer that is slow to read.
+async function pumpSource(id, stream, sink, waiting) {
     const s = { wake: null, aborted: false };
     streams.set(id, s);
-    bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob());
-    const stream = res._body;
+    const src = stream._source;
+    try {
+        for (;;) {
+            if (waiting !== undefined) await waiting;
+            waiting = undefined;
+            if (s.aborted) break;
+            if (sink.parts.length === 0 && !sink.closed) await new Promise((r) => { sink.nudge = r; });
+            if (sink.parts.length > 0) {
+                if (!bk.streamWrite(id, sink.take()) && !s.aborted) await new Promise((r) => { s.wake = r; });
+            }
+            if (sink.closed || s.aborted) break;
+            waiting = src.pull(sink);
+            if (!isThenable(waiting)) waiting = undefined;
+        }
+        if (sink.failed !== null) throw sink.failed;
+        if (s.aborted && src.cancel) src.cancel();
+        stream._state = "closed";
+    } catch (e) {
+        report(e);
+    } finally {
+        streams.delete(id);
+        bk.streamEnd(id);
+    }
+}
+
+async function pumpQueued(id, stream) {
+    const s = { wake: null, aborted: false };
+    streams.set(id, s);
     const reader = stream.getReader();
     const parts = [];
     try {
