@@ -52,12 +52,17 @@ verification, redirects re-checked against the net grants), `Request`,
 `performance`, timers, `structuredClone`, and an `unhandledrejection` event
 (unhandled rejections end the process with status 1 unless prevented).
 
+JS timers use nanosecond native re-arms on kqueue/epoll while retaining the
+1 ms minimum JS delay. Each batch uses a fixed deadline cutoff so repeating
+timers yield to another loop turn.
+
 `bkr check script.js` lists the built-ins a module graph imports and the
 flags it will probably need.
 
 Regression checks:
 
 ```sh
+bash scripts/build_uws.sh
 c3c build bkr-perf
 ./out/bkr-perf --no-sandbox tests/timers.js
 BKR_HTTP_STRESS=1 BKR_BIN="$PWD/out/bkr-perf" python3 tests/run_http.py

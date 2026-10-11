@@ -100,11 +100,13 @@ fn void timer_arm(ulong now) {
         timer_cancel(g_timer_native);
     }
     g_timer_armed_due = due;
-    long ms = due > now ? (long)((due - now + 999_999) / 1_000_000) : 1;
-    g_timer_native = timer_start(ms, &timer_native_fired, null);
+    ulong delay = due > now ? due - now : 1;
+    g_timer_native = timer_start_ns(delay, &timer_native_fired, null);
 }
 
 fn void fire_timers() {
+    // Keep this cutoff fixed: intervals reinserted by this batch belong to a
+    // later loop turn even if their callbacks take longer than the interval.
     ulong now = now_ns();
     while (g_timer_heap.len() && g_timer_heap[0].due <= now) {
         PendingTimer* t = g_timer_heap[0];

@@ -17,6 +17,7 @@ extern fn void uws_loop_defer(void* loop, Callback cb, void* user);
 extern fn UsTimer* us_create_timer(void* loop, CInt fallthrough, CUInt ext_size);
 extern fn void* us_timer_ext(UsTimer* t);
 extern fn void us_timer_set(UsTimer* t, UsTimerCb cb, CInt ms, CInt repeat_ms);
+extern fn void uws_timer_set_ns(UsTimer* t, UsTimerCb cb, ulong ns);
 extern fn void us_timer_close(UsTimer* t);
 
 void* g_loop;
@@ -40,6 +41,14 @@ fn UsTimer* timer_start(long ms, Callback cb, void* user) {
     *(TimerExt*)us_timer_ext(t) = { cb, user };
     // uSockets reads 0 as disarmed.
     us_timer_set(t, &timer_fired, (CInt)max(1, min(ms, (long)int::max)), 0);
+    return t;
+}
+
+// Precise one-shot for JS deadlines, including deadlines already overdue.
+fn UsTimer* timer_start_ns(ulong ns, Callback cb, void* user) {
+    UsTimer* t = us_create_timer(g_loop, 0, TimerExt::size);
+    *(TimerExt*)us_timer_ext(t) = { cb, user };
+    uws_timer_set_ns(t, &timer_fired, max(ns, 1ul));
     return t;
 }
 

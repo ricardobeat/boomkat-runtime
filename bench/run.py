@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Runs each workload against bkr, node and bun with wrk and prints a table.
 
-  bench/run.py [seconds] [connections]
+  bench/run.py [seconds] [connections] [workload]
 
 Per run: req/s and latency from wrk, CPU as server cpu-seconds over wall
 seconds (100% is one core), memory as peak RSS sampled during the run.
@@ -27,6 +27,10 @@ WORKLOADS = [
     ("stream 8KB", "/stream", None),
     ("file 4KB", "/file", None),
 ]
+if len(sys.argv) > 3:
+    WORKLOADS = [w for w in WORKLOADS if w[0] == sys.argv[3]]
+    if not WORKLOADS:
+        raise SystemExit(f"unknown workload: {sys.argv[3]}")
 LUA = os.path.join(ROOT, "post.lua")
 open(LUA, "w").write('wrk.method = "POST"\nwrk.body = string.rep("a", 1024)\n')
 
