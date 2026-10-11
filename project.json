@@ -6,30 +6,31 @@
   // native C3 binding links engine internals, so there is no prebuilt lib).
   // Paths are absolute because the engine lives outside this project.
   "c-sources": [
-    "/Users/rtomasi/Projects/boomkat/libregexp/libregexp.c",
-    "/Users/rtomasi/Projects/boomkat/libregexp/libunicode.c",
-    "/Users/rtomasi/Projects/boomkat/libregexp/re_wrapper.c",
-    "/Users/rtomasi/Projects/boomkat/libregexp/unicode_wrapper.c",
-    "/Users/rtomasi/Projects/boomkat/vendor/dtoa/cutils.c",
-    "/Users/rtomasi/Projects/boomkat/vendor/dtoa/dtoa.c",
-    "/Users/rtomasi/Projects/boomkat/src/dtoa_wrapper.c",
-    "/Users/rtomasi/Projects/boomkat/src/date_math.c"
+    "/Users/rtomasi/cousas/boomkat/libregexp/libregexp.c",
+    "/Users/rtomasi/cousas/boomkat/libregexp/libunicode.c",
+    "/Users/rtomasi/cousas/boomkat/libregexp/re_wrapper.c",
+    "/Users/rtomasi/cousas/boomkat/libregexp/unicode_wrapper.c",
+    "/Users/rtomasi/cousas/boomkat/vendor/dtoa/cutils.c",
+    "/Users/rtomasi/cousas/boomkat/vendor/dtoa/dtoa.c",
+    "/Users/rtomasi/cousas/boomkat/src/dtoa_wrapper.c",
+    "/Users/rtomasi/cousas/boomkat/src/date_math.c",
+    "/Users/rtomasi/cousas/boomkat/src/native_stack.c",
+    "/Users/rtomasi/cousas/boomkat/src/sysmem.c"
   ],
   "cflags": "-O2",
   "c-include-dirs": [
-    "/Users/rtomasi/Projects/boomkat/vendor/dtoa",
-    "/Users/rtomasi/Projects/boomkat/libregexp"
+    "/Users/rtomasi/cousas/boomkat/vendor/dtoa",
+    "/Users/rtomasi/cousas/boomkat/libregexp"
   ],
 
   "dependency-search-paths": [ "vendor" ],
-  "dependencies": [ "libwebsockets" ],
 
   "targets": {
     "test-server": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/Projects/boomkat/src",
-        "/Users/rtomasi/Projects/boomkat/bindings/c3/boomkat.c3",
+        "/Users/rtomasi/cousas/boomkat/src",
+        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "src/**"
       ],
       "opt": "O3",
@@ -37,6 +38,7 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       "features": [ "THREADED_DISPATCH" ],
+      "dependencies": [ "libwebsockets" ],
       "linked-libraries": [ "vendor/lws-src/build/lib/libwebsockets.a" ],
       "link-args": [ "-lssl", "-lcrypto" ]
     },
@@ -47,15 +49,15 @@
     "test-server-uws": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/Projects/boomkat/src",
-        "/Users/rtomasi/Projects/boomkat/bindings/c3/boomkat.c3",
+        "/Users/rtomasi/cousas/boomkat/src",
+        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "src-uws/**"
       ],
       "opt": "O3",
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "none",
-      "features": [ "THREADED_DISPATCH" ],
+      "features": [ "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++" ]
     }

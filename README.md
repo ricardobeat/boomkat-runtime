@@ -26,6 +26,26 @@ function handler(method, url) {
 }
 ```
 
+## Fetch-style handlers (uWebSockets build)
+
+The uWebSockets server takes a script that evaluates to `{ fetch(req) }` (or a
+bare function), the shape Bun, Deno and Cloudflare Workers share. The handler
+gets a `Request` and returns a `Response` or a Promise of one:
+
+```sh
+./out/test-server-uws 8080 1 examples/api.js
+```
+
+Available: `Request`, `Response` (`json`, `redirect`), `Headers`, `URL`,
+`URLSearchParams`, `TextEncoder`/`TextDecoder`, `setTimeout`/`setInterval`,
+`queueMicrotask`, `console`. Bodies are strings (bytes are UTF-8 decoded); no
+streams, `formData()` or `blob()`. Request bodies above 16 MB get a 413.
+
+The C++ shim is one-line pass-throughs over uWS. Request glue, body
+buffering, pending responses and timers are C3 (`src-uws/main.c3`); the Web
+API classes are JS (`src-uws/prelude.c3`). The libwebsockets build still uses
+the older `handler(method, url)` form below.
+
 ## Build and run
 
 ```sh
@@ -111,7 +131,7 @@ of these already existed but are scoped to a callback, so they are unusable
 here.
 
 **The boomkat source tree is linked in place**, not vendored: `project.json`
-points absolute paths at `/Users/rtomasi/Projects/boomkat`. `vendor/libboomkat.dylib`
+points absolute paths at `/Users/rtomasi/cousas/boomkat`. `vendor/libboomkat.dylib`
 is currently unused — it is the C ABI build, and the native binding compiles
 the engine from source instead. This is the open question from the start of
 the session and is worth settling: the project won't build on another machine

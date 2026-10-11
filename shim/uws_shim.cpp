@@ -1,9 +1,10 @@
 // extern "C" shim over uWebSockets.
 //
 // uWebSockets is C++ (header-only, templated on the SSL flag), so C3 cannot
-// bind it directly. This exposes the smallest surface the server needs: run
-// one or more listener threads that hand each request's method and URL to a C
-// callback and send back whatever the callback writes.
+// bind it directly. This is a thin, one-to-one C surface over the parts of
+// HttpRequest and HttpResponse the server uses. Everything above that --
+// buffering bodies, building the Request, writing a Response, timers' JS side
+// -- lives in C3 (src-uws/), so this file should stay a set of pass-throughs.
 //
 // Threading is the caller's job: this runs exactly one event loop on the calling
 // thread. uSockets sets SO_REUSEPORT on the listen socket, so several threads
@@ -24,14 +25,50 @@
 
 extern "C" {
 
-// Fills `out` with the response body and writes its length and HTTP status
-// through the out-parameters. Called on the loop thread that owns `user`, one
-// request at a time, so a `user` never sees concurrent calls.
-typedef void (*uws_req_cb)(void *user,
-                           const char *method, size_t method_len,
-                           const char *url, size_t url_len,
-                           char *out, size_t out_cap, size_t *out_len,
-                           int *out_status);
+// Opaque to the caller: these are uWS::HttpRequest and uWS::HttpResponse<false>.
+// A request is only valid during the request callback; a response is valid
+// until it is ended or its abort callback runs.
+typedef struct uws_req uws_req;
+typedef struct uws_res uws_res;
+
+// Called on the loop thread that owns `user`, one request at a time. Whatever
+// the callback does not end before returning it must have hooked with
+// uws_res_on_aborted, as uWS requires.
+typedef void (*uws_req_cb)(void *user, uws_req *req, uws_res *res);
+
+// ---- request, valid only inside the request callback ----
+
+// Lowercase, as uWS reports it.
+size_t uws_req_method(uws_req *req, const char **out);
+// Path only; the query is separate.
+size_t uws_req_url(uws_req *req, const char **out);
+// Without the leading '?'; empty when there is none.
+size_t uws_req_query(uws_req *req, const char **out);
+// Header `i` in arrival order, keys lowercased. Returns 0 past the last one.
+int uws_req_header(uws_req *req, int i, const char **key, size_t *key_len,
+                   const char **val, size_t *val_len);
+
+// ---- response ----
+
+// `last` is set on the final chunk. The chunk is only valid during the call.
+typedef void (*uws_data_cb)(void *user, const char *chunk, size_t len, int last);
+void uws_res_on_data(uws_res *res, uws_data_cb cb, void *user);
+void uws_res_on_aborted(uws_res *res, void (*cb)(void *), void *user);
+
+// `status` is the full status line text, e.g. "404 Not Found".
+void uws_res_write_status(uws_res *res, const char *status, size_t len);
+void uws_res_write_header(uws_res *res, const char *key, size_t key_len,
+                          const char *val, size_t val_len);
+void uws_res_end(uws_res *res, const char *body, size_t len);
+// Run `cb(user)` with the socket corked, so writes made outside the request
+// callback still leave as one packet.
+void uws_res_cork(uws_res *res, void (*cb)(void *), void *user);
+
+// Run `cb(user)` once after `ms` milliseconds on the calling thread's loop.
+// The returned handle is valid until the callback starts or the timer is
+// cancelled, whichever comes first.
+void *uws_timer_start(int ms, void (*cb)(void *), void *user);
+void uws_timer_cancel(void *timer);
 
 // Runs one listener on the calling thread. Blocks forever once bound.
 // Returns 0 if the port was bound, -1 if it was not.
@@ -45,16 +82,19 @@ typedef void (*uws_req_cb)(void *user,
 // them -- measured as one busy thread and the rest idle. Handing the accepted
 // fd across loops explicitly does not depend on kernel behaviour. It is the
 // approach uWebSockets' own LocalCluster.h takes.
-int uws_run_one(int port, uws_req_cb cb, void *user, size_t max_body,
-                int index, int nthreads);
+int uws_run_one(int port, uws_req_cb cb, void *user, int index, int nthreads);
 
 }
 
+using Req = uWS::HttpRequest;
+using Res = uWS::HttpResponse<false>;
+
 namespace {
 
-// Matches the 8 KB response cap on the libwebsockets server, so the two are
-// limited the same way rather than one silently truncating later than the other.
-constexpr size_t kDefaultMaxBody = 8192;
+struct TimerExt {
+    void (*cb)(void *);
+    void *user;
+};
 
 // Cluster rendezvous. Every loop must be constructed and registered before any
 // of them starts accepting, or a socket could be handed to a null app.
@@ -73,14 +113,8 @@ Cluster g_cluster;
 // accepting loop's own index reaches it through this instead.
 thread_local int t_index = -1;
 
-bool serve(int port, uws_req_cb cb, void *user, size_t max_body,
-           int index, int nthreads) {
+bool serve(int port, uws_req_cb cb, void *user, int index, int nthreads) {
     bool listening = false;
-
-    // Reused across requests: handlers run one at a time on this thread and
-    // the body is copied into the socket before the next one starts, so there
-    // is nothing to keep between calls. Per-thread, never shared.
-    std::vector<char> buf(max_body);
 
     uWS::App app;
 
@@ -115,33 +149,8 @@ bool serve(int port, uws_req_cb cb, void *user, size_t max_body,
         });
     }
 
-    app.any("/*", [cb, user, &buf, max_body](auto *res, auto *req) {
-        // uWS reports the method lowercase ("get"); the libwebsockets server
-        // reports it uppercase, and the JS handler echoes it, so normalise
-        // here to keep the two servers byte-identical.
-        std::string_view m = req->getMethod();
-        char method[16];
-        size_t mlen = m.size() < sizeof(method) ? m.size() : sizeof(method);
-        for (size_t i = 0; i < mlen; i++) {
-            char c = m[i];
-            method[i] = (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
-        }
-
-        std::string_view u = req->getUrl();
-
-        size_t out_len = 0;
-        int status = 200;
-        cb(user, method, mlen, u.data(), u.size(), buf.data(), max_body,
-           &out_len, &status);
-        if (out_len > max_body) out_len = max_body;
-
-        // 200 is uWS's default, so only a failure writes a status line.
-        if (status != 200) {
-            res->writeStatus(status == 500 ? "500 Internal Server Error"
-                                           : "400 Bad Request");
-        }
-        res->writeHeader("Content-Type", "text/plain");
-        res->end(std::string_view(buf.data(), out_len));
+    app.any("/*", [cb, user](auto *res, auto *req) {
+        cb(user, (uws_req *)req, (uws_res *)res);
     });
 
     app.listen("127.0.0.1", port, [&listening](auto *token) {
@@ -155,10 +164,82 @@ bool serve(int port, uws_req_cb cb, void *user, size_t max_body,
 
 } // namespace
 
-int uws_run_one(int port, uws_req_cb cb, void *user, size_t max_body,
-                int index, int nthreads) {
+size_t uws_req_method(uws_req *req, const char **out) {
+    std::string_view v = ((Req *)req)->getMethod();
+    *out = v.data();
+    return v.size();
+}
+
+size_t uws_req_url(uws_req *req, const char **out) {
+    std::string_view v = ((Req *)req)->getUrl();
+    *out = v.data();
+    return v.size();
+}
+
+size_t uws_req_query(uws_req *req, const char **out) {
+    std::string_view v = ((Req *)req)->getQuery();
+    *out = v.data();
+    return v.size();
+}
+
+int uws_req_header(uws_req *req, int i, const char **key, size_t *key_len,
+                   const char **val, size_t *val_len) {
+    int n = 0;
+    for (auto [k, v] : *(Req *)req) {
+        if (n++ != i) continue;
+        *key = k.data(); *key_len = k.size();
+        *val = v.data(); *val_len = v.size();
+        return 1;
+    }
+    return 0;
+}
+
+void uws_res_on_data(uws_res *res, uws_data_cb cb, void *user) {
+    ((Res *)res)->onData([cb, user](std::string_view chunk, bool last) {
+        cb(user, chunk.data(), chunk.size(), last ? 1 : 0);
+    });
+}
+
+void uws_res_on_aborted(uws_res *res, void (*cb)(void *), void *user) {
+    ((Res *)res)->onAborted([cb, user]() { cb(user); });
+}
+
+void uws_res_write_status(uws_res *res, const char *status, size_t len) {
+    ((Res *)res)->writeStatus(std::string_view(status, len));
+}
+
+void uws_res_write_header(uws_res *res, const char *key, size_t key_len,
+                          const char *val, size_t val_len) {
+    ((Res *)res)->writeHeader(std::string_view(key, key_len), std::string_view(val, val_len));
+}
+
+void uws_res_end(uws_res *res, const char *body, size_t len) {
+    ((Res *)res)->end(std::string_view(body, len));
+}
+
+void uws_res_cork(uws_res *res, void (*cb)(void *), void *user) {
+    ((Res *)res)->cork([cb, user]() { cb(user); });
+}
+
+void *uws_timer_start(int ms, void (*cb)(void *), void *user) {
+    struct us_loop_t *loop = (struct us_loop_t *)uWS::Loop::get();
+    struct us_timer_t *t = us_create_timer(loop, 0, sizeof(TimerExt));
+    *(TimerExt *)us_timer_ext(t) = TimerExt{cb, user};
+    // uSockets reads 0 ms as "disarmed", and a 0 ms timeout means "soon".
+    us_timer_set(t, [](struct us_timer_t *t) {
+        TimerExt e = *(TimerExt *)us_timer_ext(t);
+        us_timer_close(t);
+        e.cb(e.user);
+    }, ms < 1 ? 1 : ms, 0);
+    return t;
+}
+
+void uws_timer_cancel(void *timer) {
+    if (timer != nullptr) us_timer_close((struct us_timer_t *)timer);
+}
+
+int uws_run_one(int port, uws_req_cb cb, void *user, int index, int nthreads) {
     if (cb == nullptr || nthreads < 1 || index < 0 || index >= nthreads) return -1;
-    if (max_body == 0) max_body = kDefaultMaxBody;
 
     if (nthreads > 1) {
         // The first caller in sizes the cluster; all callers must agree.
@@ -171,5 +252,5 @@ int uws_run_one(int port, uws_req_cb cb, void *user, size_t max_body,
         }
     }
 
-    return serve(port, cb, user, max_body, index, nthreads) ? 0 : -1;
+    return serve(port, cb, user, index, nthreads) ? 0 : -1;
 }
