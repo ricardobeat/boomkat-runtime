@@ -9,6 +9,7 @@ function info(text) {
     return { kind, size: Number(size), mtime: new Date(Number(mtime)), mode: Number(mode) };
 }
 
+export const body = (path) => new bk.FileBody(toPath(path));
 export const read = (path) => bk.op(bk.readFile, toPath(path));
 export const readText = (path) => bk.op(bk.readText, toPath(path));
 export const write = (path, data, { append = false } = {}) => bk.op(bk.writeFile, toPath(path), toBytes(data), append);

@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PAYLOAD = os.path.join(ROOT, "payload.txt")
 PORT = {"bkr": 18001, "node": 18002, "bun": 18003}
 CMD = {
-    "bkr": lambda p: [os.path.join(ROOT, "..", "out", "bkr"), "--allow-net", f"--allow-read={ROOT}", os.path.join(ROOT, "servers/bkr.js"), str(p), PAYLOAD],
+    "bkr": lambda p: [os.environ.get("BKR_BIN", os.path.join(ROOT, "..", "out", "bkr")), "--allow-net", f"--allow-read={ROOT}", os.path.join(ROOT, "servers/bkr.js"), str(p), PAYLOAD],
     "node": lambda p: ["node", os.path.join(ROOT, "servers/node.mjs"), str(p), PAYLOAD],
     "bun": lambda p: ["bun", os.path.join(ROOT, "servers/bun.js"), str(p), PAYLOAD],
 }
@@ -69,6 +69,7 @@ for name in CMD:
     else:
         print(name, "failed to start:", proc.stderr.read().decode()[:300]); proc.kill(); continue
     for label, path, method in WORKLOADS:
+        print(f"Running {name}: {label}", file=sys.stderr, flush=True)
         wrk(port, path, method)
         c0, t0 = cpu_seconds(proc.pid), time.time()
         peak = 0

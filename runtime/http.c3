@@ -3,6 +3,7 @@
 module bkr;
 
 import boomkat;
+import boomkat::builtins;
 import boomkat::heap;
 import boomkat::hobject;
 import boomkat::hstring;
@@ -43,6 +44,7 @@ extern fn void uws_res_write_status(UwsRes* res, char* status, sz len);
 extern fn void uws_res_write_header(UwsRes* res, char* key, sz key_len, char* val, sz val_len);
 extern fn CInt uws_res_write(UwsRes* res, char* data, sz len);
 extern fn void uws_res_end(UwsRes* res, char* body, sz len);
+extern fn void uws_res_close(UwsRes* res);
 extern fn void uws_res_end_empty(UwsRes* res);
 extern fn void uws_res_cork(UwsRes* res, Callback cb, void* user);
 
@@ -74,12 +76,14 @@ struct Static {
 // captures them first, since uWS reuses the request buffer.
 struct Conn {
     Server* server;
-    uint id;
+    ulong id;
     UwsRes* res;
     bool aborted;
     bool in_request;
     bool streaming;
     bool head;
+    bool discard_body;
+    NativeFile* file_body;
     UwsReq* req;
     UwsHeader[] hdrs;
     String path;
@@ -94,7 +98,7 @@ List{Server*} g_servers;
 List{Conn*} g_conns;
 List{uint} g_free_slots;
 List{Conn*} g_spare;
-uint g_generation;
+ulong g_generation;
 
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
 JsValue[METHODS.len] g_methods;
@@ -116,12 +120,20 @@ struct FastTypes {
     HString* k_used;
     HString* k_status;
     HString* k_ct;
-    JsValue[7] keep;
+    HString* k_url;
+    HString* k_header_blob;
+    HObject* file_proto;
+    HString* k_file_path;
+    JsValue[10] keep;
 }
 
 FastTypes g_fast;
 JsValue g_drain;
 JsValue g_aborted;
+JsValue g_http_fulfilled;
+JsValue g_http_rejected;
+JsValue g_http_then;
+JsValue g_http_error;
 
 fn void? init_http() {
     g_servers.init(mem);
@@ -129,6 +141,10 @@ fn void? init_http() {
     g_free_slots.init(mem, 256);
     g_spare.init(mem, 256);
     foreach (i, m : METHODS) g_methods[i] = g_rt.string(m)!;
+    g_http_fulfilled = bk_get("httpFulfilled")!;
+    g_http_rejected = bk_get("httpRejected")!;
+    g_http_error = bk_get("error")!;
+    g_http_then = g_rt.root(g_rt.rt.heap.promise_proto.get_prop(g_rt.rt.heap.str(THEN), g_rt.rt.heap)!)!;
 }
 
 // ---- conn table ----
@@ -145,21 +161,21 @@ fn Conn* conn_new(Server* s, UwsRes* res) {
         slot = (uint)g_conns.len();
         g_conns.push(c);
     }
-    g_generation = (g_generation + 1) & ((1u << (32 - SLOT_BITS)) - 1);
+    g_generation = (g_generation + 1) & ((1ul << (53 - SLOT_BITS)) - 1);
     c.id = (g_generation << SLOT_BITS) | slot;
     return c;
 }
 
-fn Conn* conn_find(uint id) {
-    uint slot = id & SLOT_MASK;
+fn Conn* conn_find(ulong id) {
+    uint slot = (uint)(id & SLOT_MASK);
     if (slot >= g_conns.len()) return null;
     Conn* c = g_conns[slot];
     return c && c.id == id ? c : null;
 }
 
 fn void conn_free(Conn* c) {
-    g_conns[c.id & SLOT_MASK] = null;
-    g_free_slots.push(c.id & SLOT_MASK);
+    g_conns[(sz)(c.id & SLOT_MASK)] = null;
+    g_free_slots.push((uint)(c.id & SLOT_MASK));
     if (c.method.len) free(c.method.ptr);
     if (c.url.len) free(c.url.ptr);
     if (c.blob.len) free(c.blob.ptr);
@@ -254,7 +270,8 @@ fn void js_fast_types(JsCtx ctx, void* udata) {
     g_fast.response_proto = (HObject*)ctx.arg(1).tv.get_heapptr();
     g_fast.ct_text = ctx.arg(2).tv;
     g_fast.ct_json = ctx.arg(3).tv;
-    for (uint i = 0; i < 4; i++) (void)ctx.persist(ctx.arg(i));
+    g_fast.file_proto = ctx.arg(4).tv.get_heapptr();
+    for (uint i = 0; i < 5; i++) (void)ctx.persist(ctx.arg(i));
     g_fast.k_method = fast_key(0, "method");
     g_fast.k_id = fast_key(1, "_id");
     g_fast.k_body = fast_key(2, "_body");
@@ -262,6 +279,9 @@ fn void js_fast_types(JsCtx ctx, void* udata) {
     g_fast.k_used = fast_key(4, "_used");
     g_fast.k_status = fast_key(5, "status");
     g_fast.k_ct = fast_key(6, "_ct");
+    g_fast.k_url = fast_key(7, "_url");
+    g_fast.k_header_blob = fast_key(8, "_headerBlob");
+    g_fast.k_file_path = fast_key(9, "_path");
 }
 
 // fetchFor(index, fetch, server): call this server's handler straight from C3.
@@ -284,6 +304,14 @@ fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
     id.set_number((double)c.id);
     req.put_prop(g_fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
     req.put_prop(g_fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
+    // Metadata belongs to the Request even when the response has ended.
+    JsValue url  = g_rt.string(c.url_now())!;
+    JsValue blob = g_rt.string(c.blob_now())!;
+    TVal metadata;
+    g_rt.load(url, &metadata);
+    req.put_prop(g_fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
+    g_rt.load(blob, &metadata);
+    req.put_prop(g_fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
     if (has_body) {
         TVal b;
         b.set_object(new_u8(copy_bytes(body))!);
@@ -324,12 +352,18 @@ fn bool respond_fast(Conn* c, JsValue result) {
     }
     TVal b     = fast_get(o, g_fast.k_body);
     JsArg body = { .tv = b };
-    if (!b.is_null() && !b.is_string() && !body.is_bytes()) return false;
+    bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_fast.file_proto;
+    if (!b.is_null() && !b.is_string() && !body.is_bytes() && !file) return false;
     TVal t;
     t.set_boolean(true);
     o.put_prop(g_fast.k_used, t, hobject::PROP_FLAGS_WEC, g_rt.rt.heap);
     @pool() {
-        finish(c, 200, "", blob, b.is_null() ? (char[]) { } : body.bytes());
+        if (file) {
+            JsArg path = { .tv = fast_get((HObject*)b.get_heapptr(), g_fast.k_file_path) };
+            native_file_start(c, (String)path.bytes(), 200, "", blob);
+        } else {
+            finish(c, 200, "", blob, b.is_null() ? (char[]) { } : body.bytes());
+        }
     };
     return true;
 }
@@ -355,7 +389,7 @@ fn void dispatch(Conn* c, String method, char[] body, bool has_body) {
         if (!cached) m = g_rt.string(method) ?? { };
         JsValue[4] args = {
             c.server.index_value,
-            g_rt.number(c.id) ?? { },
+            g_rt.number((double)c.id) ?? { },
             m,
             has_body ? bytes_value(copy_bytes(body)) ?? { } : (JsValue) { },
         };
@@ -372,7 +406,7 @@ fn JsValue method_value(String method) {
 
 fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
     Server* s = c.server;
-    uint id   = c.id;
+    ulong id  = c.id;
     g_rt.@scope() {
         JsValue? req = new_request(c, method_value(method), body, has_body);
         if (catch req) return;
@@ -384,7 +418,7 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
                 if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
                 return;
             }
-            JsValue[3] fa = { s.index_value, g_rt.number(id) ?? { }, thrown };
+            JsValue[3] fa = { s.index_value, g_rt.number((double)id) ?? { }, thrown };
             if (catch call_js(g_failed, fa[..])) {
                 if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
             }
@@ -393,10 +427,120 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
         defer if (g_depth == 0 && g_rejections.len()) flush_rejections();
         if (conn_find(id) != c || !c.res) return;
         if (respond_fast(c, r)) return;
-        JsValue[3] ha = { s.index_value, g_rt.number(id) ?? { }, r };
+        if (subscribe_response(r, id)) {
+            if (catch g_rt.drain_microtasks()) report_uncaught();
+            return;
+        }
+        JsValue[3] ha = { s.index_value, g_rt.number((double)id) ?? { }, r };
         if (catch call_js(g_handled, ha[..])) {
             if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
         }
+    };
+}
+
+// Terminal reactions hold an id, never a borrowed Conn pointer. They are
+// ordinary GC-managed host functions and allocate no downstream promise.
+fn JsValue? response_callback(JsValue template_fn, ulong id) {
+    Heap* h = g_rt.rt.heap;
+    TVal template_value;
+    g_rt.load(template_fn, &template_value);
+    HObject* template_obj = template_value.get_heapptr();
+    HObject* fn_obj       = h.alloc_object(FUNCTION)!;
+    h.set_prototype(fn_obj, h.function_proto);
+    fn_obj.flags.callable = true;
+    fn_obj.extra_ptr().func.builtin_fn_index = template_obj.extra_ptr().func.builtin_fn_index;
+    fn_obj.extra_ptr().func.comp_func = null;
+    TVal value;
+    value.set_number((double)id);
+    fn_obj.put_prop(g_fast.k_id, value, hobject::PROP_FLAGS_WEC, h);
+    value.set_object(fn_obj);
+    return g_rt.root(value);
+}
+
+fn bool subscribe_response(JsValue result, ulong id) {
+    Heap* h = g_rt.rt.heap;
+    TVal value;
+    if (!g_rt.load(result, &value) || !value.is_object()) return false;
+    HObject* promise = value.get_heapptr();
+    if (promise.get_class() != PROMISE || promise.prototype != h.promise_proto) return false;
+    TVal expected;
+    g_rt.load(g_http_then, &expected);
+    TVal actual = promise.get_prop_proto(h.str(THEN), h) ?? (TVal) { };
+    if (!builtins::same_value(actual, expected) || !builtins::promise_default_species(h, promise)) return false;
+    JsValue? fulfilled = response_callback(g_http_fulfilled, id);
+    if (catch fulfilled) return false;
+    JsValue? rejected = response_callback(g_http_rejected, id);
+    if (catch rejected) return false;
+    TVal f, r, downstream;
+    g_rt.load(fulfilled, &f);
+    g_rt.load(rejected, &r);
+    downstream.set_undefined();
+    uint state = builtins::promise_get_state(promise, builtins::PROMISE_PENDING);
+    if (state == builtins::PROMISE_PENDING) {
+        HObject*? reaction = builtins::promise_create_reaction(h);
+        if (catch reaction) return false;
+        builtins::reaction_set(reaction, 0, f, h);
+        builtins::reaction_set(reaction, 1, r, h);
+        builtins::promise_add_reaction(promise, reaction, h);
+    } else {
+        builtins::promise_mark_handled(promise, h);
+        builtins::promise_enqueue_reaction(
+            h,
+            state,
+            state == builtins::PROMISE_FULFILLED ? f : r,
+            builtins::promise_get_result(promise),
+            downstream
+        );
+    }
+    return true;
+}
+
+fn Conn* response_callback_conn(JsCtx ctx) {
+    BuiltinContext* native = ctx.ctx;
+    if (!native.callee_obj) return null;
+    TVal id   = native.callee_obj.get_prop(g_fast.k_id, g_rt.rt.heap) ?? (TVal) { };
+    JsArg arg = { .tv = id };
+    return conn_find(arg.conn_id());
+}
+
+fn void js_http_fulfilled(JsCtx ctx, void* user) {
+    Conn* c = response_callback_conn(ctx);
+    if (!c || !c.res || c.aborted) return;
+    g_rt.@scope() {
+        JsValue value = g_rt.root(ctx.arg(0).tv) ?? { };
+        if (respond_fast(c, value)) return;
+        JsValue[3] args = { c.server.index_value, g_rt.number((double)c.id) ?? { }, value };
+        (void)call_js(g_handled, args[..]);
+    };
+}
+
+fn void js_http_rejected(JsCtx ctx, void* user) {
+    Conn* c = response_callback_conn(ctx);
+    if (!c || !c.res || c.aborted) return;
+    g_rt.@scope() {
+        JsValue[3] args = { c.server.index_value, g_rt.number((double)c.id) ?? { }, g_rt.root(ctx.arg(0).tv) ?? { } };
+        (void)call_js(g_failed, args[..]);
+    };
+}
+
+fn void response_error(Conn* c, String code, String message) {
+    if (c.aborted || !c.res) return;
+    g_rt.@scope() {
+        JsValue[2] parts = { g_rt.string(code) ?? { }, g_rt.string(message) ?? { } };
+        JsValue error    = g_rt.call(g_http_error, parts[..]) ?? { };
+        JsValue[3] args  = { c.server.index_value, g_rt.number((double)c.id) ?? { }, error };
+        (void)call_js(g_failed, args[..]);
+    };
+}
+
+fn void js_native_response(JsCtx ctx, void* user) {
+    Conn* c = ctx.conn();
+    if (!c) {
+        ctx.ret_bool(true);
+        return;
+    }
+    g_rt.@scope() {
+        ctx.ret_bool(respond_fast(c, g_rt.root(ctx.arg(1).tv) ?? { }));
     };
 }
 
@@ -473,8 +617,10 @@ fn void finish_plain(Conn* c, int status, String body) {
     finish(c, status, text, "content-type\ntext/plain;charset=UTF-8\n", body);
 }
 
+fn ulong JsArg.conn_id(self) => (ulong)(self.as_number() ?? 0);
+
 fn Conn* JsCtx.conn(self) {
-    Conn* c = conn_find(self.arg(0).id());
+    Conn* c = conn_find(self.arg(0).conn_id());
     return c && c.res ? c : null;
 }
 
@@ -483,7 +629,14 @@ fn void js_respond(JsCtx ctx, void* udata) {
     Conn* c = ctx.conn();
     if (!c) return;
     @pool() {
-        finish(c, ctx.arg(1).as_int(200), (String)ctx.arg(2).bytes(), (String)ctx.arg(3).bytes(), ctx.arg(4).bytes());
+        JsArg body = ctx.arg(4);
+        if (body.tv.is_object() && ((HObject*)body.tv.get_heapptr()).prototype == g_fast.file_proto) {
+            JsArg path = { .tv = fast_get(body.tv.get_heapptr(), g_fast.k_file_path) };
+            native_file_start(c, (String)path.bytes(), ctx.arg(1)
+                .as_int(200), (String)ctx.arg(2).bytes(), (String)ctx.arg(3).bytes());
+        } else {
+            finish(c, ctx.arg(1).as_int(200), (String)ctx.arg(2).bytes(), (String)ctx.arg(3).bytes(), body.bytes());
+        }
     };
 }
 
@@ -491,13 +644,18 @@ fn void js_respond(JsCtx ctx, void* udata) {
 // through stream_write and stream_end.
 fn void js_stream_start(JsCtx ctx, void* udata) {
     Conn* c = ctx.conn();
-    if (!c || c.aborted) return;
+    if (!c || c.aborted) {
+        ctx.ret_bool(false);
+        return;
+    }
     @pool() {
         Reply r = { c, ctx.arg(1).as_int(200), (String)ctx.arg(2).bytes(), (String)ctx.arg(3).bytes(), { }, false };
         corked(c, &write_reply, &r);
     };
+    c.discard_body = c.head || ctx.arg(1).as_int(200) == 204 || ctx.arg(1).as_int(200) == 304;
     c.streaming = true;
     uws_res_on_writable(c.res, &on_writable, c);
+    ctx.ret_bool(!c.discard_body);
 }
 
 struct Chunk {
@@ -511,6 +669,20 @@ fn void write_chunk(void* user) {
     k.ok = uws_res_write(k.res, k.data.ptr, k.data.len) != 0;
 }
 
+struct ChunkBatch {
+    UwsRes* res;
+    char[][] chunks;
+    bool ok;
+}
+
+fn void write_batch(void* user) {
+    ChunkBatch* batch = user;
+    batch.ok = true;
+    foreach (bytes : batch.chunks) {
+        if (bytes.len && !uws_res_write(batch.res, bytes.ptr, bytes.len)) batch.ok = false;
+    }
+}
+
 // stream_write(id, bytes) -> false once the client is behind; JS then
 // waits for __drain(id).
 fn void js_stream_write(JsCtx ctx, void* udata) {
@@ -519,16 +691,41 @@ fn void js_stream_write(JsCtx ctx, void* udata) {
         ctx.ret_bool(false);
         return;
     }
+    if (c.discard_body) {
+        ctx.ret_bool(true);
+        return;
+    }
     @pool() {
-        Chunk k = { c.res, ctx.arg(1).bytes(), false };
-        corked(c, &write_chunk, &k);
-        ctx.ret_bool(k.ok);
+        JsArg value = ctx.arg(1);
+        if (value.tv.is_object() && ((HObject*)value.tv.get_heapptr()).get_class() == ARRAY) {
+            HObject* parts  = value.tv.get_heapptr();
+            char[][] chunks = mem::temp_array(char[], *parts.array_len_ptr());
+            foreach (i, &bytes : chunks) {
+                JsArg part = { .tv = parts.get_array_idx((uint)i) ?? (TVal) { } };
+                if (!part.is_bytes()) {
+                    ctx.throw_error(TYPE, "stream chunk must be bytes");
+                    return;
+                }
+                *bytes = part.bytes();
+            }
+            ChunkBatch batch = { c.res, chunks, false };
+            corked(c, &write_batch, &batch);
+            ctx.ret_bool(batch.ok);
+        } else {
+            Chunk k = { c.res, value.bytes(), false };
+            corked(c, &write_chunk, &k);
+            ctx.ret_bool(k.ok);
+        }
     };
 }
 
 fn void end_stream(void* user) {
     Conn* c = user;
-    uws_res_end(c.res, null, 0);
+    if (c.discard_body) {
+        uws_res_end_empty(c.res);
+    } else {
+        uws_res_end(c.res, null, 0);
+    }
 }
 
 fn void js_stream_end(JsCtx ctx, void* udata) {
@@ -544,22 +741,22 @@ fn CInt on_writable(void* user, ulong offset) {
     return 1;
 }
 
-fn void call_conn(JsValue f, uint id) {
+fn void call_conn(JsValue f, ulong id) {
     g_rt.@scope() {
-        JsValue[1] args = { g_rt.number(id) ?? { } };
+        JsValue[1] args = { g_rt.number((double)id) ?? { } };
         (void)call_js(f, args[..]);
     };
 }
 
 fn void js_req_url(JsCtx ctx, void* udata) {
-    Conn* c = conn_find(ctx.arg(0).id());
+    Conn* c = conn_find(ctx.arg(0).conn_id());
     @pool() {
         ctx.ret_string(c ? c.url_now() : "");
     };
 }
 
 fn void js_req_headers(JsCtx ctx, void* udata) {
-    Conn* c = conn_find(ctx.arg(0).id());
+    Conn* c = conn_find(ctx.arg(0).conn_id());
     @pool() {
         ctx.ret_string(c ? c.blob_now() : "");
     };
@@ -578,12 +775,16 @@ fn void js_req_remote(JsCtx ctx, void* udata) {
 fn void on_aborted(void* user) {
     Conn* c = user;
     c.aborted = true;
-    if (c.streaming) call_conn(g_aborted, c.id);
+    ulong id = c.id;
+    if (c.file_body) native_file_abort(c.file_body);
+    if (c.streaming) call_conn(g_aborted, id);
+    // JS cancellation can finish the connection reentrantly.
+    if (conn_find(id) == c) done(c);
 }
 
 fn void on_data(void* user, char* chunk, sz len, CInt last) {
-    Conn* c = user;
-    if (!c.res) return;
+    Conn* c = conn_find((ulong)(usz)user);
+    if (!c || !c.res) return;
     if (c.body.len() + len > MAX_REQUEST_BODY) {
         finish_plain(c, 413, "Payload Too Large");
         return;
@@ -618,7 +819,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
             c.capture(method);
             c.body.init(mem, 1024);
             uws_res_on_aborted(res, &on_aborted, c);
-            uws_res_on_data(res, &on_data, c);
+            uws_res_on_data(res, &on_data, (void*)(usz)c.id);
             return;
         }
         c.in_request = true;
@@ -628,7 +829,10 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
             conn_free(c);
             return;
         }
-        c.capture(method);
+        c.req = null;
+        c.hdrs = { };
+        c.path = "";
+        c.query = "";
         uws_res_on_aborted(res, &on_aborted, c);
     };
 }
@@ -706,8 +910,11 @@ fn void js_stop(JsCtx ctx, void* udata) {
 const Native[] HTTP_NATIVES = {
     { "serve", &js_serve, 3 },
     { "staticRoute", &js_static_route, 6 },
-    { "fastTypes", &js_fast_types, 4 },
+    { "fastTypes", &js_fast_types, 5 },
     { "fetchFor", &js_fetch_for, 3 },
+    { "httpFulfilled", &js_http_fulfilled, 1 },
+    { "httpRejected", &js_http_rejected, 1 },
+    { "nativeResponse", &js_native_response, 2 },
     { "stop", &js_stop, 2 },
     { "respond", &js_respond, 5 },
     { "streamStart", &js_stream_start, 4 },

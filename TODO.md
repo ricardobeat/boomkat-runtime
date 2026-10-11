@@ -19,6 +19,8 @@ Runtime build order from PLAN.md, tracked here as it lands.
 
 ## Remaining
 
+- [x] Timer fairness, disconnected-upload cleanup, retained Request metadata, empty stream pulls, and stream cancellation.
+- [x] Native HTTP promise completion, stream chunk batches, and lazy bounded `file.body` responses.
 - [x] Native `file.readText` with owned external strings in the `boomkat-perf` worktree; UTF-8 decoding fallback for the main engine.
 - [ ] Merge external-string support from `boomkat-perf` into the engine after reviewing the performance branch. HTTP URL/header buffers and mutable `Uint8Array` storage still require copies.
 

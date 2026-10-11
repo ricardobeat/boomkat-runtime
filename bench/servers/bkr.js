@@ -27,7 +27,7 @@ serve({
                     },
                 }));
             }
-            case "/file": return file.read(payload).then((b) => new Response(b));
+            case "/file": return new Response(file.body(payload));
         }
         return new Response("not found", { status: 404 });
     },

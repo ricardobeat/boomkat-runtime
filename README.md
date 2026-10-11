@@ -24,10 +24,26 @@ built-in or an error, and remote imports are not supported.
 |---|---|
 | `http` | `serve({ port, hostname, fetch, onListen })` -> `{ port, finished, stop(force) }` |
 | `net` | `connect({ hostname, port, tls })`, `listen({ hostname, port })`, `resolve(host)`; connections expose `read`, `write`, `closeWrite`, `close`, `readable`, `writable` |
-| `file` | `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
+| `file` | `body`, `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
 | `process` | `args`, `pid`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
 | `path` | `join`, `resolve`, `relative`, `dirname`, `basename`, `extname`, `parse`, `format`, `toFileUrl`, `fromFileUrl` |
 | `permissions` | `query`, `request`, `revoke` |
+
+`file.body(path)` creates a lazy response body:
+
+```js
+import { serve } from "http";
+import { body } from "file";
+
+serve({ port: 8080, fetch: () => new Response(body("./asset.bin")) });
+```
+
+The server checks read permission when it sends the body, reads at most 64 KiB
+at a time, and pauses reads under socket backpressure. Disconnecting closes the
+file after any outstanding read completes. The same body supports `text()`,
+`bytes()`, `body`, and cloning through `Response`. Reading the body in JavaScript,
+including accessing `response.body`, currently loads the file into memory;
+the bounded native path applies when the server sends the untouched descriptor.
 
 Globals: `fetch` (HTTP/1.1 over `net`, TLS with certificate and hostname
 verification, redirects re-checked against the net grants), `Request`,
@@ -38,6 +54,16 @@ verification, redirects re-checked against the net grants), `Request`,
 
 `bkr check script.js` lists the built-ins a module graph imports and the
 flags it will probably need.
+
+Regression checks:
+
+```sh
+c3c build bkr-perf
+./out/bkr-perf --no-sandbox tests/timers.js
+BKR_HTTP_STRESS=1 BKR_BIN="$PWD/out/bkr-perf" python3 tests/run_http.py
+c3c build bkr-perf-asan
+BKR_BIN="$PWD/out/bkr-perf-asan" python3 tests/run_http.py
+```
 
 ## Permissions
 

@@ -22,10 +22,6 @@ uint g_next_timer = 1;
 UsTimer* g_timer_native;
 ulong g_timer_armed_due;
 
-// Timers due within a millisecond of now fire together, as with libuv's
-// millisecond clock.
-const ulong TIMER_SLACK = 1_000_000;
-
 fn void init_timers() {
     g_timer_heap.init(mem, 64);
     g_timer_ids.init(mem);
@@ -110,11 +106,11 @@ fn void timer_arm(ulong now) {
 
 fn void fire_timers() {
     ulong now = now_ns();
-    while (g_timer_heap.len() && g_timer_heap[0].due <= now + TIMER_SLACK) {
+    while (g_timer_heap.len() && g_timer_heap[0].due <= now) {
         PendingTimer* t = g_timer_heap[0];
         timer_remove(t);
         if (t.interval >= 0) {
-            t.due = now + (ulong)max(t.interval, (long)1_000_000);
+            t.due = now_ns() + (ulong)t.interval;
             timer_push(t);
             (void)call_js(t.callback, t.args);
         } else {

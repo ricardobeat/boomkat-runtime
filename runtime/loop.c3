@@ -96,7 +96,9 @@ Pool g_pool;
 fn void task_done(void* user) {
     Task* t = user;
     unhold();
-    t.done(t);
+    @pool() {
+        t.done(t);
+    };
 }
 
 fn int pool_thread(void* arg) {

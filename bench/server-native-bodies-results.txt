@@ -1,0 +1,52 @@
+Engine: boomkat-perf 6c144acd, rebased onto main 229e7b7a
+Runtime: native response bodies and HTTP lifecycle fixes (committed with this report)
+Node: v24.13.0; Bun: 1.3.13
+Each workload: 2s warm-up + 2s measurement; wrk -t2 -c128; loopback
+CPU: 100% = one core. RSS: peak sampled during each measurement.
+Node JSON is precomputed; Bun file responses use Bun.file.
+bkr file responses now use file.body instead of file.read through JS.
+Async uses setTimeout(0), clamped to 1ms: corrected timers honor deadlines rather than firing early.
+Single sample per workload; client and server share the machine.
+Optimized HTTP and retention stress tests passed; AddressSanitizer HTTP tests passed.
+
+Running bkr: hello
+Running bkr: json
+Running bkr: async
+Running bkr: echo 1KB
+Running bkr: stream 8KB
+Running bkr: file 4KB
+Running node: hello
+Running node: json
+Running node: async
+Running node: echo 1KB
+Running node: stream 8KB
+Running node: file 4KB
+Running bun: hello
+Running bun: json
+Running bun: async
+Running bun: echo 1KB
+Running bun: stream 8KB
+Running bun: file 4KB
+
+wrk -t2 -c128 -d2s, loopback, one server process each
+
+| workload | runtime | req/s | p50 ms | p99 ms | max ms | CPU % | peak RSS MB |
+|---|---|---:|---:|---:|---:|---:|---:|
+| hello | bkr | 214,067 | 0.57 | 1.09 | 1.8 | 91 | 12 |
+| hello | node | 122,587 | 1.03 | 1.68 | 57.8 | 93 | 103 |
+| hello | bun | 211,471 | 0.59 | 1.09 | 1.8 | 92 | 41 |
+| json | bkr | 176,299 | 0.70 | 1.26 | 2.1 | 91 | 13 |
+| json | node | 122,006 | 1.04 | 1.23 | 43.5 | 92 | 104 |
+| json | bun | 194,345 | 0.64 | 1.06 | 1.7 | 93 | 42 |
+| async | bkr | 46,713 | 2.70 | 3.38 | 4.1 | 52 | 14 |
+| async | node | 79,370 | 1.38 | 2.55 | 3.2 | 61 | 130 |
+| async | bun | 119,867 | 1.05 | 1.31 | 1.9 | 81 | 44 |
+| echo 1KB | bkr | 138,137 | 0.86 | 1.68 | 3.3 | 91 | 16 |
+| echo 1KB | node | 94,927 | 1.34 | 1.74 | 58.5 | 93 | 140 |
+| echo 1KB | bun | 163,785 | 0.76 | 1.25 | 2.1 | 92 | 49 |
+| stream 8KB | bkr | 57,594 | 2.08 | 2.77 | 5.1 | 92 | 16 |
+| stream 8KB | node | 84,338 | 1.51 | 2.67 | 63.5 | 92 | 140 |
+| stream 8KB | bun | 108,417 | 1.15 | 1.53 | 3.0 | 93 | 76 |
+| file 4KB | bkr | 42,044 | 2.96 | 4.83 | 7.9 | 154 | 18 |
+| file 4KB | node | 51,655 | 2.41 | 3.37 | 12.3 | 256 | 214 |
+| file 4KB | bun | 51,598 | 2.46 | 2.86 | 5.4 | 121 | 78 |

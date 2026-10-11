@@ -350,7 +350,7 @@ class ReadableStream {
     }
     _pullDone() {
         this._pulling = false;
-        if (this._repull) { this._repull = false; this._pullIfNeeded(); }
+        if (this._repull || this._reads.length) { this._repull = false; queueMicrotask(() => this._pullIfNeeded()); }
     }
     _finish() {
         this._state = "closed";
@@ -968,11 +968,15 @@ def("Headers", Headers);
 // A body is held as given -- null, a string, bytes or a ReadableStream --
 // and converted only when read, so a string handler's string reaches the
 // wire untouched.
+bk.FileBody = class FileBody {
+    constructor(path) { this._path = String(path); Object.freeze(this); }
+};
+
 function bodyInit(body, headers) {
     if (body === undefined || body === null) return null;
     const ct = (t) => { if (!headers.has("content-type")) headers.set("content-type", t); };
     if (typeof body === "string") { ct("text/plain;charset=UTF-8"); return body; }
-    if (body instanceof Uint8Array) return body;
+    if (body instanceof Uint8Array || body instanceof bk.FileBody) return body;
     if (body instanceof ReadableStream) return body;
     if (body instanceof URLSearchParams) { ct("application/x-www-form-urlencoded;charset=UTF-8"); return body.toString(); }
     if (body instanceof Blob) { if (body.type) ct(body.type); return body._bytes; }
@@ -984,6 +988,9 @@ function bodyInit(body, headers) {
 }
 
 function bodyStream(b) {
+    if (b instanceof bk.FileBody) return new ReadableStream({ async start(c) {
+        try { c.enqueue(await bk.op(bk.readFile, b._path)); c.close(); } catch (e) { c.error(e); }
+    } });
     if (b === null || b instanceof ReadableStream) return b;
     return bytesStream(typeof b === "string" ? bk.encode(b) : b);
 }
@@ -997,7 +1004,7 @@ const BodyMixin = {
     _take() {
         if (this._used) return Promise.reject(new TypeError("Body already used"));
         this._used = true;
-        return Promise.resolve(this._body);
+        return this._body instanceof bk.FileBody ? bk.op(bk.readFile, this._body._path) : Promise.resolve(this._body);
     },
     text() {
         return this._take().then((b) => b === null ? "" : typeof b === "string" ? b
@@ -1036,6 +1043,8 @@ class Request {
             // From the server: the URL and headers come from C3 only if read.
             this.method = init;
             this._id = id;
+            this._url = bk.reqUrl(id);
+            this._headerBlob = bk.reqHeaders(id);
             if (body !== undefined) this._body = body;
             return;
         }
@@ -1055,7 +1064,7 @@ class Request {
         return this._url;
     }
     get headers() {
-        if (this._headers === null) this._headers = Headers._fromBlob(bk.reqHeaders(this._id));
+        if (this._headers === null) this._headers = Headers._fromBlob(this._headerBlob === null ? bk.reqHeaders(this._id) : this._headerBlob);
         return this._headers;
     }
     get signal() { return this._signal || (this._signal = new AbortController().signal); }
@@ -1070,7 +1079,7 @@ class Request {
     }
 }
 mixBody(Request);
-protoDefaults(Request, { _id: 0, _url: null, _headers: null, _body: null, _used: false, _signal: null, redirect: "follow" });
+protoDefaults(Request, { _id: 0, _url: null, _headerBlob: null, _headers: null, _body: null, _used: false, _signal: null, redirect: "follow" });
 def("Request", Request);
 
 // ---- Response ----
@@ -1097,7 +1106,7 @@ const BLOB_JSON = "content-type\n" + CT_JSON + "\n";
 // content-type as a constant blob and never builds a Headers.
 class Response {
     constructor(body, init) {
-        if (init === undefined && (body instanceof Uint8Array || body instanceof ReadableStream)) {
+        if (init === undefined && (body instanceof Uint8Array || body instanceof ReadableStream || body instanceof bk.FileBody)) {
             this._ct = null;
             this._body = body;
             return;
@@ -1208,22 +1217,11 @@ bk.drain = function (id) {
 bk.aborted = function (id) {
     const s = streams.get(id);
     if (!s) return;
-    s.aborted = true;
-    if (s.wake) { const w = s.wake; s.wake = null; w(); }
+    s.abort();
 };
 
 const BATCH = 65536;
 const encoder = new TextEncoder();
-
-function joinChunks(parts, size) {
-    const out = new Uint8Array(size);
-    let at = 0;
-    for (const p of parts) {
-        out.set(p, at);
-        at += p.length;
-    }
-    return out;
-}
 
 // A stream nobody else touched is driven straight from its source: pull
 // feeds a local batch instead of the stream's queue and promises.
@@ -1241,17 +1239,19 @@ class Sink {
         this.size = 0;
         this.closed = false;
         this.failed = null;
+        this.hasError = false;
         this.nudge = null;
     }
     get desiredSize() { return 1; }
     enqueue(value) {
+        if (this.closed) throw new TypeError("stream is not readable");
         const chunk = typeof value === "string" ? encoder.encode(value) : asBytes(value);
         this.parts.push(chunk);
         this.size += chunk.length;
         this._wake();
     }
-    close() { this.closed = true; this._wake(); }
-    error(e) { this.failed = e; this.closed = true; this._wake(); }
+    close() { if (this.closed) throw new TypeError("stream is not readable"); this.closed = true; this._wake(); }
+    error(e) { this.failed = e; this.hasError = true; this.closed = true; this._wake(); }
     _wake() {
         if (this.nudge === null) return;
         const n = this.nudge;
@@ -1259,7 +1259,7 @@ class Sink {
         n();
     }
     take() {
-        const out = this.parts.length === 1 ? this.parts[0] : joinChunks(this.parts, this.size);
+        const out = this.parts;
         this.parts = [];
         this.size = 0;
         return out;
@@ -1268,7 +1268,11 @@ class Sink {
 
 function pump(id, res) {
     const stream = res._body;
-    bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob());
+    if (!bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob())) {
+        Promise.resolve().then(() => stream.cancel()).catch(report);
+        bk.streamEnd(id);
+        return;
+    }
     if (!directSource(stream)) { pumpQueued(id, stream); return; }
     stream._reader = stream;
     const src = stream._source;
@@ -1281,43 +1285,76 @@ function pump(id, res) {
     // produces synchronously never leaves this loop or makes a promise.
     try {
         while (!sink.closed && sink.size < BATCH) {
+            const size = sink.size;
             const r = src.pull(sink);
+            if (!sink.closed && sink.size === size && !isThenable(r)) { pumpSource(id, stream, sink, undefined); return; }
             if (isThenable(r)) { pumpSource(id, stream, sink, r); return; }
         }
-        if (sink.failed === null && sink.parts.length > 0 && !sink.closed) { pumpSource(id, stream, sink, undefined); return; }
-        if (sink.failed === null && sink.parts.length > 0) bk.streamWrite(id, sink.take());
+        if (!sink.hasError && sink.parts.length > 0 && !sink.closed) { pumpSource(id, stream, sink, undefined); return; }
+        if (!sink.hasError && sink.parts.length > 0) bk.streamWrite(id, sink.take());
     } catch (e) {
+        stream._fail(e);
         report(e);
         bk.streamEnd(id);
         return;
     }
-    if (sink.failed !== null) report(sink.failed);
-    stream._state = "closed";
+    if (sink.hasError) { stream._fail(sink.failed); report(sink.failed); }
+    else stream._finish();
     bk.streamEnd(id);
 }
 
 // The general case: pulls that take time, big or endless sources, or a peer that is slow to read.
-async function pumpSource(id, stream, sink, waiting) {
-    const s = { wake: null, aborted: false };
+function streamState(id, cancel) {
+    const waits = new Set();
+    const s = { wake: null, aborted: false, abort() {
+        if (s.aborted) return;
+        s.aborted = true;
+        for (const wake of waits) wake();
+        waits.clear();
+        if (s.wake) { const w = s.wake; s.wake = null; w(); }
+        Promise.resolve().then(cancel).catch(report);
+    }, wait(promise) {
+        if (s.aborted) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            waits.add(resolve);
+            Promise.resolve(promise).then((value) => { waits.delete(resolve); resolve(value); },
+                (error) => { waits.delete(resolve); reject(error); });
+        });
+    } };
     streams.set(id, s);
+    return s;
+}
+
+async function pumpSource(id, stream, sink, waiting) {
     const src = stream._source;
+    const s = streamState(id, () => { sink.closed = true; sink.parts = []; sink.size = 0; stream._finish(); return src.cancel ? src.cancel() : undefined; });
+    let pulling = false;
+    const track = (promise) => {
+        pulling = true;
+        Promise.resolve(promise).then(() => { pulling = false; sink._wake(); },
+            (e) => { pulling = false; sink.error(e); });
+    };
+    if (waiting !== undefined) track(waiting);
     try {
         for (;;) {
-            if (waiting !== undefined) await waiting;
-            waiting = undefined;
             if (s.aborted) break;
-            if (sink.parts.length === 0 && !sink.closed) await new Promise((r) => { sink.nudge = r; });
+            while (!sink.closed && !pulling && sink.size < BATCH && !s.aborted) {
+                const size = sink.size;
+                const r = src.pull(sink);
+                if (isThenable(r)) track(r);
+                else if (!sink.closed && sink.size === size) await s.wait(new Promise((resolve) => setImmediate(resolve)));
+            }
+            if (s.aborted) break;
+            if (sink.hasError) throw sink.failed;
             if (sink.parts.length > 0) {
-                if (!bk.streamWrite(id, sink.take()) && !s.aborted) await new Promise((r) => { s.wake = r; });
+                if (!bk.streamWrite(id, sink.take()) && !s.aborted) await new Promise((resolve) => { s.wake = resolve; });
             }
             if (sink.closed || s.aborted) break;
-            waiting = src.pull(sink);
-            if (!isThenable(waiting)) waiting = undefined;
+            if (pulling) await s.wait(new Promise((resolve) => { sink.nudge = resolve; }));
         }
-        if (sink.failed !== null) throw sink.failed;
-        if (s.aborted && src.cancel) src.cancel();
-        stream._state = "closed";
+        if (!s.aborted) stream._finish();
     } catch (e) {
+        stream._fail(e);
         report(e);
     } finally {
         streams.delete(id);
@@ -1326,9 +1363,8 @@ async function pumpSource(id, stream, sink, waiting) {
 }
 
 async function pumpQueued(id, stream) {
-    const s = { wake: null, aborted: false };
-    streams.set(id, s);
     const reader = stream.getReader();
+    const s = streamState(id, () => reader.cancel());
     const parts = [];
     try {
         while (!s.aborted) {
@@ -1341,17 +1377,16 @@ async function pumpQueued(id, stream) {
             }
             if (parts.length === 0) {
                 if (stream._state === "closed") break;
-                const r = await reader.read();
-                if (r.done) break;
+                const r = await s.wait(reader.read());
+                if (s.aborted || r.done) break;
                 const chunk = typeof r.value === "string" ? encoder.encode(r.value) : asBytes(r.value);
                 parts.push(chunk);
                 size = chunk.length;
             }
-            const out = parts.length === 1 ? parts[0] : joinChunks(parts, size);
+            const ok = bk.streamWrite(id, parts);
             parts.length = 0;
-            if (!bk.streamWrite(id, out) && !s.aborted) await new Promise((r) => { s.wake = r; });
+            if (!ok && !s.aborted) await new Promise((r) => { s.wake = r; });
         }
-        if (s.aborted) reader.cancel();
     } catch (e) {
         report(e);
     } finally {
@@ -1365,6 +1400,7 @@ function send(id, res) {
         fail(id, new TypeError("fetch handler must return a Response, got " + typeof res));
         return;
     }
+    if (bk.nativeResponse(id, res)) return;
     res._used = true;
     const st = res.status;
     const b = res._body;
@@ -1380,7 +1416,7 @@ bk.handled = function (index, id, r) {
 
 bk.failed = function (index, id, e) { fail(id, e, handlers[index]); };
 
-bk.fastTypes(Request.prototype, Response.prototype, CT_TEXT, CT_JSON);
+bk.fastTypes(Request.prototype, Response.prototype, CT_TEXT, CT_JSON, bk.FileBody.prototype);
 
 bk.dispatch = function (index, id, method, body) {
     const h = handlers[index];
