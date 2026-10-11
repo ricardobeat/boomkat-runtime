@@ -39,23 +39,6 @@ fn void exit_now() {
 
 // ---- core natives ----
 
-struct JsTimer {
-    UsTimer* handle;
-    double id;
-}
-
-JsValue g_timer_fire;
-
-fn void on_js_timer(void* user) {
-    JsTimer* t = user;
-    double id  = t.id;
-    free(t);
-    g_rt.@scope() {
-        JsValue[1] args = { g_rt.number(id) ?? { } };
-        (void)call_js(g_timer_fire, args[..]);
-    };
-}
-
 JsValue g_immediate_fire;
 bool g_immediate_armed;
 
@@ -71,21 +54,6 @@ fn void js_immediate_arm(JsCtx ctx, void* udata) {
     g_immediate_armed = true;
     hold();
     uws_loop_defer(g_loop, &on_immediates, null);
-}
-
-// timerStart(ms, id) -> handle, a pointer a double holds exactly.
-fn void js_timer_start(JsCtx ctx, void* udata) {
-    JsTimer* t = mem::new(JsTimer);
-    t.id = ctx.arg(1).as_number() ?? 0;
-    t.handle = timer_start((long)(ctx.arg(0).as_number() ?? 0), &on_js_timer, t);
-    ctx.ret_number((double)(uptr)t);
-}
-
-fn void js_timer_cancel(JsCtx ctx, void* udata) {
-    JsTimer* t = (JsTimer*)(uptr)(ctx.arg(0).as_number() ?? 0);
-    if (!t) return;
-    timer_cancel(t.handle);
-    free(t);
 }
 
 extern fn ulong clock_gettime_nsec_np(CInt clock);
@@ -298,8 +266,6 @@ fn HostPort split_host_port(String s) {
 }
 
 const Native[] CORE_NATIVES = {
-    { "timerStart", &js_timer_start, 2 },
-    { "timerCancel", &js_timer_cancel, 1 },
     { "immediateArm", &js_immediate_arm, 0 },
     { "now", &js_now, 0 },
     { "urlFast", &js_url_fast, 1 },
@@ -336,11 +302,11 @@ fn void? boot() {
     install_natives(NET_NATIVES)!;
     install_natives(FS_NATIVES)!;
     install_natives(PROC_NATIVES)!;
+    install_natives(TIMER_NATIVES)!;
     g_rt.exec(PRELUDE, "<prelude>")!;
     g_rt.exec(FETCH, "<fetch>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
     g_settle = bk_get("settle")!;
-    g_timer_fire = bk_get("timerFire")!;
     g_immediate_fire = bk_get("immediateFire")!;
     g_dispatch = bk_get("dispatch")!;
     g_handled = bk_get("handled")!;
@@ -350,6 +316,7 @@ fn void? boot() {
     g_unhandled = bk_get("unhandled")!;
     g_describe = bk_get("describe")!;
     init_guard();
+    init_timers();
     init_res();
     init_http()!;
 }

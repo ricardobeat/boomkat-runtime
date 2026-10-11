@@ -20,6 +20,10 @@ mkdir -p "$OBJ"
 # real end (recv returning 0) is the correct behaviour. Idempotent.
 sed -i '' 's/flags & (EV_ERROR | EV_EOF);/flags \& EV_ERROR;/' "$UWS/uSockets/src/eventing/epoll_kqueue.c"
 
+# macOS coalesces kqueue timers armed with the default leeway, so a 1 ms timer
+# often fires a millisecond late. Arm them in microseconds as critical.
+sed -i '' 's/EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), 0, ms, internal_cb);/EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), NOTE_USECONDS | NOTE_CRITICAL, (int64_t) ms * 1000, internal_cb);/' "$UWS/uSockets/src/eventing/epoll_kqueue.c"
+
 # A TLS peer that sends close_notify right behind its last records made
 # uSockets drop the data decoded in that same call. Emit it before closing.
 python3 - "$UWS/uSockets/src/crypto/openssl.c" <<'PY'

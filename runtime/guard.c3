@@ -109,7 +109,15 @@ fn void? call_js(JsValue f, JsValue[] args) {
         return err~;
     }
     g_rt.release(r);
-    if (g_depth == 1 && g_rejections.len()) flush_rejections();
+    // The engine drains after a JS function, but not after a native one such
+    // as a promise's resolve.
+    if (g_depth == 1) {
+        if (catch e = g_rt.drain_microtasks()) {
+            report_uncaught();
+            return e~;
+        }
+        if (g_rejections.len()) flush_rejections();
+    }
 }
 
 fn void init_guard() {
