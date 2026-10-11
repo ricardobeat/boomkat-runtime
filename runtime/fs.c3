@@ -40,6 +40,7 @@ const char DT_LNK         = 10;
 
 enum FsOp {
     READ_FILE,
+    READ_TEXT,
     WRITE_FILE,
     OPEN,
     STAT,
@@ -81,7 +82,7 @@ fn void read_all(FsTask* f) {
     defer libc::close(fd);
     Stat st;
     if (fstat(fd, &st) == 0 && st.st_size > 0) {
-        f.data = mem::alloc_array(char, st.st_size);
+        f.data = mem::alloc_array(char, st.st_size + (f.kind == READ_TEXT ? 1 : 0))[:st.st_size];
         usz at;
         while (at < f.data.len) {
             sz n = libc::read(fd, f.data.ptr + at, f.data.len - at);
@@ -94,6 +95,7 @@ fn void read_all(FsTask* f) {
             if (n == 0) break;
             at += (usz)n;
         }
+        if (f.kind == READ_TEXT) f.data.ptr[at] = 0;
         f.data = f.data[:at];
         return;
     }
@@ -110,7 +112,14 @@ fn void read_all(FsTask* f) {
         if (n == 0) break;
         acc.append_bytes(buf[:n]);
     }
-    f.data = copy_bytes((char[])acc.str_view());
+    if (f.kind == READ_TEXT) {
+        String text = acc.str_view();
+        f.data = mem::alloc_array(char, text.len + 1)[:text.len];
+        f.data[..] = ((char[])text)[..];
+        f.data.ptr[text.len] = 0;
+    } else {
+        f.data = copy_bytes((char[])acc.str_view());
+    }
 }
 
 fn void write_all(FsTask* f) {
@@ -209,7 +218,8 @@ fn CInt remove_all(String path, bool recursive) {
 fn void fs_work(Task* t) {
     FsTask* f = (FsTask*)t;
     switch (f.kind) {
-        case READ_FILE: read_all(f);
+        case READ_FILE:
+        case READ_TEXT: read_all(f);
         case WRITE_FILE: write_all(f);
         case OPEN:
             f.fd = open(f.path.zstr_tcopy(), f.flags | O_NOFOLLOW_ANY | O_CLOEXEC, 0o666);
@@ -232,12 +242,21 @@ fn void fs_done(Task* t) {
         free(f);
     }
     if (f.err) {
-        if (f.data.len && f.kind == READ_FILE) free(f.data.ptr);
+        if (f.data.ptr && (f.kind == READ_FILE || f.kind == READ_TEXT)) free(f.data.ptr);
         reject_errno(f.op, f.err, f.path);
         return;
     }
     switch (f.kind) {
         case READ_FILE: resolve_bytes(f.op, f.data);
+        case READ_TEXT:
+            g_rt.@scope() {
+                JsValue? value = owned_text_value(f.data);
+                if (catch value) {
+                    reject(f.op, "ENOMEM", "cannot allocate file text");
+                } else {
+                    resolve(f.op, value);
+                }
+            };
         case OPEN:
             Res* r = res_new(FILE);
             r.fd = f.fd;
@@ -307,6 +326,14 @@ fn void js_read_file(JsCtx ctx, void* udata) {
     @pool() {
         String path;
         if (guarded(op, READ, ctx.arg(1).as_string() ?? "", &path)) fs_submit(READ_FILE, op, path);
+    };
+}
+
+fn void js_read_text(JsCtx ctx, void* udata) {
+    uint op = ctx.arg(0).id();
+    @pool() {
+        String path;
+        if (guarded(op, READ, ctx.arg(1).as_string() ?? "", &path)) fs_submit(READ_TEXT, op, path);
     };
 }
 
@@ -399,6 +426,7 @@ fn void js_rename(JsCtx ctx, void* udata) {
 
 const Native[] FS_NATIVES = {
     { "readFile", &js_read_file, 2 },
+    { "readText", &js_read_text, 2 },
     { "writeFile", &js_write_file, 4 },
     { "open", &js_open, 3 },
     { "stat", &js_stat, 2 },

@@ -93,6 +93,31 @@ fn JsValue? bytes_value(char[] owned) {
     return g_rt.root(tv);
 }
 
+fn void release_string_bytes(char* data, void* user) => free(user ? user : data);
+
+// `owned` has a trailing NUL outside its slice. Ownership passes to JS.
+fn JsValue? owned_text_value(char[] owned) {
+    char* base = owned.ptr;
+    bool transferred;
+    defer if (!transferred && base) free(base);
+    if (owned.len >= 3 && owned[0] == 0xEF && owned[1] == 0xBB && owned[2] == 0xBF) owned = owned[3..];
+    @pool() {
+        String text = utf8_clean(owned, false) ?? "";
+        $if $defined(Heap.alloc_external_string):
+            if (owned.len && text.ptr == owned.ptr && !hstring::has_raw_utf8_astral(owned)) {
+                HString* hs = g_rt.rt.heap.alloc_external_string(owned, &release_string_bytes, base);
+                if (hs != null) {
+                    transferred = true;
+                    TVal tv;
+                    tv.set_string_borrowed(hs);
+                    return g_rt.root(tv);
+                }
+            }
+        $endif
+        return g_rt.string(text);
+    };
+}
+
 // ---- settling async ops ----
 
 // JS starts an op by passing a fresh id to a native; the native finishes it,

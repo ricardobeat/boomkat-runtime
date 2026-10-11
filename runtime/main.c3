@@ -169,6 +169,7 @@ fn usz utf8_seq_len(char[] b) {
 }
 
 fn usz utf8_valid_prefix(char[] b) {
+    if (hstring::check_is_ascii(b)) return b.len;
     usz i = 0;
     while (i < b.len) {
         if (b[i] < 0x80) {

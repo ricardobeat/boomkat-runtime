@@ -1,0 +1,11 @@
+import { read, readText, write } from "file";
+import { args } from "process";
+const p = args[0];
+const dec = new TextDecoder();
+const load = args[1] === "legacy" ? async (p) => dec.decode(await read(p)) : readText;
+await write(p, "a".repeat(1048576));
+for (let i = 0; i < 20; i++) await load(p);
+const start = performance.now();
+let sum = 0;
+for (let i = 0; i < 250; i++) sum += (await load(p)).length;
+console.log(((performance.now() - start) / 250).toFixed(3), "ms/read", sum);

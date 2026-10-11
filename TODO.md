@@ -19,6 +19,9 @@ Runtime build order from PLAN.md, tracked here as it lands.
 
 ## Remaining
 
+- [x] Native `file.readText` with owned external strings in the `boomkat-perf` worktree; UTF-8 decoding fallback for the main engine.
+- [ ] Merge external-string support from `boomkat-perf` into the engine after reviewing the performance branch. HTTP URL/header buffers and mutable `Uint8Array` storage still require copies.
+
 - [ ] Merge `fix/sort-concat-strings` (boomkat worktree `~/cousas/boomkat-sort-fix`, commit `bb59c1a5`) into the engine's main: `Array.prototype.sort` freed strings it still needed, and bkr compiles the engine from main. Also check `toSorted` for the same borrowing.
 - [ ] Close the gap to node/bun on json, echo, stream and file: the cost is interpreted JS per request (`new Request`, header blobs, promise hops) and `open` on the pool; a per-thread JS worker model (`SO_REUSEPORT`) would multiply throughput past the single-thread ceiling.
 - [ ] TLS server in `serve` (cert/key options) and HTTP/2.

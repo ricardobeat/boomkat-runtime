@@ -1,6 +1,5 @@
 const bk = __bk;
 const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 const toPath = (p) => (p instanceof URL ? decodeURIComponent(p.pathname) : String(p));
 const toBytes = (d) => (typeof d === "string" ? enc.encode(d) : d);
@@ -11,7 +10,7 @@ function info(text) {
 }
 
 export const read = (path) => bk.op(bk.readFile, toPath(path));
-export const readText = async (path) => dec.decode(await read(path));
+export const readText = (path) => bk.op(bk.readText, toPath(path));
 export const write = (path, data, { append = false } = {}) => bk.op(bk.writeFile, toPath(path), toBytes(data), append);
 export const writeText = write;
 export const stat = async (path) => info(await bk.op(bk.stat, toPath(path)));
