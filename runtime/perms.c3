@@ -237,14 +237,67 @@ fn String absolute(String path, String base = "") {
 // The real path: symlinks resolved for the part that exists, the rest
 // appended lexically. In tmem.
 fn String canonical(String path, String base = "") {
-    String abs  = absolute(path, base);
+    String abs   = absolute(path, base);
+    String quick = canonical_cached(abs);
+    if (quick.len) return quick;
+    return canonical_slow(abs);
+}
+
+// A few recently resolved directories, trusted for DIR_TTL_NS, so a hot path
+// pays one lstat for its leaf instead of a realpath over every component.
+// A leaf that is a symlink always takes the full resolution.
+const ulong DIR_TTL_NS = 1_000_000_000;
+
+struct DirEntry {
+    String dir;
+    String real;
+    ulong stamp;
+}
+
+DirEntry[4] g_dirs;
+usz g_dir_next;
+
+fn String canonical_cached(String abs) {
+    sz slash = abs.rindex_of_char('/') ?? -1;
+    if (slash <= 0) return "";
+    String dir  = abs[:slash];
+    String leaf = abs[slash + 1..];
+    ulong now   = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+    foreach (&e : g_dirs) {
+        if (!e.dir.len || e.dir != dir || now - e.stamp > DIR_TTL_NS) continue;
+        String full = string::tformat("%s/%s", e.real, leaf);
+        libc::Stat st;
+        if (libc::lstat(full.zstr_tcopy(), &st) != 0) return libc::errno() == Errno.ENOENT ? full : "";
+        return (st.st_mode & libc::S_IFMT) == 0o120000 ? "" : full;
+    }
+    return "";
+}
+
+fn void remember_dir(String dir, String real) {
+    DirEntry* e = &g_dirs[g_dir_next++ % g_dirs.len];
+    if (e.dir.len) {
+        free(e.dir.ptr);
+        free(e.real.ptr);
+    }
+    *e = { dir.copy(mem), real.copy(mem), clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) };
+}
+
+fn String canonical_slow(String abs) {
     String head = abs;
     String tail = "";
     while (true) {
         char[4096] buf;
         if (realpath(head.zstr_tcopy(), &buf)) {
             String real = ((ZString)&buf).str_view();
-            if (!tail.len) return real.tcopy();
+            if (!tail.len) {
+                sz cut = abs.rindex_of_char('/') ?? -1;
+                if (cut > 0) {
+                    char[4096] dbuf;
+                    String parent = abs[:cut];
+                    if (realpath(parent.zstr_tcopy(), &dbuf)) remember_dir(parent, ((ZString)&dbuf).str_view());
+                }
+                return real.tcopy();
+            }
             return string::tformat("%s/%s", real == "/" ? "" : real, tail);
         }
         if (head == "/") return abs;

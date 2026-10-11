@@ -100,19 +100,22 @@ fn void task_done(void* user) {
 }
 
 fn int pool_thread(void* arg) {
-    while (true) {
-        Task* t;
-        g_pool.lock.@in_lock() {
-            while (!g_pool.head) g_pool.ready.wait(&g_pool.lock);
-            t = g_pool.head;
-            g_pool.head = t.next;
-            if (!g_pool.head) g_pool.tail = null;
-        };
-        @pool_init(mem, 64 * 1024) {
-            t.work(t);
-        };
-        uws_loop_defer(g_loop, &task_done, t);
-    }
+    @pool_init(mem, 64 * 1024) {
+        while (true) {
+            Task* t;
+            g_pool.lock.@in_lock() {
+                while (!g_pool.head) g_pool.ready.wait(&g_pool.lock);
+                t = g_pool.head;
+                g_pool.head = t.next;
+                if (!g_pool.head) g_pool.tail = null;
+            };
+            @pool() {
+                t.work(t);
+            };
+            uws_loop_defer(g_loop, &task_done, t);
+        }
+    };
+    return 0;
 }
 
 fn void submit(Task* t) {
