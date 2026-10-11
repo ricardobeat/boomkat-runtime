@@ -340,7 +340,9 @@ fn int main(String[] argv) {
         io::eprintfn("error: cannot read %s: %s", g_main, err);
         return 1;
     }
+    g_depth++;
     JsValue? ns = g_rt.eval_module((String)src, g_main);
+    g_depth--;
     if (catch err = ns) {
         io::eprintfn("error: %s", g_rt.last_error());
         return 1;

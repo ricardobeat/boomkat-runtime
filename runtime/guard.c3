@@ -91,7 +91,11 @@ fn ulong now_ns() => clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
 
 // ---- entering JS ----
 
+uint g_depth;
+
 fn void? call_js(JsValue f, JsValue[] args) {
+    g_depth++;
+    defer g_depth--;
     if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, now_ns());
     JsValue? r = g_rt.call(f, args);
     if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, (ulong)0);
@@ -105,7 +109,7 @@ fn void? call_js(JsValue f, JsValue[] args) {
         return err~;
     }
     g_rt.release(r);
-    if (g_rejections.len()) flush_rejections();
+    if (g_depth == 1 && g_rejections.len()) flush_rejections();
 }
 
 fn void init_guard() {
