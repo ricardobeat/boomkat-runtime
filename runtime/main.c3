@@ -71,6 +71,47 @@ const CInt CLOCK_MONOTONIC_RAW = 4;
 
 fn void js_now(JsCtx ctx, void* udata) => ctx.ret_number((double)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) / 1e6);
 
+fn bool url_char(char c) {
+    if (c.is_alnum()) return true;
+    return !@catch("-._~!$&'()*+,;=:@/?".index_of_char(c));
+}
+
+// Plain http(s) URLs only. Returns slash | query << 16 | colon << 32, with
+// 0xFFFF for an absent part, or -1 for anything the general parser must see.
+fn void js_url_fast(JsCtx ctx, void* udata) {
+    String u = ctx.arg(0).as_string() ?? "";
+    usz lead = u.starts_with("http://") ? 7 : u.starts_with("https://") ? 8 : 0;
+    if (!lead || u.len >= 0xFFFF) return ctx.ret_number(-1);
+    usz slash = u.len;
+    usz query = 0xFFFF;
+    usz colon = 0xFFFF;
+    for (usz i = lead; i < u.len; i++) {
+        char c = u[i];
+        if (!url_char(c)) return ctx.ret_number(-1);
+        if (slash == u.len) {
+            if (c == '/') {
+                slash = i;
+                continue;
+            }
+            if (c == '@' || c == '?' || c.is_upper()) return ctx.ret_number(-1);
+            if (c == ':') {
+                colon = i;
+                continue;
+            }
+            if (colon != 0xFFFF && !c.is_digit()) return ctx.ret_number(-1);
+            continue;
+        }
+        if (c == '?' && query == 0xFFFF) query = i;
+        if (c == '.' && query == 0xFFFF && u[i - 1] == '/') {
+            bool one = i + 1 == u.len || u[i + 1] == '/' || u[i + 1] == '?';
+            bool two = u[i + 1] == '.' && (i + 2 == u.len || u[i + 2] == '/' || u[i + 2] == '?');
+            if (one || two) return ctx.ret_number(-1);
+        }
+    }
+    if (slash == lead || (colon != 0xFFFF && colon + 1 == slash) || colon == lead) return ctx.ret_number(-1);
+    ctx.ret_number((double)(slash | query << 16 | colon << 32));
+}
+
 extern fn void arc4random_buf(void* buf, usz n);
 
 fn void js_random(JsCtx ctx, void* udata) {
@@ -238,6 +279,7 @@ const Native[] CORE_NATIVES = {
     { "timerStart", &js_timer_start, 2 },
     { "timerCancel", &js_timer_cancel, 1 },
     { "now", &js_now, 0 },
+    { "urlFast", &js_url_fast, 1 },
     { "random", &js_random, 1 },
     { "encode", &js_encode, 1 },
     { "decode", &js_decode, 2 },

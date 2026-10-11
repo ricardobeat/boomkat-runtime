@@ -315,11 +315,23 @@ class ReadableStream {
         this._started = false;
         this._hwm = strategy.highWaterMark === undefined ? 1 : strategy.highWaterMark;
         this._controller = new ReadableStreamDefaultController(this);
-        this._closed = Promise.withResolvers();
-        this._closed.promise.catch(() => {});
-        Promise.resolve(source.start ? source.start(this._controller) : undefined).then(
-            () => { this._started = true; this._pullIfNeeded(); },
-            (e) => this._fail(e));
+        this._closed = null;
+        const begun = () => { this._started = true; this._pullIfNeeded(); };
+        if (!source.start) {
+            queueMicrotask(begun);
+            return;
+        }
+        Promise.resolve(source.start(this._controller)).then(begun, (e) => this._fail(e));
+    }
+    // The closed promise is rarely asked for, so it is made on demand.
+    _closedPromise() {
+        if (this._closed === null) {
+            this._closed = Promise.withResolvers();
+            this._closed.promise.catch(() => {});
+            if (this._state === "closed") this._closed.resolve();
+            else if (this._state === "errored") this._closed.reject(this._error);
+        }
+        return this._closed.promise;
     }
     get locked() { return this._reader !== null; }
     _pullIfNeeded() {
@@ -327,16 +339,24 @@ class ReadableStream {
         if (this._queue.length >= this._hwm && !this._reads.length) return;
         if (this._pulling) { this._repull = true; return; }
         this._pulling = true;
-        Promise.resolve().then(() => this._source.pull(this._controller)).then(() => {
-            this._pulling = false;
-            if (this._repull) { this._repull = false; this._pullIfNeeded(); }
-        }, (e) => this._fail(e));
+        let r;
+        try { r = this._source.pull(this._controller); }
+        catch (e) { this._pulling = false; this._fail(e); return; }
+        if (r !== undefined && r !== null && typeof r.then === "function") {
+            r.then(() => this._pullDone(), (e) => this._fail(e));
+        } else {
+            this._pullDone();
+        }
+    }
+    _pullDone() {
+        this._pulling = false;
+        if (this._repull) { this._repull = false; this._pullIfNeeded(); }
     }
     _finish() {
         this._state = "closed";
         for (const r of this._reads) r.resolve({ value: undefined, done: true });
         this._reads = [];
-        this._closed.resolve();
+        if (this._closed !== null) this._closed.resolve();
     }
     _fail(e) {
         if (this._state !== "readable") return;
@@ -345,15 +365,16 @@ class ReadableStream {
         this._queue = [];
         for (const r of this._reads) r.reject(e);
         this._reads = [];
-        this._closed.reject(e);
+        if (this._closed !== null) this._closed.reject(e);
+    }
+    _takeQueued() {
+        const value = this._queue.shift();
+        if (this._closeRequested && !this._queue.length) this._finish();
+        else this._pullIfNeeded();
+        return value;
     }
     _read() {
-        if (this._queue.length) {
-            const value = this._queue.shift();
-            if (this._closeRequested && !this._queue.length) this._finish();
-            else this._pullIfNeeded();
-            return Promise.resolve({ value, done: false });
-        }
+        if (this._queue.length) return Promise.resolve({ value: this._takeQueued(), done: false });
         if (this._state === "closed") return Promise.resolve({ value: undefined, done: true });
         if (this._state === "errored") return Promise.reject(this._error);
         const p = Promise.withResolvers();
@@ -447,7 +468,7 @@ class ReadableStreamDefaultReader {
         this._stream = stream;
         stream._reader = this;
     }
-    get closed() { return this._stream ? this._stream._closed.promise : Promise.resolve(); }
+    get closed() { return this._stream ? this._stream._closedPromise() : Promise.resolve(); }
     read() {
         if (!this._stream) return Promise.reject(new TypeError("reader released"));
         return this._stream._read();
@@ -726,7 +747,28 @@ const DEFAULT_PORTS = { "http:": "80", "https:": "443", "ws:": "80", "wss:": "44
 
 class URL {
     constructor(url, base) {
-        url = String(url).trim();
+        url = String(url);
+        // Plain http(s) URLs, the server's common case, skip the general split.
+        const f = bk.urlFast(url);
+        if (f >= 0) {
+            const slash = f % 65536;
+            const query = Math.floor(f / 65536) % 65536;
+            const colon = Math.floor(f / 4294967296);
+            const https = url.charCodeAt(4) === 115;
+            const lead = https ? 8 : 7;
+            const port = colon === 65535 ? "" : url.slice(colon + 1, slash);
+            this.protocol = https ? "https:" : "http:";
+            this.username = "";
+            this.password = "";
+            this.hostname = url.slice(lead, colon === 65535 ? slash : colon);
+            this.port = port === (https ? "443" : "80") ? "" : port;
+            this.pathname = slash === url.length ? "/" : query === 65535 ? url.slice(slash) : url.slice(slash, query);
+            this._search = query === 65535 || query === url.length - 1 ? "" : url.slice(query);
+            this.hash = "";
+            this._params = null;
+            return;
+        }
+        url = url.trim();
         let m = urlSplit(url);
         if (!m && base !== undefined) {
             const b = base instanceof URL ? base : new URL(String(base));
@@ -818,7 +860,11 @@ class Headers {
         } else if (typeof init[Symbol.iterator] === "function") {
             for (const p of init) this.append(p[0], p[1]);
         } else {
-            for (const k of Object.keys(init)) this.append(k, init[k]);
+            for (const k of Object.keys(init)) {
+                const name = k.toLowerCase();
+                if (name === "set-cookie") this.append(k, init[k]);
+                else this._map.set(name, String(init[k]).trim());
+            }
         }
     }
     // Set-Cookie is the one header never joined with commas.
@@ -1014,6 +1060,8 @@ const STATUS_TEXT = {
 
 const CT_TEXT = "text/plain;charset=UTF-8";
 const BLOB_TEXT = "content-type\n" + CT_TEXT + "\n";
+const CT_JSON = "application/json";
+const BLOB_JSON = "content-type\n" + CT_JSON + "\n";
 
 // The common Response is a string with no init: it keeps the implied
 // content-type as a constant blob and never builds a Headers.
@@ -1048,7 +1096,7 @@ class Response {
     get ok() { return this.status >= 200 && this.status < 300; }
     _blob() {
         if (this._headers !== null) return this._headers._blob();
-        return this._ct === CT_TEXT ? BLOB_TEXT : "";
+        return this._ct === CT_TEXT ? BLOB_TEXT : this._ct === CT_JSON ? BLOB_JSON : "";
     }
     clone() {
         if (this._used) throw new TypeError("Body already used");
@@ -1064,7 +1112,13 @@ class Response {
         r.type = this.type;
         return r;
     }
-    static json(data, init = {}) {
+    static json(data, init) {
+        if (init === undefined) {
+            const r = new Response(null);
+            r._ct = CT_JSON;
+            r._body = JSON.stringify(data);
+            return r;
+        }
         const h = new Headers(init.headers);
         if (!h.has("content-type")) h.set("content-type", "application/json");
         return new Response(JSON.stringify(data), { status: init.status, statusText: init.statusText, headers: h, [INTERNAL]: true });
@@ -1123,17 +1177,48 @@ bk.aborted = function (id) {
     if (s.wake) { const w = s.wake; s.wake = null; w(); }
 };
 
+const BATCH = 65536;
+const encoder = new TextEncoder();
+
+function joinChunks(parts, size) {
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const p of parts) {
+        out.set(p, at);
+        at += p.length;
+    }
+    return out;
+}
+
+// Chunks already queued go out as one write, so a stream that produces
+// synchronously costs one syscall per batch rather than one per chunk.
 async function pump(id, res) {
     const s = { wake: null, aborted: false };
     streams.set(id, s);
     bk.streamStart(id, res.status, res.status === 200 ? "" : res.statusText, res._blob());
-    const reader = res._body.getReader();
+    const stream = res._body;
+    const reader = stream.getReader();
+    const parts = [];
     try {
         while (!s.aborted) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            const chunk = typeof value === "string" ? value : asBytes(value);
-            if (!bk.streamWrite(id, chunk) && !s.aborted) await new Promise((r) => { s.wake = r; });
+            let size = 0;
+            while (stream._queue.length && size < BATCH) {
+                const value = stream._takeQueued();
+                const chunk = typeof value === "string" ? encoder.encode(value) : asBytes(value);
+                parts.push(chunk);
+                size += chunk.length;
+            }
+            if (parts.length === 0) {
+                if (stream._state === "closed") break;
+                const r = await reader.read();
+                if (r.done) break;
+                const chunk = typeof r.value === "string" ? encoder.encode(r.value) : asBytes(r.value);
+                parts.push(chunk);
+                size = chunk.length;
+            }
+            const out = parts.length === 1 ? parts[0] : joinChunks(parts, size);
+            parts.length = 0;
+            if (!bk.streamWrite(id, out) && !s.aborted) await new Promise((r) => { s.wake = r; });
         }
         if (s.aborted) reader.cancel();
     } catch (e) {

@@ -111,10 +111,26 @@ fn void settle(uint id, bool ok, JsValue value = { }, String code = "") {
 }
 
 fn void resolve(uint id, JsValue value = { }) => settle(id, true, value);
-fn void resolve_number(uint id, double n) => settle(id, true, g_rt.number(n) ?? { });
-fn void resolve_string(uint id, String s) => settle(id, true, g_rt.string(s) ?? { });
-fn void resolve_bytes(uint id, char[] owned) => settle(id, true, bytes_value(owned) ?? { });
-fn void reject(uint id, String code, String msg) => settle(id, false, g_rt.string(msg) ?? { }, code);
+fn void resolve_number(uint id, double n) {
+    g_rt.@scope() {
+        settle(id, true, g_rt.number(n) ?? { });
+    };
+}
+fn void resolve_string(uint id, String s) {
+    g_rt.@scope() {
+        settle(id, true, g_rt.string(s) ?? { });
+    };
+}
+fn void resolve_bytes(uint id, char[] owned) {
+    g_rt.@scope() {
+        settle(id, true, bytes_value(owned) ?? { });
+    };
+}
+fn void reject(uint id, String code, String msg) {
+    g_rt.@scope() {
+        settle(id, false, g_rt.string(msg) ?? { }, code);
+    };
+}
 fn void reject_errno(
     uint id,
     CInt err,
