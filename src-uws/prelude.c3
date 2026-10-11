@@ -7,9 +7,10 @@
 // and keeping them in JS lets the engine's inline caches see through them.
 // The host boundary is kept to a few primitives that move strings across:
 //
-//   C3 -> JS  __dispatch(id, method, url, headerBlob, body)
+//   C3 -> JS  __dispatch(id, method, body)
 //             __timer_fire(id)
 //   JS -> C3  __respond(id, status, statusText, headerBlob, body)
+//             __req_url(id), __req_headers(id) -> string, read lazily
 //             __timer_start(ms, id) -> handle, __timer_cancel(handle)
 //
 // A header blob is "name\nvalue\nname\nvalue\n...": HTTP forbids a newline in
@@ -365,16 +366,14 @@ function __mixBody(cls) {
 // ---- Request -----------------------------------------------------------
 
 class Request {
-    constructor(input, init, url, blob, body) {
+    constructor(input, init, id, body) {
         if (input === __INTERNAL) {
-            // From the server. Headers are parsed only if the handler reads
-            // them, which most handlers never do.
+            // From the server. The URL and headers are fetched from C3 only
+            // if the handler reads them, which most handlers barely do. The
+            // other fields default from the prototype (see __protoDefaults).
             this.method = init;
-            this._url = url;
-            this._headers = null;
-            this._blob = blob;
-            this._body = body === undefined ? null : body;
-            this._used = false;
+            this._id = id;
+            if (body !== undefined) this._body = body;
             return;
         }
         init = init || {};
@@ -382,13 +381,16 @@ class Request {
         this._url = src ? src.url : new URL(String(input)).href;
         this.method = String(init.method || (src ? src.method : "GET")).toUpperCase();
         this._headers = new Headers(init.headers !== undefined ? init.headers : src ? src.headers : undefined);
-        this._blob = null;
+        this._id = 0;
         this._body = init.body !== undefined ? __bodyInit(init.body, this._headers) : src ? src._body : null;
         this._used = false;
     }
-    get url() { return this._url; }
+    get url() {
+        if (this._url === null) this._url = __req_url(this._id);
+        return this._url;
+    }
     get headers() {
-        if (this._headers === null) this._headers = Headers._fromBlob(this._blob);
+        if (this._headers === null) this._headers = Headers._fromBlob(__req_headers(this._id));
         return this._headers;
     }
     get signal() { return undefined; }
@@ -398,6 +400,17 @@ class Request {
     }
 }
 __mixBody(Request);
+
+// Defaults on the prototype rather than assigned in each constructor: every
+// own property a constructor adds costs a shape transition and a setter check
+// up the prototype chain, which on the per-request path is most of the cost
+// of building the object. An instance gets its own property only when it
+// differs.
+function __protoDefaults(cls, d) {
+    for (var k of Object.keys(d))
+        Object.defineProperty(cls.prototype, k, { value: d[k], writable: true, configurable: true });
+}
+__protoDefaults(Request, { _id: 0, _url: null, _headers: null, _body: null, _used: false });
 
 // ---- Response ----------------------------------------------------------
 
@@ -420,14 +433,12 @@ var __BLOB_TEXT = "content-type\n" + __CT_TEXT + "\n";
 // and hands C3 a constant blob. Touching .headers materializes the real thing.
 class Response {
     constructor(body, init) {
-        this.type = "default";
-        this.redirected = false;
-        this._used = false;
-        this._statusText = null;
-        this._headers = null;
-        this._ct = null;
+        if (typeof body === "string" && init === undefined) {
+            // The hot case: everything but the body is a prototype default.
+            this._body = body;
+            return;
+        }
         if (init === undefined || init === null) {
-            this.status = 200;
         } else {
             var status = init.status === undefined ? 200 : init.status | 0;
             if (status < 200 || status > 599) throw new RangeError("Invalid status: " + init.status);
@@ -437,10 +448,10 @@ class Response {
         }
         if (typeof body === "string" && this._headers === null) {
             this._body = body;
-            this._ct = __CT_TEXT;
         } else if (body === undefined || body === null) {
-            this._body = null;
+            this._ct = null;
         } else {
+            this._ct = null;
             this._body = __bodyInit(body, this.headers);
         }
     }
@@ -486,6 +497,8 @@ class Response {
     }
 }
 __mixBody(Response);
+__protoDefaults(Response, { status: 200, type: "default", redirected: false, _used: false,
+                            _statusText: null, _headers: null, _ct: __CT_TEXT, _body: null });
 
 // ---- timers ------------------------------------------------------------
 
@@ -521,11 +534,14 @@ function queueMicrotask(fn) { Promise.resolve().then(fn); }
 
 // ---- dispatch ----------------------------------------------------------
 
-var __handler = null;
+// The handler as the script gave it: an object with fetch, called as a
+// method so it keeps its this, or a bare function.
+var __handlerObj = null;
+var __handlerFn = null;
 
 function __install(h) {
-    if (typeof h === "function") __handler = h;
-    else if (h && typeof h.fetch === "function") __handler = h.fetch.bind(h);
+    if (typeof h === "function") __handlerFn = h;
+    else if (h && typeof h.fetch === "function") __handlerObj = h;
     else throw new TypeError("the script must evaluate to a fetch function or an object with fetch()");
 }
 
@@ -548,11 +564,17 @@ function __send(id, res) {
     __respond(id, st, st === 200 ? "" : res.statusText, res._blob(), res._body === null ? "" : res._body);
 }
 
-function __dispatch(id, method, url, blob, body) {
-    var req = new Request(__INTERNAL, method, url, blob, body);
+function __dispatch(id, method, body) {
+    var req = new Request(__INTERNAL, method, id, body);
     var r;
-    try { r = __handler(req); } catch (e) { __fail(id, e); return; }
-    if (r instanceof Response) { __send(id, r); return; }
+    try { r = __handlerObj !== null ? __handlerObj.fetch(req) : __handlerFn(req); }
+    catch (e) { __fail(id, e); return; }
+    if (r instanceof Response) {
+        r._used = true;
+        var st = r.status;
+        __respond(id, st, st === 200 ? "" : r.statusText, r._blob(), r._body === null ? "" : r._body);
+        return;
+    }
     Promise.resolve(r).then(function (res) { __send(id, res); }, function (e) { __fail(id, e); });
 }
 `;

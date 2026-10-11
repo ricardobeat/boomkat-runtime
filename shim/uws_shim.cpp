@@ -44,9 +44,10 @@ size_t uws_req_method(uws_req *req, const char **out);
 size_t uws_req_url(uws_req *req, const char **out);
 // Without the leading '?'; empty when there is none.
 size_t uws_req_query(uws_req *req, const char **out);
-// Header `i` in arrival order, keys lowercased. Returns 0 past the last one.
-int uws_req_header(uws_req *req, int i, const char **key, size_t *key_len,
-                   const char **val, size_t *val_len);
+// Up to `cap` headers in arrival order, keys lowercased, pointing into the
+// request buffer. Returns how many were written.
+typedef struct { const char *key; size_t key_len; const char *val; size_t val_len; } uws_header;
+int uws_req_headers(uws_req *req, uws_header *out, int cap);
 
 // ---- response ----
 
@@ -182,16 +183,13 @@ size_t uws_req_query(uws_req *req, const char **out) {
     return v.size();
 }
 
-int uws_req_header(uws_req *req, int i, const char **key, size_t *key_len,
-                   const char **val, size_t *val_len) {
+int uws_req_headers(uws_req *req, uws_header *out, int cap) {
     int n = 0;
     for (auto [k, v] : *(Req *)req) {
-        if (n++ != i) continue;
-        *key = k.data(); *key_len = k.size();
-        *val = v.data(); *val_len = v.size();
-        return 1;
+        if (n == cap) break;
+        out[n++] = uws_header{k.data(), k.size(), v.data(), v.size()};
     }
-    return 0;
+    return n;
 }
 
 void uws_res_on_data(uws_res *res, uws_data_cb cb, void *user) {

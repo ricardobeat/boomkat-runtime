@@ -53,8 +53,14 @@ alias UwsVoidCb = fn void(void* user);
 extern fn sz uws_req_method(UwsReq* req, char** out);
 extern fn sz uws_req_url(UwsReq* req, char** out);
 extern fn sz uws_req_query(UwsReq* req, char** out);
-extern fn CInt uws_req_header(UwsReq* req, CInt i, char** key, sz* key_len,
-                              char** val, sz* val_len);
+struct UwsHeader
+{
+    char* key;
+    sz key_len;
+    char* val;
+    sz val_len;
+}
+extern fn CInt uws_req_headers(UwsReq* req, UwsHeader* out, CInt cap);
 
 extern fn void uws_res_on_data(UwsRes* res, UwsDataCb cb, void* user);
 extern fn void uws_res_on_aborted(UwsRes* res, UwsVoidCb cb, void* user);
@@ -84,9 +90,16 @@ struct Conn
     bool aborted;     // the client went away; res must not be touched again
     bool in_request;  // inside the uWS request callback, which corks for us
 
-    // Only filled when the body is read after the request callback returns,
-    // since uWS's request object is gone by then.
-    String method;
+    // The request's parts, read lazily: JS asks for the URL and headers only
+    // when the handler touches them. While the request callback runs they
+    // come straight from uWS through `req` and `hdrs`. A Conn that outlives
+    // the callback captures them onto the heap first, since uWS recycles the
+    // request as soon as the callback returns.
+    UwsReq* req;
+    UwsHeader[] hdrs;
+    String path;
+    String query;
+    String method;    // heap copies, once captured
     String url;
     String blob;
     List{char} body;
@@ -106,6 +119,7 @@ struct Worker
     // high bits, so a stale id from JS can never reach a recycled slot.
     List{Conn*} conns;
     List{uint} free_slots;
+    List{Conn*} spare;
     uint generation;
 }
 
@@ -134,7 +148,8 @@ const uint SLOT_MASK = (1u << SLOT_BITS) - 1;
 
 fn Conn* Worker.conn_new(&self, UwsRes* res)
 {
-    Conn* c = mem::new(Conn);
+    // Recycled rather than malloc'd: one per request adds up.
+    Conn* c = self.spare.len() ? self.spare.pop()!! : mem::new(Conn);
     c.w = self;
     c.res = res;
     uint slot;
@@ -171,7 +186,15 @@ fn void Worker.conn_free(&self, Conn* c)
     if (c.url.len) free(c.url.ptr);
     if (c.blob.len) free(c.blob.ptr);
     if (c.body.is_initialized()) c.body.free();
-    free(c);
+    *c = {};
+    if (self.spare.len() < 1024)
+    {
+        self.spare.push(c);
+    }
+    else
+    {
+        free(c);
+    }
 }
 
 // ---- reading the request ----
@@ -184,37 +207,97 @@ fn String upper_method(String lower) @inline
     return (String)up;
 }
 
-// Collects headers as a "name\nvalue\n" blob in tmem, reports whether the
-// request carries a body, and picks out Host for the request URL.
-fn String read_headers(UwsReq* req, bool* has_body, String* host)
+// Most requests carry a handful of headers; anything past this is not seen.
+const int MAX_HEADERS = 64;
+
+fn bool has_body(UwsHeader[] hdrs)
 {
-    DString blob = dstring::temp_with_capacity(512);
-    *has_body = false;
-    *host = "localhost";
-    for (CInt i = 0; ; i++)
+    foreach (h : hdrs)
     {
-        char* k; sz kl; char* v; sz vl;
-        if (!uws_req_header(req, i, &k, &kl, &v, &vl)) break;
-        String key = (String)k[:kl];
-        String val = (String)v[:vl];
-        switch (key)
-        {
-            case "content-length": if (val != "0") *has_body = true;
-            case "transfer-encoding": *has_body = true;
-            case "host": *host = val;
-        }
-        blob.append(key);
-        blob.append_char('\n');
-        blob.append(val);
-        blob.append_char('\n');
+        String key = (String)h.key[:h.key_len];
+        if (key == "content-length") return (String)h.val[:h.val_len] != "0";
+        if (key == "transfer-encoding") return true;
     }
-    return blob.str_view();
+    return false;
+}
+
+fn String host_of(UwsHeader[] hdrs)
+{
+    foreach (h : hdrs)
+    {
+        if ((String)h.key[:h.key_len] == "host") return (String)h.val[:h.val_len];
+    }
+    return "localhost";
+}
+
+// Headers as a "name\nvalue\n" blob, in tmem.
+fn String headers_blob(UwsHeader[] hdrs)
+{
+    sz n = 0;
+    foreach (h : hdrs) n += h.key_len + h.val_len + 2;
+    char[] out = mem::temp_array(char, n);
+    sz at = 0;
+    foreach (h : hdrs)
+    {
+        mem::copy(&out[at], h.key, h.key_len);
+        at += h.key_len;
+        out[at++] = '\n';
+        mem::copy(&out[at], h.val, h.val_len);
+        at += h.val_len;
+        out[at++] = '\n';
+    }
+    return (String)out;
+}
+
+fn String Conn.url_now(&self)
+{
+    if (self.url.len) return self.url;
+    if (self.req == null) return "";
+    return join_url(host_of(self.hdrs), self.path, self.query);
+}
+
+fn String Conn.blob_now(&self)
+{
+    if (self.req == null) return self.blob;
+    return headers_blob(self.hdrs);
+}
+
+// Copies everything still pointing into uWS onto the heap. Called before the
+// request callback returns on any Conn that will outlive it.
+fn void Conn.capture(&self, String method)
+{
+    if (self.req == null) return;
+    self.method = method.copy(mem);
+    self.url = self.url_now().copy(mem);
+    self.blob = self.blob_now().copy(mem);
+    self.req = null;
+    self.hdrs = {};
+}
+
+// "http://" + host + path ["?" + query], in tmem. Plain copies: the
+// formatter is measurably slower for this on the per-request path.
+fn String join_url(String host, String path, String query)
+{
+    sz n = 7 + host.len + path.len + (query.len ? query.len + 1 : 0);
+    char[] out = mem::temp_array(char, n);
+    sz at = 0;
+    out[at:7] = "http://"[..];
+    at += 7;
+    out[at:host.len] = host[..];
+    at += host.len;
+    out[at:path.len] = path[..];
+    at += path.len;
+    if (query.len)
+    {
+        out[at] = '?';
+        out[at + 1:query.len] = query[..];
+    }
+    return (String)out;
 }
 
 // ---- calling JS ----
 
-fn void Worker.call_dispatch(&self, Conn* c, String method, String url,
-                             String blob, String body, bool has_body)
+fn void Worker.call_dispatch(&self, Conn* c, String method, String body, bool has_body)
 {
     JsValue m = {};
     bool m_cached = false;
@@ -223,7 +306,7 @@ fn void Worker.call_dispatch(&self, Conn* c, String method, String url,
         if (name == method) { m = self.methods[i]; m_cached = true; break; }
     }
 
-    JsValue[5] args;
+    JsValue[3] args;
     bool ok = true;
     do
     {
@@ -235,10 +318,8 @@ fn void Worker.call_dispatch(&self, Conn* c, String method, String url,
         }
         args[0] = self.rt.number((double)c.id) ?? (JsValue){};
         args[1] = m;
-        args[2] = self.rt.string(url) ?? (JsValue){};
-        args[3] = self.rt.string(blob) ?? (JsValue){};
         // An empty handle reaches JS as undefined, which Request reads as no body.
-        args[4] = has_body ? self.rt.string(body) ?? (JsValue){} : (JsValue){};
+        args[2] = has_body ? self.rt.string(body) ?? (JsValue){} : (JsValue){};
     };
 
     if (ok)
@@ -254,7 +335,7 @@ fn void Worker.call_dispatch(&self, Conn* c, String method, String url,
             self.rt.release(r);
         }
     }
-    for (int i = 2; i < 5; i++) if (!args[i].is_empty()) self.rt.release(args[i]);
+    for (int i = 2; i < 3; i++) if (!args[i].is_empty()) self.rt.release(args[i]);
     if (!args[0].is_empty()) self.rt.release(args[0]);
     if (!m_cached && !m.is_empty()) self.rt.release(m);
 
@@ -348,6 +429,36 @@ fn void Worker.finish_plain(&self, Conn* c, int status, String body)
     self.finish(c, status, text, "content-type\ntext/plain;charset=UTF-8\n", body);
 }
 
+// The bytes of a string argument, without copying when that is possible.
+//
+// Engine strings are CESU-8, which is already UTF-8 for ASCII, so those are
+// viewed in place -- valid only for the rest of the host call, which is all
+// __respond needs since it writes before returning. Anything else is
+// transcoded into tmem.
+fn String arg_bytes(JsArg a) @inline
+{
+    if (!a.tv.is_string()) return "";
+    HString* hs = (HString*)a.tv.get_heapptr();
+    if (hs.is_ascii()) return (String)hs.get_data();
+    return a.as_string() ?? "";
+}
+
+// __req_url(id), __req_headers(id): the parts of a request JS reads lazily.
+// After the response is sent the Conn is gone and these return "".
+fn void host_req_url(JsCtx ctx, void* udata)
+{
+    Worker* w = (Worker*)udata;
+    Conn* c = w.conn_find((uint)(ctx.arg(0).as_number() ?? 0));
+    @pool() { ctx.ret_string(c == null ? "" : c.url_now()); };
+}
+
+fn void host_req_headers(JsCtx ctx, void* udata)
+{
+    Worker* w = (Worker*)udata;
+    Conn* c = w.conn_find((uint)(ctx.arg(0).as_number() ?? 0));
+    @pool() { ctx.ret_string(c == null ? "" : c.blob_now()); };
+}
+
 // __respond(id, status, statusText, headerBlob, body)
 fn void host_respond(JsCtx ctx, void* udata)
 {
@@ -360,9 +471,9 @@ fn void host_respond(JsCtx ctx, void* udata)
         if (c == null || c.res == null) return;   // already answered
 
         double status = ctx.arg(1).as_number() ?? 200;
-        String text = ctx.arg(2).as_string() ?? "";
-        String blob = ctx.arg(3).as_string() ?? "";
-        String body = ctx.arg(4).as_string() ?? "";
+        String text = arg_bytes(ctx.arg(2));
+        String blob = arg_bytes(ctx.arg(3));
+        String body = arg_bytes(ctx.arg(4));
         w.finish(c, (int)status, text, blob, body);
     };
 }
@@ -444,7 +555,7 @@ fn void on_data(void* user, char* chunk, sz len, CInt last)
 
     @pool()
     {
-        w.call_dispatch(c, c.method, c.url, c.blob, (String)c.body.array_view(), true);
+        w.call_dispatch(c, c.method, (String)c.body.array_view(), true);
     };
 }
 
@@ -471,23 +582,19 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res)
     @pool()
     {
         String method = upper_method((String)mp[:ml]);
-        bool has_body;
-        String host;
-        String blob = read_headers(req, &has_body, &host);
-        // Absolute, as Request.url is everywhere else: http://host/path?query
-        String url = ql
-            ? string::tformat("http://%s%s?%s", host, (String)up[:ul], (String)qp[:ql])
-            : string::tformat("http://%s%s", host, (String)up[:ul]);
+        UwsHeader[MAX_HEADERS] hbuf;
+        CInt nh = uws_req_headers(req, &hbuf, MAX_HEADERS);
 
         Conn* c = w.conn_new(res);
+        c.req = req;
+        c.hdrs = hbuf[:nh];
+        c.path = (String)up[:ul];
+        c.query = (String)qp[:ql];
 
-        if (has_body)
+        if (has_body(c.hdrs))
         {
-            // The body arrives after this callback returns, by which time uWS
-            // has recycled the request, so everything read from it is copied.
-            c.method = method.copy(mem);
-            c.url = url.copy(mem);
-            c.blob = blob.copy(mem);
+            // The body arrives after this callback returns.
+            c.capture(method);
             c.body.init(mem, 1024);
             uws_res_on_aborted(res, &on_aborted, c);
             uws_res_on_data(res, &on_data, c);
@@ -495,7 +602,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res)
         }
 
         c.in_request = true;
-        w.call_dispatch(c, method, url, blob, "", false);
+        w.call_dispatch(c, method, "", false);
         c.in_request = false;
 
         if (c.res == null)
@@ -504,6 +611,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res)
             w.conn_free(c);
             return;
         }
+        c.capture(method);
         // Still pending: uWS requires an abort handler on any response that
         // outlives its request callback.
         uws_res_on_aborted(res, &on_aborted, c);
@@ -533,9 +641,12 @@ fn void? Worker.boot(&self)
     // A zeroed List allocates from tmem, which every request resets.
     self.conns.init(mem, 256);
     self.free_slots.init(mem, 256);
+    self.spare.init(mem, 256);
     self.rt.open()!;
     self.rt.register_fn("__respond", &host_respond, self, 5)!;
     self.rt.register_fn("__timer_start", &host_timer_start, self, 2)!;
+    self.rt.register_fn("__req_url", &host_req_url, self, 1)!;
+    self.rt.register_fn("__req_headers", &host_req_headers, self, 1)!;
     self.rt.register_fn("__timer_cancel", &host_timer_cancel, self, 1)!;
     self.rt.exec(PRELUDE, "<prelude>")!;
 
