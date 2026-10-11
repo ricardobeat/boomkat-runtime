@@ -10,6 +10,14 @@ export function serve(opts, fetch) {
     const h = { fetch, error: opts.error, server: null };
     const index = bk.addHandler(h);
     const bound = bk.serve(index, hostname, port);
+    if (opts.static) {
+        for (const [path, res] of Object.entries(opts.static)) {
+            if (!(res instanceof Response)) throw new TypeError(`static route ${path} must be a Response`);
+            const b = res._body;
+            if (b instanceof ReadableStream) throw new TypeError(`static route ${path} cannot stream`);
+            bk.staticRoute(index, path, res.status, res.status === 200 ? "" : res.statusText, res._blob(), b === null ? "" : b);
+        }
+    }
     let closed;
     const finished = new Promise((r) => { closed = r; });
     const server = {

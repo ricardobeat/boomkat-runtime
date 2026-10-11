@@ -5,6 +5,7 @@ module bkr;
 import boomkat;
 import std::io;
 import std::collections::list;
+import std::collections::map;
 
 typedef UwsApp = void;
 typedef UwsReq = void;
@@ -51,6 +52,15 @@ struct Server {
     UwsApp* app;
     JsValue index_value;
     bool stopped;
+    HashMap{String, Static} statics;
+}
+
+// A response fixed at serve() time, answered without entering JS.
+struct Static {
+    int status;
+    String status_text;
+    String blob;
+    char[] body;
 }
 
 // A request in flight. While the uWS request callback runs, the URL and
@@ -429,6 +439,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
     sz ul     = uws_req_url(req, &up);
     char* qp;
     sz ql     = uws_req_query(req, &qp);
+    if (s.statics.len() && serve_static(s, (String)mp[:ml], (String)up[:ul], res)) return;
     @pool() {
         String method = (String)mp[:ml];
         UwsHeader[MAX_HEADERS] hbuf;
@@ -458,7 +469,36 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
     };
 }
 
+fn bool serve_static(Server* s, String method, String path, UwsRes* res) {
+    bool head = method == "HEAD";
+    if (!head && method != "GET") return false;
+    Static? st = s.statics.get(path);
+    if (catch st) return false;
+    write_head(res, st.status, st.status_text, st.blob);
+    if (head || st.status == 204 || st.status == 304) {
+        uws_res_end_empty(res);
+    } else {
+        uws_res_end(res, st.body.ptr, st.body.len);
+    }
+    return true;
+}
+
 // ---- natives ----
+
+// staticRoute(index, path, status, statusText, headerBlob, body)
+fn void js_static_route(JsCtx ctx, void* udata) {
+    uint index = ctx.arg(0).id();
+    foreach (s : g_servers) {
+        if (s.index != index) continue;
+        String path = ((String)ctx.arg(1).bytes()).copy(mem);
+        s.statics.set(
+            path,
+            {
+                ctx.arg(2)
+            .as_int(200), ((String)ctx.arg(3)
+                .bytes()).copy(mem), ((String)ctx.arg(4).bytes()).copy(mem), copy_bytes(ctx.arg(5).bytes()), });
+    }
+}
 
 // serve(index, hostname, port) -> bound port
 fn void js_serve(JsCtx ctx, void* udata) {
@@ -476,6 +516,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
         Server* s = mem::new(Server);
         s.index = index;
         s.index_value = g_rt.number(index)!!;
+        s.statics.init(mem);
         s.app = uws_app_new(&on_request, s);
         CInt bound = uws_app_listen(s.app, host.zstr_tcopy(), port);
         if (bound < 0) {
@@ -500,6 +541,7 @@ fn void js_stop(JsCtx ctx, void* udata) {
 
 const Native[] HTTP_NATIVES = {
     { "serve", &js_serve, 3 },
+    { "staticRoute", &js_static_route, 6 },
     { "stop", &js_stop, 2 },
     { "respond", &js_respond, 5 },
     { "streamStart", &js_stream_start, 4 },
