@@ -288,7 +288,7 @@ fn void? boot() {
 
 fn void usage() {
     io::eprintn(
-        "usage: bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--config file] [--time-limit=ms] script.js [args...]"
+        "usage: bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] script.js [args...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
 }
@@ -301,6 +301,10 @@ fn void? parse_args(String[] argv) {
         if (!a.starts_with("-")) break;
         if (a == "--config" && i + 1 < argv.len) {
             config = argv[++i];
+            continue;
+        }
+        if (a == "--no-sandbox") {
+            g_sandbox = false;
             continue;
         }
         if (a.starts_with("--time-limit=")) {
@@ -344,6 +348,7 @@ fn int main(String[] argv) {
         io::eprintfn("error: cannot read %s: %s", g_main, err);
         return 1;
     }
+    apply_sandbox();
     g_depth++;
     JsValue? ns = g_rt.eval_module((String)src, g_main);
     g_depth--;
