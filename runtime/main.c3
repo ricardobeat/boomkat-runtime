@@ -79,7 +79,7 @@ fn bool url_char(char c) {
 // Plain http(s) URLs only. Returns slash | query << 16 | colon << 32, with
 // 0xFFFF for an absent part, or -1 for anything the general parser must see.
 fn void js_url_fast(JsCtx ctx, void* udata) {
-    String u = ctx.arg(0).as_string() ?? "";
+    String u = (String)ctx.arg(0).bytes();
     usz lead = u.starts_with("http://") ? 7 : u.starts_with("https://") ? 8 : 0;
     if (!lead || u.len >= 0xFFFF) return ctx.ret_number(-1);
     usz slash = u.len;

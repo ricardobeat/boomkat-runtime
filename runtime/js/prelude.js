@@ -811,26 +811,30 @@ function normalizePath(p) {
 const DEFAULT_PORTS = { "http:": "80", "https:": "443", "ws:": "80", "wss:": "443" };
 
 class URL {
+    _expand() {
+        const url = this._raw;
+        const f = this._f;
+        this._raw = null;
+        const slash = f % 65536;
+        const query = Math.floor(f / 65536) % 65536;
+        const colon = Math.floor(f / 4294967296);
+        const https = url.charCodeAt(4) === 115;
+        const lead = https ? 8 : 7;
+        const port = colon === 65535 ? "" : url.slice(colon + 1, slash);
+        this._protocol = https ? "https:" : "http:";
+        this._hostname = url.slice(lead, colon === 65535 ? slash : colon);
+        this._port = port === (https ? "443" : "80") ? "" : port;
+        this._pathname = slash === url.length ? "/" : query === 65535 ? url.slice(slash) : url.slice(slash, query);
+        this._search = query === 65535 || query === url.length - 1 ? "" : url.slice(query);
+    }
     constructor(url, base) {
         url = String(url);
         // Plain http(s) URLs, the server's common case, skip the general split.
         const f = bk.urlFast(url);
         if (f >= 0) {
-            const slash = f % 65536;
-            const query = Math.floor(f / 65536) % 65536;
-            const colon = Math.floor(f / 4294967296);
-            const https = url.charCodeAt(4) === 115;
-            const lead = https ? 8 : 7;
-            const port = colon === 65535 ? "" : url.slice(colon + 1, slash);
-            this.protocol = https ? "https:" : "http:";
-            this.username = "";
-            this.password = "";
-            this.hostname = url.slice(lead, colon === 65535 ? slash : colon);
-            this.port = port === (https ? "443" : "80") ? "" : port;
-            this.pathname = slash === url.length ? "/" : query === 65535 ? url.slice(slash) : url.slice(slash, query);
-            this._search = query === 65535 || query === url.length - 1 ? "" : url.slice(query);
-            this.hash = "";
-            this._params = null;
+            // Fields are cut from the string only when one is read.
+            this._raw = url;
+            this._f = f;
             return;
         }
         url = url.trim();
@@ -847,55 +851,80 @@ class URL {
         if (!m) {
             const o = OPAQUE_RE.exec(url);
             if (!o) throw new TypeError("Invalid URL: " + url);
-            this.protocol = o[1].toLowerCase();
-            this.username = this.password = this.hostname = this.port = "";
-            this.pathname = o[2];
+            this._protocol = o[1].toLowerCase();
+            this._username = this._password = this._hostname = this._port = "";
+            this._pathname = o[2];
             this._search = o[3] && o[3] !== "?" ? o[3] : "";
-            this.hash = o[4] && o[4] !== "#" ? o[4] : "";
+            this._hash = o[4] && o[4] !== "#" ? o[4] : "";
             this._params = null;
             this._opaque = true;
             return;
         }
-        this.protocol = m[1] === "http:" || m[1] === "https:" ? m[1] : m[1].toLowerCase();
+        this._protocol = m[1] === "http:" || m[1] === "https:" ? m[1] : m[1].toLowerCase();
         let host = m[2];
         const at = host.lastIndexOf("@");
-        this.username = "";
-        this.password = "";
+        this._username = "";
+        this._password = "";
         if (at >= 0) {
             const cred = host.slice(0, at);
             host = host.slice(at + 1);
             const c = cred.indexOf(":");
-            if (c < 0) this.username = cred;
-            else { this.username = cred.slice(0, c); this.password = cred.slice(c + 1); }
+            if (c < 0) this._username = cred;
+            else { this._username = cred.slice(0, c); this._password = cred.slice(c + 1); }
         }
         const colon = host.lastIndexOf(":");
         if (colon >= 0 && host.indexOf("]", colon) < 0) {
-            this.hostname = host.slice(0, colon).toLowerCase();
-            this.port = host.slice(colon + 1);
-            if (!/^\d*$/.test(this.port)) throw new TypeError("Invalid URL: " + url);
+            this._hostname = host.slice(0, colon).toLowerCase();
+            this._port = host.slice(colon + 1);
+            if (!/^\d*$/.test(this._port)) throw new TypeError("Invalid URL: " + url);
         } else {
-            this.hostname = host.toLowerCase();
-            this.port = "";
+            this._hostname = host.toLowerCase();
+            this._port = "";
         }
-        if (DEFAULT_PORTS[this.protocol] === this.port) this.port = "";
-        if (this.hostname === "" && (this.protocol === "http:" || this.protocol === "https:")) throw new TypeError("Invalid URL: " + url);
-        this.pathname = normalizePath(m[3] || "/");
+        if (DEFAULT_PORTS[this._protocol] === this._port) this._port = "";
+        if (this._hostname === "" && (this._protocol === "http:" || this._protocol === "https:")) throw new TypeError("Invalid URL: " + url);
+        this._pathname = normalizePath(m[3] || "/");
         this._search = m[4] && m[4] !== "?" ? m[4] : "";
-        this.hash = m[5] && m[5] !== "#" ? m[5] : "";
+        this._hash = m[5] && m[5] !== "#" ? m[5] : "";
         this._params = null;
     }
+    get protocol() { if (this._raw !== null) this._expand(); return this._protocol; }
+    set protocol(v) { if (this._raw !== null) this._expand(); this._protocol = String(v); }
+    get username() { if (this._raw !== null) this._expand(); return this._username; }
+    set username(v) { if (this._raw !== null) this._expand(); this._username = String(v); }
+    get password() { if (this._raw !== null) this._expand(); return this._password; }
+    set password(v) { if (this._raw !== null) this._expand(); this._password = String(v); }
+    get hostname() { if (this._raw !== null) this._expand(); return this._hostname; }
+    set hostname(v) { if (this._raw !== null) this._expand(); this._hostname = String(v); }
+    get port() { if (this._raw !== null) this._expand(); return this._port; }
+    set port(v) { if (this._raw !== null) this._expand(); this._port = String(v); }
+    get pathname() {
+        const url = this._raw;
+        if (url === null) return this._pathname;
+        const lo = this._f % 4294967296;
+        const slash = lo & 65535;
+        const query = lo >>> 16;
+        return slash === url.length ? "/" : query === 65535 ? url.slice(slash) : url.slice(slash, query);
+    }
+    set pathname(v) { if (this._raw !== null) this._expand(); this._pathname = String(v); }
+    get hash() { if (this._raw !== null) this._expand(); return this._hash; }
+    set hash(v) { if (this._raw !== null) this._expand(); this._hash = String(v); }
     get host() { return this.port ? this.hostname + ":" + this.port : this.hostname; }
     get origin() { return this._opaque || this.protocol === "file:" ? "null" : this.protocol + "//" + this.host; }
-    get search() { return this._search; }
+    get search() { if (this._raw !== null) this._expand(); return this._search; }
     set search(s) {
+        if (this._raw !== null) this._expand();
         s = String(s);
         if (s !== "" && s.charAt(0) !== "?") s = "?" + s;
         this._search = s === "?" ? "" : s;
         if (this._params) this._params._parse(this._search);
     }
-    _setSearch(qs) { this._search = qs ? "?" + qs : ""; }
+    _setSearch(qs) {
+        if (this._raw !== null) this._expand();
+        this._search = qs ? "?" + qs : "";
+    }
     get searchParams() {
-        if (!this._params) { this._params = new URLSearchParams(this._search); this._params._url = this; }
+        if (!this._params) { this._params = new URLSearchParams(this.search); this._params._url = this; }
         return this._params;
     }
     get href() {
@@ -909,6 +938,7 @@ class URL {
     static parse(u, b) { try { return new URL(u, b); } catch (e) { return null; } }
 }
 
+protoDefaults(URL, { _raw: null, _f: 0, _protocol: "", _username: "", _password: "", _hostname: "", _port: "", _pathname: "", _search: "", _hash: "", _params: null, _opaque: false });
 def("URL", URL);
 def("URLSearchParams", URLSearchParams);
 
