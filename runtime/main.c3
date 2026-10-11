@@ -30,7 +30,12 @@ List{String} g_args;
 long g_time_limit_ms;
 String g_main;
 
-fn void exit_now() => libc::exit(g_exit_code);
+fn void exit_now() {
+    $if $feat(OP_PROFILE):
+        boomkat::vm::opprof_dump();
+    $endif
+    libc::exit(g_exit_code);
+}
 
 // ---- core natives ----
 

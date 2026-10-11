@@ -43,6 +43,38 @@
       "link-args": [ "-lssl", "-lcrypto" ]
     },
 
+    "bkr-opprof": {
+      "type": "executable",
+      "sources": [
+        "/Users/rtomasi/cousas/boomkat/src",
+        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "features": [ "CONSOLE", "OP_PROFILE" ],
+      "linked-libraries": [ "vendor/libuws_shim.a" ],
+      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+    },
+
+    "bkr-opprof-th": {
+      "type": "executable",
+      "sources": [
+        "/Users/rtomasi/cousas/boomkat/src",
+        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "features": [ "CONSOLE", "OP_PROFILE", "THREADED_DISPATCH" ],
+      "linked-libraries": [ "vendor/libuws_shim.a" ],
+      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+    },
+
     "bkr": {
       "type": "executable",
       "sources": [
@@ -55,6 +87,38 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       "features": [ "THREADED_DISPATCH", "CONSOLE" ],
+      "linked-libraries": [ "vendor/libuws_shim.a" ],
+      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+    },
+
+    "bkr-perf": {
+      "type": "executable",
+      "sources": [
+        "/Users/rtomasi/cousas/boomkat-perf/src",
+        "/Users/rtomasi/cousas/boomkat-perf/bindings/c3/boomkat.c3",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "features": [ "THREADED_DISPATCH", "CONSOLE" ],
+      "linked-libraries": [ "vendor/libuws_shim.a" ],
+      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+    },
+
+    "bkr-perf-prof": {
+      "type": "executable",
+      "sources": [
+        "/Users/rtomasi/cousas/boomkat-perf/src",
+        "/Users/rtomasi/cousas/boomkat-perf/bindings/c3/boomkat.c3",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "features": [ "THREADED_DISPATCH", "CONSOLE", "OP_PROFILE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     }
