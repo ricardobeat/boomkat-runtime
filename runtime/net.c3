@@ -198,6 +198,7 @@ fn void Res.socket_write(&self, uint op, char[] data) {
         reject(op, "EBUSY", "a write is already pending");
         return;
     }
+    usz total = data.len;
     if (!self.outbox.len()) {
         CInt n = us_socket_write(self.ssl, self.sock, data.ptr, (CInt)data.len, 0);
         if (n == data.len) {
@@ -208,7 +209,7 @@ fn void Res.socket_write(&self, uint op, char[] data) {
     }
     self.outbox.push_all(data);
     self.write_op = op;
-    self.write_len = data.len;
+    self.write_len = total;
 }
 
 fn void Res.flush(&self) {

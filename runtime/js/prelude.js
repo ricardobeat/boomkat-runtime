@@ -1177,18 +1177,24 @@ bk.dispatch = function (index, id, method, body) {
 
 bk.Handle = class Handle {
     #rid;
+    #readable = null;
+    #writable = null;
     constructor(rid) {
         this.#rid = rid;
-        this.readable = new ReadableStream({
+    }
+    get readable() {
+        return this.#readable ??= new ReadableStream({
             pull: async (c) => {
-                const chunk = await bk.op(bk.read, rid);
+                const chunk = await bk.op(bk.read, this.#rid);
                 if (chunk === null) c.close();
                 else c.enqueue(chunk);
             },
             cancel: () => this.close(),
         });
-        this.writable = new WritableStream({
-            write: (chunk) => bk.op(bk.write, rid, chunk),
+    }
+    get writable() {
+        return this.#writable ??= new WritableStream({
+            write: (chunk) => bk.op(bk.write, this.#rid, chunk),
             close: () => this.closeWrite(),
             abort: () => this.close(),
         });

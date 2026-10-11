@@ -10,6 +10,7 @@ import std::collections::list;
 import libc;
 
 const String PRELUDE = $embed("js/prelude.js");
+const String FETCH   = $embed("js/fetch.js");
 
 struct Builtin {
     String name;
@@ -271,6 +272,7 @@ fn void? boot() {
     install_natives(FS_NATIVES)!;
     install_natives(PROC_NATIVES)!;
     g_rt.exec(PRELUDE, "<prelude>")!;
+    g_rt.exec(FETCH, "<fetch>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
     g_settle = bk_get("settle")!;
     g_timer_fire = bk_get("timerFire")!;

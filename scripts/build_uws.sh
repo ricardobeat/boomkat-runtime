@@ -20,6 +20,24 @@ mkdir -p "$OBJ"
 # real end (recv returning 0) is the correct behaviour. Idempotent.
 sed -i '' 's/flags & (EV_ERROR | EV_EOF);/flags \& EV_ERROR;/' "$UWS/uSockets/src/eventing/epoll_kqueue.c"
 
+# A TLS peer that sends close_notify right behind its last records made
+# uSockets drop the data decoded in that same call. Emit it before closing.
+python3 - "$UWS/uSockets/src/crypto/openssl.c" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "                // terminate connection here\n                return us_internal_ssl_socket_close(s, 0, NULL);"
+new = ("                // terminate connection here\n"
+       "                if (read) {\n"
+       "                    context = (struct us_internal_ssl_socket_context_t *) us_socket_context(0, &s->s);\n"
+       "                    s = context->on_data(s, loop_ssl_data->ssl_read_output + LIBUS_RECV_BUFFER_PADDING, read);\n"
+       "                    if (us_socket_is_closed(0, &s->s)) return s;\n"
+       "                }\n"
+       "                return us_internal_ssl_socket_close(s, 0, NULL);")
+if old in s:
+    open(p, "w").write(s.replace(old, new, 1))
+PY
+
 # OpenSSL for TLS sockets (fetch, net); no zlib, since permessage-deflate
 # is never negotiated.
 SSL=$(brew --prefix openssl@3)
