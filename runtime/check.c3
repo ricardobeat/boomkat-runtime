@@ -17,6 +17,7 @@ const Needs[] NEEDS = {
     { "http", "net" },
     { "net", "net" },
     { "file", "read write" },
+    { "sqlite", "read write" },
     { "process", "env run" },
     { "permissions", "" },
     { "path", "" },

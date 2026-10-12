@@ -28,6 +28,63 @@ built-in or an error, and remote imports are not supported.
 | `process` | `args`, `pid`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
 | `path` | `join`, `resolve`, `relative`, `dirname`, `basename`, `extname`, `parse`, `format`, `toFileUrl`, `fromFileUrl` |
 | `permissions` | `query`, `request`, `revoke` |
+| `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |
+
+### Optional SQLite
+
+`sqlite` is registered when a system SQLite shared library (3.31+) and all required
+symbols can be loaded. The runtime has no SQLite link dependency and starts normally
+without it. macOS searches `/usr/lib/libsqlite3.dylib` and the dynamic loader's
+`libsqlite3.dylib`; Linux searches `libsqlite3.so.0` and `libsqlite3.so`.
+An unavailable module can be detected with `await import("sqlite").catch(...)`.
+
+```js
+import { Database } from "sqlite";
+
+const db = new Database(); // private in-memory database; no file permissions needed
+try {
+    db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
+    const insert = db.prepare("INSERT INTO users(name) VALUES (?)");
+    insert.run("Ada");
+    console.log(db.query("SELECT * FROM users WHERE id = :id").get({ id: 1 }));
+} finally {
+    db.close();
+}
+```
+
+`new Database(path, { readonly: true })` opens an existing file for reading.
+Writable databases create missing files. File access requires read permission and,
+for writable connections, write permission for the database directory, including
+SQLite's `-journal`, `-wal`, and `-shm` sidecars. Permissions are checked again on
+operations, so revoking a grant blocks later queries. `:memory:` needs no file grants.
+
+`prepare(sql)` and its alias `query(sql)` each create one reusable statement.
+`all(...values)` returns rows, `get(...values)` returns the first row or `undefined`,
+and `run(...values)` returns `{ changes, lastInsertRowid }`. Bindings accept positional
+arguments, an array, or an object with named parameters (bare or `:`, `$`, `@` prefixed).
+Missing and extra bindings throw. Values may be null, booleans, finite numbers,
+signed 64-bit BigInts, strings, ArrayBuffers or views. Rows are dictionaries with a
+null prototype; blobs are copied Uint8Arrays. INTEGER results outside the safe Number
+range become BigInts, including `lastInsertRowid`.
+
+Use `statement.finalize()` to release a statement. Closing a database finalizes its
+outstanding statements; process shutdown closes remaining databases. There is no
+implicit GC finalization or statement cache. Both close and finalize are idempotent.
+`db.transaction(fn)` returns a synchronous wrapper using savepoints, including nested
+transactions. Exceptions roll back; promise-returning callbacks are rejected.
+
+Operations run on the event-loop thread. Long queries honor `--time-limit` through a
+SQLite progress callback. SQL errors carry `code` values such as `SQLITE_2067`.
+`exec` accepts multiple statements; `prepare` accepts one, including trailing comments.
+SQL/path strings reject embedded NUL bytes; bound text preserves them.
+
+SQL `ATTACH`, `VACUUM INTO`, extension loading and temporary-storage directory changes
+are blocked to preserve file permission boundaries. Temporary query storage stays in
+memory. The implementation uses SQLite's [authorizer](https://sqlite.org/c3ref/set_authorizer.html)
+and [transient bindings](https://sqlite.org/c3ref/bind_blob.html) to copy parameter buffers.
+
+Validation: `python3 tests/run_sqlite.py` (set `BKR_BIN` for an ASAN build). On macOS it
+also simulates missing and incomplete SQLite libraries with loader interposition.
 
 `file.body(path)` creates a lazy response body:
 

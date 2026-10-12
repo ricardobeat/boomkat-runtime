@@ -31,6 +31,7 @@ long g_time_limit_ms;
 String g_main;
 
 fn void exit_now() {
+    close_sqlite();
     $if $feat(OP_PROFILE):
         boomkat::vm::opprof_dump();
     $endif
@@ -312,6 +313,10 @@ fn void? boot() {
     g_rt.exec(PRELUDE, "<prelude>")!;
     g_rt.exec(FETCH, "<fetch>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
+    if (init_sqlite()) {
+        install_natives(SQLITE_NATIVES)!;
+        g_rt.define_module("sqlite", $embed("js/sqlite.js"))!;
+    }
     g_settle = bk_get("settle")!;
     g_immediate_fire = bk_get("immediateFire")!;
     g_dispatch = bk_get("dispatch")!;
@@ -376,6 +381,7 @@ fn void? parse_args(String[] argv) {
 }
 
 fn int main(String[] argv) {
+    defer close_sqlite();
     if (argv.len == 3 && argv[1] == "check") {
         init_perms();
         return check_main(argv[2]);
