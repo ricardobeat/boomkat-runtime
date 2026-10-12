@@ -68,38 +68,41 @@ fn bool url_char(char c) {
 
 // Plain http(s) URLs only. Returns slash | query << 16 | colon << 32, with
 // 0xFFFF for an absent part, or -1 for anything the general parser must see.
-fn void js_url_fast(JsCtx ctx, void* udata) {
-    String u = (String)ctx.arg(0).bytes();
+fn long url_fast_flags(String u) {
     usz lead = u.starts_with("http://") ? 7 : u.starts_with("https://") ? 8 : 0;
-    if (!lead || u.len >= 0xFFFF) return ctx.ret_number(-1);
+    if (!lead || u.len >= 0xFFFF) return -1;
     usz slash = u.len;
     usz query = 0xFFFF;
     usz colon = 0xFFFF;
     for (usz i = lead; i < u.len; i++) {
         char c = u[i];
-        if (!url_char(c)) return ctx.ret_number(-1);
+        if (!url_char(c)) return -1;
         if (slash == u.len) {
             if (c == '/') {
                 slash = i;
                 continue;
             }
-            if (c == '@' || c == '?' || c.is_upper()) return ctx.ret_number(-1);
+            if (c == '@' || c == '?' || c.is_upper()) return -1;
             if (c == ':') {
                 colon = i;
                 continue;
             }
-            if (colon != 0xFFFF && !c.is_digit()) return ctx.ret_number(-1);
+            if (colon != 0xFFFF && !c.is_digit()) return -1;
             continue;
         }
         if (c == '?' && query == 0xFFFF) query = i;
         if (c == '.' && query == 0xFFFF && u[i - 1] == '/') {
             bool one = i + 1 == u.len || u[i + 1] == '/' || u[i + 1] == '?';
-            bool two = u[i + 1] == '.' && (i + 2 == u.len || u[i + 2] == '/' || u[i + 2] == '?');
-            if (one || two) return ctx.ret_number(-1);
+            bool two = i + 1 < u.len && u[i + 1] == '.' && (i + 2 == u.len || u[i + 2] == '/' || u[i + 2] == '?');
+            if (one || two) return -1;
         }
     }
-    if (slash == lead || (colon != 0xFFFF && colon + 1 == slash) || colon == lead) return ctx.ret_number(-1);
-    ctx.ret_number((double)(slash | query << 16 | colon << 32));
+    if (slash == lead || (colon != 0xFFFF && colon + 1 == slash) || colon == lead) return -1;
+    return (long)(slash | query << 16 | colon << 32);
+}
+
+fn void js_url_fast(JsCtx ctx, void* udata) {
+    ctx.ret_number((double)url_fast_flags((String)ctx.arg(0).bytes()));
 }
 
 extern fn void arc4random_buf(void* buf, usz n);
@@ -298,6 +301,7 @@ fn void? boot() {
     g_rt.set_module_reader(&read_module);
     g_rt.open()!;
     install_natives(CORE_NATIVES)!;
+    install_natives(WEB_NATIVES)!;
     install_natives(HTTP_NATIVES)!;
     install_natives(RES_NATIVES)!;
     install_natives(NET_NATIVES)!;

@@ -6,6 +6,17 @@ const INTERNAL = Symbol("internal");
 const def = (name, value) => Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
 const hidden = (obj, props) => { for (const k in props) Object.defineProperty(obj, k, { value: props[k], writable: true, configurable: true }); };
 
+
+function nativeClass(ctor, initialize, name, a, b, c) {
+    const native = bk.nativeClass(ctor, initialize, name, a, b, c);
+    for (const key of Reflect.ownKeys(ctor)) {
+        if (key !== "name" && key !== "length" && key !== "prototype")
+            Object.defineProperty(native, key, Object.getOwnPropertyDescriptor(ctor, key));
+    }
+    Object.defineProperty(ctor.prototype, "constructor", { value: native, writable: true, configurable: true });
+    return native;
+}
+
 // ---- errors and async ops ----
 
 class SystemError extends Error {
@@ -745,7 +756,70 @@ function normalizePath(p) {
 
 const DEFAULT_PORTS = { "http:": "80", "https:": "443", "ws:": "80", "wss:": "443" };
 
-class URL {
+function initURL(url, base) {
+    url = String(url);
+    // Plain http(s) URLs, the server's common case, skip the general split.
+    const f = bk.urlFast(url);
+    if (f >= 0) {
+        // Fields are cut from the string only when one is read.
+        this._raw = url;
+        this._f = f;
+        return;
+    }
+    url = url.trim();
+    let m = urlSplit(url);
+    if (!m && base !== undefined) {
+        const b = base instanceof URL ? base : new URL(String(base));
+        if (url.startsWith("//")) m = urlSplit(b.protocol + url);
+        else if (url.charAt(0) === "/") m = urlSplit(b.origin + url);
+        else if (url.charAt(0) === "?") m = urlSplit(b.origin + b.pathname + url);
+        else if (url.charAt(0) === "#") m = urlSplit(b.origin + b.pathname + b.search + url);
+        else if (url === "") m = urlSplit(b.origin + b.pathname + b.search);
+        else m = urlSplit(b.origin + b.pathname.slice(0, b.pathname.lastIndexOf("/") + 1) + url);
+    }
+    if (!m) {
+        const o = OPAQUE_RE.exec(url);
+        if (!o) throw new TypeError("Invalid URL: " + url);
+        this._protocol = o[1].toLowerCase();
+        this._username = this._password = this._hostname = this._port = "";
+        this._pathname = o[2];
+        this._search = o[3] && o[3] !== "?" ? o[3] : "";
+        this._hash = o[4] && o[4] !== "#" ? o[4] : "";
+        this._params = null;
+        this._opaque = true;
+        return;
+    }
+    this._protocol = m[1] === "http:" || m[1] === "https:" ? m[1] : m[1].toLowerCase();
+    let host = m[2];
+    const at = host.lastIndexOf("@");
+    this._username = "";
+    this._password = "";
+    if (at >= 0) {
+        const cred = host.slice(0, at);
+        host = host.slice(at + 1);
+        const c = cred.indexOf(":");
+        if (c < 0) this._username = cred;
+        else { this._username = cred.slice(0, c); this._password = cred.slice(c + 1); }
+    }
+    const colon = host.lastIndexOf(":");
+    if (colon >= 0 && host.indexOf("]", colon) < 0) {
+        this._hostname = host.slice(0, colon).toLowerCase();
+        this._port = host.slice(colon + 1);
+        if (!/^\d*$/.test(this._port)) throw new TypeError("Invalid URL: " + url);
+    } else {
+        this._hostname = host.toLowerCase();
+        this._port = "";
+    }
+    if (DEFAULT_PORTS[this._protocol] === this._port) this._port = "";
+    if (this._hostname === "" && (this._protocol === "http:" || this._protocol === "https:")) throw new TypeError("Invalid URL: " + url);
+    this._pathname = normalizePath(m[3] || "/");
+    this._search = m[4] && m[4] !== "?" ? m[4] : "";
+    this._hash = m[5] && m[5] !== "#" ? m[5] : "";
+    this._params = null;
+}
+
+
+class URLFallback {
     _expand() {
         const url = this._raw;
         const f = this._f;
@@ -761,67 +835,6 @@ class URL {
         this._port = port === (https ? "443" : "80") ? "" : port;
         this._pathname = slash === url.length ? "/" : query === 65535 ? url.slice(slash) : url.slice(slash, query);
         this._search = query === 65535 || query === url.length - 1 ? "" : url.slice(query);
-    }
-    constructor(url, base) {
-        url = String(url);
-        // Plain http(s) URLs, the server's common case, skip the general split.
-        const f = bk.urlFast(url);
-        if (f >= 0) {
-            // Fields are cut from the string only when one is read.
-            this._raw = url;
-            this._f = f;
-            return;
-        }
-        url = url.trim();
-        let m = urlSplit(url);
-        if (!m && base !== undefined) {
-            const b = base instanceof URL ? base : new URL(String(base));
-            if (url.startsWith("//")) m = urlSplit(b.protocol + url);
-            else if (url.charAt(0) === "/") m = urlSplit(b.origin + url);
-            else if (url.charAt(0) === "?") m = urlSplit(b.origin + b.pathname + url);
-            else if (url.charAt(0) === "#") m = urlSplit(b.origin + b.pathname + b.search + url);
-            else if (url === "") m = urlSplit(b.origin + b.pathname + b.search);
-            else m = urlSplit(b.origin + b.pathname.slice(0, b.pathname.lastIndexOf("/") + 1) + url);
-        }
-        if (!m) {
-            const o = OPAQUE_RE.exec(url);
-            if (!o) throw new TypeError("Invalid URL: " + url);
-            this._protocol = o[1].toLowerCase();
-            this._username = this._password = this._hostname = this._port = "";
-            this._pathname = o[2];
-            this._search = o[3] && o[3] !== "?" ? o[3] : "";
-            this._hash = o[4] && o[4] !== "#" ? o[4] : "";
-            this._params = null;
-            this._opaque = true;
-            return;
-        }
-        this._protocol = m[1] === "http:" || m[1] === "https:" ? m[1] : m[1].toLowerCase();
-        let host = m[2];
-        const at = host.lastIndexOf("@");
-        this._username = "";
-        this._password = "";
-        if (at >= 0) {
-            const cred = host.slice(0, at);
-            host = host.slice(at + 1);
-            const c = cred.indexOf(":");
-            if (c < 0) this._username = cred;
-            else { this._username = cred.slice(0, c); this._password = cred.slice(c + 1); }
-        }
-        const colon = host.lastIndexOf(":");
-        if (colon >= 0 && host.indexOf("]", colon) < 0) {
-            this._hostname = host.slice(0, colon).toLowerCase();
-            this._port = host.slice(colon + 1);
-            if (!/^\d*$/.test(this._port)) throw new TypeError("Invalid URL: " + url);
-        } else {
-            this._hostname = host.toLowerCase();
-            this._port = "";
-        }
-        if (DEFAULT_PORTS[this._protocol] === this._port) this._port = "";
-        if (this._hostname === "" && (this._protocol === "http:" || this._protocol === "https:")) throw new TypeError("Invalid URL: " + url);
-        this._pathname = normalizePath(m[3] || "/");
-        this._search = m[4] && m[4] !== "?" ? m[4] : "";
-        this._hash = m[5] && m[5] !== "#" ? m[5] : "";
-        this._params = null;
     }
     get protocol() { if (this._raw !== null) this._expand(); return this._protocol; }
     set protocol(v) { if (this._raw !== null) this._expand(); this._protocol = String(v); }
@@ -872,6 +885,8 @@ class URL {
     static canParse(u, b) { try { new URL(u, b); return true; } catch (e) { return false; } }
     static parse(u, b) { try { return new URL(u, b); } catch (e) { return null; } }
 }
+
+const URL = nativeClass(URLFallback, initURL, "URL", String);
 
 protoDefaults(URL, { _raw: null, _f: 0, _protocol: "", _username: "", _password: "", _hostname: "", _port: "", _pathname: "", _search: "", _hash: "", _params: null, _opaque: false });
 def("URL", URL);
@@ -1104,31 +1119,33 @@ const BLOB_JSON = "content-type\n" + CT_JSON + "\n";
 
 // The common Response is a string with no init: it keeps the implied
 // content-type as a constant blob and never builds a Headers.
-class Response {
-    constructor(body, init) {
-        if (init === undefined && (body instanceof Uint8Array || body instanceof ReadableStream || body instanceof bk.FileBody)) {
-            this._ct = null;
-            this._body = body;
-            return;
-        }
-        if (typeof body === "string" && init === undefined) {
-            this._body = body;
-            return;
-        }
-        if (init !== undefined && init !== null) {
-            const status = init.status === undefined ? 200 : init.status | 0;
-            if (status < 200 || status > 599) throw new RangeError("Invalid status: " + init.status);
-            this.status = status;
-            if (init.statusText !== undefined) this._statusText = String(init.statusText);
-            if (init.headers !== undefined) this._headers = init.headers instanceof Headers && init[INTERNAL] ? init.headers : new Headers(init.headers);
-        }
-        if (typeof body === "string" && this._headers === null) {
-            this._body = body;
-        } else {
-            this._ct = null;
-            if (body !== undefined && body !== null) this._body = bodyInit(body, this.headers);
-        }
+function initResponse(body, init) {
+    if (init === undefined && (body instanceof Uint8Array || body instanceof ReadableStream || body instanceof bk.FileBody)) {
+        this._ct = null;
+        this._body = body;
+        return;
     }
+    if (typeof body === "string" && init === undefined) {
+        this._body = body;
+        return;
+    }
+    if (init !== undefined && init !== null) {
+        const status = init.status === undefined ? 200 : init.status | 0;
+        if (status < 200 || status > 599) throw new RangeError("Invalid status: " + init.status);
+        this.status = status;
+        if (init.statusText !== undefined) this._statusText = String(init.statusText);
+        if (init.headers !== undefined) this._headers = init.headers instanceof Headers && init[INTERNAL] ? init.headers : new Headers(init.headers);
+    }
+    if (typeof body === "string" && this._headers === null) {
+        this._body = body;
+    } else {
+        this._ct = null;
+        if (body !== undefined && body !== null) this._body = bodyInit(body, this.headers);
+    }
+}
+
+
+class ResponseFallback {
     get headers() {
         if (this._headers === null) {
             this._headers = new Headers(INTERNAL);
@@ -1180,6 +1197,8 @@ class Response {
         return r;
     }
 }
+const Response = nativeClass(ResponseFallback, initResponse, "Response", Uint8Array, ReadableStream, bk.FileBody);
+
 mixBody(Response);
 protoDefaults(Response, { status: 200, type: "default", url: "", redirected: false, _used: false,
                           _statusText: null, _headers: null, _ct: CT_TEXT, _body: null });

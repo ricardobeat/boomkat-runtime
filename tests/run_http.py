@@ -121,9 +121,10 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             assert proc.poll() is None, "server crashed"
             print("HTTP lifecycle and native bodies: passed")
         finally:
+            unexpected_exit = proc.poll()
             proc.terminate()
             proc.wait(timeout=5)
             log.seek(0)
             output = log.read()
-            if "ERROR: AddressSanitizer" in output or "runtime error:" in output:
+            if unexpected_exit is not None or "ERROR: AddressSanitizer" in output or "runtime error:" in output:
                 raise AssertionError(output)
