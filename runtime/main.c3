@@ -317,6 +317,7 @@ fn void? boot() {
     g_dispatch = bk_get("dispatch")!;
     g_handled = bk_get("handled")!;
     g_failed = bk_get("failed")!;
+    g_pump = bk_get("pump")!;
     g_drain = bk_get("drain")!;
     g_aborted = bk_get("aborted")!;
     g_unhandled = bk_get("unhandled")!;

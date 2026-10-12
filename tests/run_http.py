@@ -61,6 +61,13 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             assert status == 200 and short == b"x" * 8192
             assert {k.lower(): v for k, v in headers.items()}["content-length"] == "8192"
             assert request("/stream-short", method="HEAD")[2] == b""
+            for path in ["/stream-direct-promise", "/stream-direct-subclass", "/stream-direct-custom"]:
+                status, headers, body = request(path)
+                assert body == b"direct", path
+                if path == "/stream-direct-custom":
+                    assert status == 201 and headers["x-stream"] == "yes"
+            assert request("/stream-classification-guard")[2] == b"guard"
+            assert request("/stream-classification-count")[2] == b"1", "custom stream classification bypassed"
             assert request("/stream-views")[2] == "café😀ABAB".encode()
             guarded = request("/stream-native-guards")[2]
             if guarded != b"A" * 14:

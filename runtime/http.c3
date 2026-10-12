@@ -105,6 +105,7 @@ JsValue[METHODS.len] g_methods;
 JsValue g_dispatch;
 JsValue g_handled;
 JsValue g_failed;
+JsValue g_pump;
 
 // What the native request path needs to build a Request and read a
 // Response without running the prelude's JS.
@@ -353,10 +354,19 @@ fn bool respond_fast(Conn* c, JsValue result) {
     TVal b     = fast_get(o, g_fast.k_body);
     JsArg body = { .tv = b };
     bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_fast.file_proto;
-    if (!b.is_null() && !b.is_string() && !body.is_bytes() && !file) return false;
+    bool stream;
+    if (b.is_object() && !body.is_bytes() && !file) {
+        if (!web_instanceof(g_rt.rt.heap, b, g_native_response.stream_ctor, &stream)) return false;
+    }
+    if (!b.is_null() && !b.is_string() && !body.is_bytes() && !file && !stream) return false;
     TVal t;
     t.set_boolean(true);
     o.put_prop(g_fast.k_used, t, hobject::PROP_FLAGS_WEC, g_rt.rt.heap);
+    if (stream) {
+        JsValue[2] args = { g_rt.number((double)c.id) ?? { }, result };
+        (void)call_js(g_pump, args[..]);
+        return true;
+    }
     @pool() {
         if (file) {
             JsArg path = { .tv = fast_get((HObject*)b.get_heapptr(), g_fast.k_file_path) };

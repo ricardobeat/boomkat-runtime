@@ -6,6 +6,7 @@ let saved;
 let canceled = 0;
 let later;
 let failedStream;
+let streamClassifications = 0;
 const enc = new TextEncoder();
 const stream = (source, strategy) => new Response(new ReadableStream(source, strategy));
 serve({ port: Number(port), hostname: "127.0.0.1", onListen() {},
@@ -23,6 +24,30 @@ serve({ port: Number(port), hostname: "127.0.0.1", onListen() {},
         if (path === "/stream-short") {
             let n = 0;
             return stream({ pull(c) { if (n++ === 8) c.close(); else c.enqueue(enc.encode("x".repeat(1024))); } });
+        }
+        if (path === "/stream-direct-promise" || path === "/stream-direct-subclass" || path === "/stream-direct-custom") {
+            const body = new ReadableStream({ pull(c) { c.enqueue(enc.encode("direct")); c.close(); } });
+            if (path === "/stream-direct-subclass") {
+                class Derived extends Response {}
+                return new Derived(body);
+            }
+            if (path === "/stream-direct-custom") return new Response(body, { status: 201, headers: { "x-stream": "yes" } });
+            return new Promise(resolve => setImmediate(() => resolve(new Response(body))));
+        }
+        if (path === "/stream-classification-guard") {
+            const response = stream({ pull(c) { c.enqueue(enc.encode("guard")); c.close(); } });
+            const intrinsic = Function.prototype[Symbol.hasInstance];
+            Object.defineProperty(ReadableStream, Symbol.hasInstance, {
+                configurable: true, get() {
+                    streamClassifications++;
+                    return function (value) { return intrinsic.call(this, value); };
+                }
+            });
+            return response;
+        }
+        if (path === "/stream-classification-count") {
+            delete ReadableStream[Symbol.hasInstance];
+            return new Response(String(streamClassifications));
         }
         if (path === "/stream-native-guards") return stream({ pull(c) {
             const check = (ok, message) => { if (!ok) throw new Error(message); };

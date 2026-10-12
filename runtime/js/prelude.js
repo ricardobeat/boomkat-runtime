@@ -1307,6 +1307,8 @@ function pump(id, res) {
     bk.streamEnd(id);
 }
 
+bk.pump = pump;
+
 // The general case: pulls that take time, big or endless sources, or a peer that is slow to read.
 function streamState(id, cancel) {
     const waits = new Set();
