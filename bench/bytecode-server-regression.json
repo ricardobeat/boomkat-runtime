@@ -1,0 +1,558 @@
+{
+  "before_engine": "2bdab09b",
+  "after_engine": "3f352420",
+  "runtime": "4255e0c",
+  "method": "4 alternating-order pairs per workload; fresh process;1s warm-up+3s measured;wrk -t2 -c128",
+  "sha256": {
+    "before": "3930b77bca711adc1d8a38e66f46e9891f05e8473c252799090f611bba22a4cd",
+    "after": "a4d437244686590dce7b560c5bf15de17f1e73bbbe8862f542fefcb81350e05e"
+  },
+  "results": {
+    "hello": {
+      "before": [
+        {
+          "req_s": 218559.81,
+          "latency_ms": {
+            "50": 0.562,
+            "99": 1.07
+          },
+          "peak_rss_mib": 10.90625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   582.27us   92.18us   1.99ms   89.41%\n    Req/Sec   109.86k     1.36k  112.38k    62.90%\n  Latency Distribution\n     50%  562.00us\n     75%  577.00us\n     90%  644.00us\n     99%    1.07ms\n  677587 requests in 3.10s, 93.05MB read\nRequests/sec: 218559.81\nTransfer/sec:     30.01MB\n"
+        },
+        {
+          "req_s": 209376.88,
+          "latency_ms": {
+            "50": 0.578,
+            "99": 1.15
+          },
+          "peak_rss_mib": 10.875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   607.62us  115.74us   2.78ms   88.83%\n    Req/Sec   105.26k     3.87k  112.03k    72.58%\n  Latency Distribution\n     50%  578.00us\n     75%  600.00us\n     90%  715.00us\n     99%    1.15ms\n  649186 requests in 3.10s, 89.15MB read\nRequests/sec: 209376.88\nTransfer/sec:     28.75MB\n"
+        },
+        {
+          "req_s": 179302.24,
+          "latency_ms": {
+            "50": 0.611,
+            "99": 7.05
+          },
+          "peak_rss_mib": 10.875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.86ms    1.35ms  30.47ms   96.57%\n    Req/Sec    91.68k    24.28k  189.28k    88.52%\n  Latency Distribution\n     50%  611.00us\n     75%  687.00us\n     90%    1.00ms\n     99%    7.05ms\n  556564 requests in 3.10s, 76.43MB read\nRequests/sec: 179302.24\nTransfer/sec:     24.62MB\n"
+        },
+        {
+          "req_s": 199188.63,
+          "latency_ms": {
+            "50": 0.615,
+            "99": 1.18
+          },
+          "peak_rss_mib": 10.90625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   638.60us  103.37us   2.07ms   89.14%\n    Req/Sec   100.04k     2.20k  104.36k    66.13%\n  Latency Distribution\n     50%  615.00us\n     75%  641.00us\n     90%  724.00us\n     99%    1.18ms\n  617520 requests in 3.10s, 84.80MB read\nRequests/sec: 199188.63\nTransfer/sec:     27.35MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 196546.49,
+          "latency_ms": {
+            "50": 0.581,
+            "99": 1.49
+          },
+          "peak_rss_mib": 10.953125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   648.15us  197.10us   3.49ms   87.54%\n    Req/Sec    98.83k     6.59k  111.43k    62.90%\n  Latency Distribution\n     50%  581.00us\n     75%  643.00us\n     90%    0.86ms\n     99%    1.49ms\n  609335 requests in 3.10s, 83.68MB read\nRequests/sec: 196546.49\nTransfer/sec:     26.99MB\n"
+        },
+        {
+          "req_s": 208545.68,
+          "latency_ms": {
+            "50": 0.578,
+            "99": 1.16
+          },
+          "peak_rss_mib": 10.953125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   609.76us  123.04us   3.04ms   88.09%\n    Req/Sec   104.83k     3.74k  110.64k    70.97%\n  Latency Distribution\n     50%  578.00us\n     75%  599.00us\n     90%  733.00us\n     99%    1.16ms\n  646555 requests in 3.10s, 88.79MB read\nRequests/sec: 208545.68\nTransfer/sec:     28.64MB\n"
+        },
+        {
+          "req_s": 197270.52,
+          "latency_ms": {
+            "50": 0.6,
+            "99": 1.4
+          },
+          "peak_rss_mib": 10.984375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   645.85us  168.64us   3.95ms   91.03%\n    Req/Sec    99.14k     7.98k  107.02k    85.48%\n  Latency Distribution\n     50%  600.00us\n     75%  629.00us\n     90%  780.00us\n     99%    1.40ms\n  611540 requests in 3.10s, 83.98MB read\nRequests/sec: 197270.52\nTransfer/sec:     27.09MB\n"
+        },
+        {
+          "req_s": 199879.32,
+          "latency_ms": {
+            "50": 0.606,
+            "99": 1.21
+          },
+          "peak_rss_mib": 10.921875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/hello\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   636.89us  117.56us   3.07ms   89.62%\n    Req/Sec   100.53k     5.81k  107.48k    80.65%\n  Latency Distribution\n     50%  606.00us\n     75%  632.00us\n     90%  740.00us\n     99%    1.21ms\n  619760 requests in 3.10s, 85.11MB read\nRequests/sec: 199879.32\nTransfer/sec:     27.45MB\n"
+        }
+      ]
+    },
+    "json": {
+      "before": [
+        {
+          "req_s": 170711.2,
+          "latency_ms": {
+            "50": 0.704,
+            "99": 1.43
+          },
+          "peak_rss_mib": 11.34375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   747.66us  155.95us   4.26ms   88.72%\n    Req/Sec    85.84k     4.02k   91.27k    70.97%\n  Latency Distribution\n     50%  704.00us\n     75%  728.00us\n     90%    0.90ms\n     99%    1.43ms\n  529245 requests in 3.10s, 101.45MB read\nRequests/sec: 170711.20\nTransfer/sec:     32.72MB\n"
+        },
+        {
+          "req_s": 170094.34,
+          "latency_ms": {
+            "50": 0.6990000000000001,
+            "99": 1.42
+          },
+          "peak_rss_mib": 11.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   750.20us  159.65us   3.69ms   88.31%\n    Req/Sec    85.55k     3.79k   90.03k    72.58%\n  Latency Distribution\n     50%  699.00us\n     75%  738.00us\n     90%    0.93ms\n     99%    1.42ms\n  527443 requests in 3.10s, 101.10MB read\nRequests/sec: 170094.34\nTransfer/sec:     32.61MB\n"
+        },
+        {
+          "req_s": 159956.93,
+          "latency_ms": {
+            "50": 0.71,
+            "99": 2.19
+          },
+          "peak_rss_mib": 11.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   808.89us  328.08us   7.97ms   92.33%\n    Req/Sec    80.46k    12.12k   89.86k    82.26%\n  Latency Distribution\n     50%  710.00us\n     75%  775.00us\n     90%    1.03ms\n     99%    2.19ms\n  496001 requests in 3.10s, 95.08MB read\nRequests/sec: 159956.93\nTransfer/sec:     30.66MB\n"
+        },
+        {
+          "req_s": 169743.14,
+          "latency_ms": {
+            "50": 0.717,
+            "99": 1.38
+          },
+          "peak_rss_mib": 11.21875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   751.39us  120.56us   2.66ms   89.70%\n    Req/Sec    85.35k     2.70k   89.53k    80.65%\n  Latency Distribution\n     50%  717.00us\n     75%  744.00us\n     90%    0.85ms\n     99%    1.38ms\n  526357 requests in 3.10s, 100.90MB read\nRequests/sec: 169743.14\nTransfer/sec:     32.54MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 176610.65,
+          "latency_ms": {
+            "50": 0.6980000000000001,
+            "99": 1.25
+          },
+          "peak_rss_mib": 11.296875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   722.06us  109.28us   2.89ms   89.45%\n    Req/Sec    88.73k     1.35k   91.25k    74.19%\n  Latency Distribution\n     50%  698.00us\n     75%  713.00us\n     90%  796.00us\n     99%    1.25ms\n  547534 requests in 3.10s, 104.96MB read\nRequests/sec: 176610.65\nTransfer/sec:     33.85MB\n"
+        },
+        {
+          "req_s": 164019.56,
+          "latency_ms": {
+            "50": 0.706,
+            "99": 1.62
+          },
+          "peak_rss_mib": 11.375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   777.71us  212.32us   5.31ms   87.82%\n    Req/Sec    82.50k     4.93k   87.53k    83.33%\n  Latency Distribution\n     50%  706.00us\n     75%  772.00us\n     90%    1.01ms\n     99%    1.62ms\n  492215 requests in 3.00s, 94.35MB read\nRequests/sec: 164019.56\nTransfer/sec:     31.44MB\n"
+        },
+        {
+          "req_s": 167361.1,
+          "latency_ms": {
+            "50": 0.715,
+            "99": 1.47
+          },
+          "peak_rss_mib": 11.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   762.62us  164.09us   3.96ms   89.31%\n    Req/Sec    84.09k     6.51k   89.17k    90.32%\n  Latency Distribution\n     50%  715.00us\n     75%  752.00us\n     90%    0.92ms\n     99%    1.47ms\n  518963 requests in 3.10s, 99.48MB read\nRequests/sec: 167361.10\nTransfer/sec:     32.08MB\n"
+        },
+        {
+          "req_s": 172044.43,
+          "latency_ms": {
+            "50": 0.712,
+            "99": 1.35
+          },
+          "peak_rss_mib": 11.3125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/json\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   741.30us  115.41us   2.80ms   89.92%\n    Req/Sec    86.58k     1.62k   89.38k    74.19%\n  Latency Distribution\n     50%  712.00us\n     75%  732.00us\n     90%  825.00us\n     99%    1.35ms\n  533474 requests in 3.10s, 102.26MB read\nRequests/sec: 172044.43\nTransfer/sec:     32.98MB\n"
+        }
+      ]
+    },
+    "async": {
+      "before": [
+        {
+          "req_s": 141913.58,
+          "latency_ms": {
+            "50": 0.762,
+            "99": 1.73
+          },
+          "peak_rss_mib": 11.6875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.87ms  299.02us   2.84ms   73.32%\n    Req/Sec    71.34k     1.57k   73.68k    75.81%\n  Latency Distribution\n     50%  762.00us\n     75%    1.08ms\n     90%    1.26ms\n     99%    1.73ms\n  440033 requests in 3.10s, 57.07MB read\nRequests/sec: 141913.58\nTransfer/sec:     18.41MB\n"
+        },
+        {
+          "req_s": 131188.95,
+          "latency_ms": {
+            "50": 0.847,
+            "99": 2.19
+          },
+          "peak_rss_mib": 11.71875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.94ms  405.75us   8.02ms   81.81%\n    Req/Sec    65.91k     4.60k   73.05k    62.90%\n  Latency Distribution\n     50%  847.00us\n     75%    1.13ms\n     90%    1.42ms\n     99%    2.19ms\n  406861 requests in 3.10s, 52.77MB read\nRequests/sec: 131188.95\nTransfer/sec:     17.02MB\n"
+        },
+        {
+          "req_s": 130558.58,
+          "latency_ms": {
+            "50": 0.845,
+            "99": 1.89
+          },
+          "peak_rss_mib": 11.75,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.94ms  335.06us   2.55ms   72.71%\n    Req/Sec    65.60k     1.92k   69.56k    66.67%\n  Latency Distribution\n     50%  845.00us\n     75%    1.15ms\n     90%    1.36ms\n     99%    1.89ms\n  391843 requests in 3.00s, 50.82MB read\nRequests/sec: 130558.58\nTransfer/sec:     16.93MB\n"
+        },
+        {
+          "req_s": 142465.87,
+          "latency_ms": {
+            "50": 0.768,
+            "99": 1.73
+          },
+          "peak_rss_mib": 11.71875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.86ms  303.08us   2.48ms   72.12%\n    Req/Sec    71.62k     1.03k   73.88k    62.90%\n  Latency Distribution\n     50%  768.00us\n     75%    1.07ms\n     90%    1.26ms\n     99%    1.73ms\n  441764 requests in 3.10s, 57.30MB read\nRequests/sec: 142465.87\nTransfer/sec:     18.48MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 126223.34,
+          "latency_ms": {
+            "50": 0.87,
+            "99": 3.55
+          },
+          "peak_rss_mib": 11.8125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.01ms  595.75us  10.98ms   90.09%\n    Req/Sec    63.43k     9.17k   73.38k    79.03%\n  Latency Distribution\n     50%    0.87ms\n     75%    1.17ms\n     90%    1.56ms\n     99%    3.55ms\n  391538 requests in 3.10s, 50.78MB read\nRequests/sec: 126223.34\nTransfer/sec:     16.37MB\n"
+        },
+        {
+          "req_s": 139751.43,
+          "latency_ms": {
+            "50": 0.774,
+            "99": 1.78
+          },
+          "peak_rss_mib": 11.796875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.88ms  326.25us   4.38ms   76.32%\n    Req/Sec    70.23k     2.95k   73.29k    88.71%\n  Latency Distribution\n     50%  774.00us\n     75%    1.09ms\n     90%    1.28ms\n     99%    1.78ms\n  433339 requests in 3.10s, 56.20MB read\nRequests/sec: 139751.43\nTransfer/sec:     18.13MB\n"
+        },
+        {
+          "req_s": 136956.34,
+          "latency_ms": {
+            "50": 0.805,
+            "99": 1.82
+          },
+          "peak_rss_mib": 11.84375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.90ms  321.22us   2.56ms   72.85%\n    Req/Sec    68.81k     1.78k   71.93k    74.19%\n  Latency Distribution\n     50%  805.00us\n     75%    1.09ms\n     90%    1.31ms\n     99%    1.82ms\n  424606 requests in 3.10s, 55.07MB read\nRequests/sec: 136956.34\nTransfer/sec:     17.76MB\n"
+        },
+        {
+          "req_s": 141579.89,
+          "latency_ms": {
+            "50": 0.767,
+            "99": 1.75
+          },
+          "peak_rss_mib": 11.796875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/async\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.87ms  308.27us   3.14ms   73.48%\n    Req/Sec    71.20k     1.35k   73.75k    82.26%\n  Latency Distribution\n     50%  767.00us\n     75%    1.08ms\n     90%    1.26ms\n     99%    1.75ms\n  439017 requests in 3.10s, 56.94MB read\nRequests/sec: 141579.89\nTransfer/sec:     18.36MB\n"
+        }
+      ]
+    },
+    "timer": {
+      "before": [
+        {
+          "req_s": 112479.43,
+          "latency_ms": {
+            "50": 1.08,
+            "99": 1.47
+          },
+          "peak_rss_mib": 11.671875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.13ms  119.74us   3.16ms   84.29%\n    Req/Sec    56.53k     0.95k   57.45k    87.10%\n  Latency Distribution\n     50%    1.08ms\n     75%    1.19ms\n     90%    1.31ms\n     99%    1.47ms\n  348759 requests in 3.10s, 45.23MB read\nRequests/sec: 112479.43\nTransfer/sec:     14.59MB\n"
+        },
+        {
+          "req_s": 110553.63,
+          "latency_ms": {
+            "50": 1.09,
+            "99": 1.69
+          },
+          "peak_rss_mib": 11.6875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.16ms  217.93us   7.63ms   92.55%\n    Req/Sec    55.54k     1.97k   57.30k    80.65%\n  Latency Distribution\n     50%    1.09ms\n     75%    1.21ms\n     90%    1.34ms\n     99%    1.69ms\n  342703 requests in 3.10s, 44.45MB read\nRequests/sec: 110553.63\nTransfer/sec:     14.34MB\n"
+        },
+        {
+          "req_s": 110450.66,
+          "latency_ms": {
+            "50": 1.09,
+            "99": 1.71
+          },
+          "peak_rss_mib": 11.671875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.15ms  151.49us   3.16ms   87.01%\n    Req/Sec    55.55k     3.01k   57.65k    88.71%\n  Latency Distribution\n     50%    1.09ms\n     75%    1.21ms\n     90%    1.34ms\n     99%    1.71ms\n  342404 requests in 3.10s, 44.41MB read\nRequests/sec: 110450.66\nTransfer/sec:     14.33MB\n"
+        },
+        {
+          "req_s": 109582.55,
+          "latency_ms": {
+            "50": 1.08,
+            "99": 1.74
+          },
+          "peak_rss_mib": 11.8125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.16ms  357.57us  13.26ms   98.26%\n    Req/Sec    55.96k     3.04k   61.27k    91.80%\n  Latency Distribution\n     50%    1.08ms\n     75%    1.20ms\n     90%    1.32ms\n     99%    1.74ms\n  339724 requests in 3.10s, 44.06MB read\nRequests/sec: 109582.55\nTransfer/sec:     14.21MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 113077.98,
+          "latency_ms": {
+            "50": 1.08,
+            "99": 1.46
+          },
+          "peak_rss_mib": 11.8125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.13ms  108.21us   1.96ms   83.33%\n    Req/Sec    56.85k   492.69    57.55k    72.58%\n  Latency Distribution\n     50%    1.08ms\n     75%    1.18ms\n     90%    1.29ms\n     99%    1.46ms\n  350582 requests in 3.10s, 45.47MB read\nRequests/sec: 113077.98\nTransfer/sec:     14.67MB\n"
+        },
+        {
+          "req_s": 107705.71,
+          "latency_ms": {
+            "50": 1.09,
+            "99": 3.59
+          },
+          "peak_rss_mib": 11.765625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.23ms  682.20us  18.33ms   97.45%\n    Req/Sec    54.15k     6.56k   57.51k    90.32%\n  Latency Distribution\n     50%    1.09ms\n     75%    1.23ms\n     90%    1.38ms\n     99%    3.59ms\n  333903 requests in 3.10s, 43.31MB read\nRequests/sec: 107705.71\nTransfer/sec:     13.97MB\n"
+        },
+        {
+          "req_s": 111520.7,
+          "latency_ms": {
+            "50": 1.08,
+            "99": 1.46
+          },
+          "peak_rss_mib": 11.765625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.12ms  108.48us   2.13ms   83.92%\n    Req/Sec    56.99k     1.03k   62.03k    90.16%\n  Latency Distribution\n     50%    1.08ms\n     75%    1.18ms\n     90%    1.29ms\n     99%    1.46ms\n  345702 requests in 3.10s, 44.84MB read\nRequests/sec: 111520.70\nTransfer/sec:     14.46MB\n"
+        },
+        {
+          "req_s": 112902.33,
+          "latency_ms": {
+            "50": 1.08,
+            "99": 1.46
+          },
+          "peak_rss_mib": 11.75,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/timer\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.13ms  108.27us   1.83ms   83.14%\n    Req/Sec    56.75k   310.64    57.36k    61.29%\n  Latency Distribution\n     50%    1.08ms\n     75%    1.18ms\n     90%    1.30ms\n     99%    1.46ms\n  350039 requests in 3.10s, 45.40MB read\nRequests/sec: 112902.33\nTransfer/sec:     14.64MB\n"
+        }
+      ]
+    },
+    "echo": {
+      "before": [
+        {
+          "req_s": 128744.12,
+          "latency_ms": {
+            "50": 0.88,
+            "99": 2.09
+          },
+          "peak_rss_mib": 12.578125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.99ms  280.01us   5.95ms   85.40%\n    Req/Sec    64.74k     2.79k   72.21k    77.42%\n  Latency Distribution\n     50%    0.88ms\n     75%    0.97ms\n     90%    1.41ms\n     99%    2.09ms\n  399145 requests in 3.10s, 425.95MB read\nRequests/sec: 128744.12\nTransfer/sec:    137.39MB\n"
+        },
+        {
+          "req_s": 139016.62,
+          "latency_ms": {
+            "50": 0.844,
+            "99": 1.86
+          },
+          "peak_rss_mib": 12.671875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.93ms  310.08us   9.27ms   88.28%\n    Req/Sec    69.93k     5.40k   73.22k    96.77%\n  Latency Distribution\n     50%  844.00us\n     75%    0.89ms\n     90%    1.29ms\n     99%    1.86ms\n  431100 requests in 3.10s, 460.05MB read\nRequests/sec: 139016.62\nTransfer/sec:    148.35MB\n"
+        },
+        {
+          "req_s": 138501.83,
+          "latency_ms": {
+            "50": 0.85,
+            "99": 1.68
+          },
+          "peak_rss_mib": 12.578125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.92ms  198.34us   3.39ms   87.09%\n    Req/Sec    69.61k     1.46k   71.75k    82.26%\n  Latency Distribution\n     50%    0.85ms\n     75%    0.90ms\n     90%    1.28ms\n     99%    1.68ms\n  429441 requests in 3.10s, 458.28MB read\nRequests/sec: 138501.83\nTransfer/sec:    147.80MB\n"
+        },
+        {
+          "req_s": 140022.26,
+          "latency_ms": {
+            "50": 0.85,
+            "99": 1.54
+          },
+          "peak_rss_mib": 12.578125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.91ms  184.05us   2.62ms   87.08%\n    Req/Sec    70.36k     1.38k   72.78k    64.52%\n  Latency Distribution\n     50%    0.85ms\n     75%    0.89ms\n     90%    1.26ms\n     99%    1.54ms\n  434204 requests in 3.10s, 463.37MB read\nRequests/sec: 140022.26\nTransfer/sec:    149.43MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 138793.11,
+          "latency_ms": {
+            "50": 0.844,
+            "99": 1.72
+          },
+          "peak_rss_mib": 12.6875,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.92ms  213.73us   4.36ms   86.26%\n    Req/Sec    69.76k     2.95k   73.25k    75.81%\n  Latency Distribution\n     50%  844.00us\n     75%    0.87ms\n     90%    1.30ms\n     99%    1.72ms\n  430324 requests in 3.10s, 459.23MB read\nRequests/sec: 138793.11\nTransfer/sec:    148.11MB\n"
+        },
+        {
+          "req_s": 130335.51,
+          "latency_ms": {
+            "50": 0.841,
+            "99": 5.07
+          },
+          "peak_rss_mib": 12.59375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.07ms    0.92ms  22.18ms   95.60%\n    Req/Sec    65.52k    11.49k   74.61k    87.10%\n  Latency Distribution\n     50%  841.00us\n     75%    0.97ms\n     90%    1.40ms\n     99%    5.07ms\n  404368 requests in 3.10s, 431.53MB read\nRequests/sec: 130335.51\nTransfer/sec:    139.09MB\n"
+        },
+        {
+          "req_s": 140831.13,
+          "latency_ms": {
+            "50": 0.842,
+            "99": 1.58
+          },
+          "peak_rss_mib": 12.65625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.91ms  189.55us   2.83ms   87.31%\n    Req/Sec    70.80k     1.19k   73.39k    69.35%\n  Latency Distribution\n     50%  842.00us\n     75%    0.87ms\n     90%    1.27ms\n     99%    1.58ms\n  436701 requests in 3.10s, 466.03MB read\nRequests/sec: 140831.13\nTransfer/sec:    150.29MB\n"
+        },
+        {
+          "req_s": 140551.05,
+          "latency_ms": {
+            "50": 0.833,
+            "99": 1.85
+          },
+          "peak_rss_mib": 12.609375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/echo\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.92ms  302.90us   9.34ms   88.17%\n    Req/Sec    70.69k     5.21k   73.95k    96.77%\n  Latency Distribution\n     50%  833.00us\n     75%    0.87ms\n     90%    1.29ms\n     99%    1.85ms\n  435837 requests in 3.10s, 465.11MB read\nRequests/sec: 140551.05\nTransfer/sec:    149.99MB\n"
+        }
+      ]
+    },
+    "stream": {
+      "before": [
+        {
+          "req_s": 68466.31,
+          "latency_ms": {
+            "50": 1.73,
+            "99": 2.3
+          },
+          "peak_rss_mib": 11.34375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.87ms  263.46us   4.52ms   77.60%\n    Req/Sec    34.44k   308.44    35.53k    67.74%\n  Latency Distribution\n     50%    1.73ms\n     75%    2.10ms\n     90%    2.18ms\n     99%    2.30ms\n  212298 requests in 3.10s, 1.64GB read\nRequests/sec:  68466.31\nTransfer/sec:    541.10MB\n"
+        },
+        {
+          "req_s": 67785.36,
+          "latency_ms": {
+            "50": 1.76,
+            "99": 2.56
+          },
+          "peak_rss_mib": 11.484375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.89ms  281.69us   4.60ms   77.19%\n    Req/Sec    34.05k   505.10    35.46k    66.13%\n  Latency Distribution\n     50%    1.76ms\n     75%    2.11ms\n     90%    2.23ms\n     99%    2.56ms\n  210182 requests in 3.10s, 1.62GB read\nRequests/sec:  67785.36\nTransfer/sec:    535.71MB\n"
+        },
+        {
+          "req_s": 68584.58,
+          "latency_ms": {
+            "50": 1.74,
+            "99": 3.14
+          },
+          "peak_rss_mib": 11.328125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.86ms  300.12us   6.12ms   87.17%\n    Req/Sec    34.47k     1.51k   36.24k    87.10%\n  Latency Distribution\n     50%    1.74ms\n     75%    2.08ms\n     90%    2.19ms\n     99%    3.14ms\n  212672 requests in 3.10s, 1.64GB read\nRequests/sec:  68584.58\nTransfer/sec:    542.03MB\n"
+        },
+        {
+          "req_s": 67046.49,
+          "latency_ms": {
+            "50": 1.74,
+            "99": 3.8
+          },
+          "peak_rss_mib": 11.484375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.92ms  469.61us   9.84ms   92.54%\n    Req/Sec    33.73k     2.84k   37.19k    75.81%\n  Latency Distribution\n     50%    1.74ms\n     75%    2.07ms\n     90%    2.28ms\n     99%    3.80ms\n  207905 requests in 3.10s, 1.60GB read\nRequests/sec:  67046.49\nTransfer/sec:    529.88MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 70206.97,
+          "latency_ms": {
+            "50": 1.66,
+            "99": 2.89
+          },
+          "peak_rss_mib": 11.375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.82ms  290.18us   5.37ms   87.82%\n    Req/Sec    35.29k     1.29k   36.64k    75.81%\n  Latency Distribution\n     50%    1.66ms\n     75%    2.05ms\n     90%    2.12ms\n     99%    2.89ms\n  217680 requests in 3.10s, 1.68GB read\nRequests/sec:  70206.97\nTransfer/sec:    554.85MB\n"
+        },
+        {
+          "req_s": 51108.32,
+          "latency_ms": {
+            "50": 1.88,
+            "99": 14.88
+          },
+          "peak_rss_mib": 11.40625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     2.97ms    2.90ms  39.40ms   88.89%\n    Req/Sec    26.13k    13.45k   72.03k    72.13%\n  Latency Distribution\n     50%    1.88ms\n     75%    2.93ms\n     90%    6.22ms\n     99%   14.88ms\n  158492 requests in 3.10s, 1.22GB read\nRequests/sec:  51108.32\nTransfer/sec:    403.91MB\n"
+        },
+        {
+          "req_s": 72379.65,
+          "latency_ms": {
+            "50": 1.66,
+            "99": 2.51
+          },
+          "peak_rss_mib": 11.34375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.77ms  272.62us   5.11ms   80.62%\n    Req/Sec    36.37k   722.09    37.86k    70.97%\n  Latency Distribution\n     50%    1.66ms\n     75%    1.97ms\n     90%    2.10ms\n     99%    2.51ms\n  224406 requests in 3.10s, 1.73GB read\nRequests/sec:  72379.65\nTransfer/sec:    572.02MB\n"
+        },
+        {
+          "req_s": 74005.35,
+          "latency_ms": {
+            "50": 1.6,
+            "99": 2.29
+          },
+          "peak_rss_mib": 11.40625,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/stream\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.73ms  253.88us   4.59ms   79.23%\n    Req/Sec    37.24k   421.02    37.88k    80.65%\n  Latency Distribution\n     50%    1.60ms\n     75%    1.95ms\n     90%    2.03ms\n     99%    2.29ms\n  229478 requests in 3.10s, 1.77GB read\nRequests/sec:  74005.35\nTransfer/sec:    584.87MB\n"
+        }
+      ]
+    },
+    "file": {
+      "before": [
+        {
+          "req_s": 92045.94,
+          "latency_ms": {
+            "50": 1.2,
+            "99": 2.87
+          },
+          "peak_rss_mib": 12.34375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.37ms  501.95us   4.23ms   73.03%\n    Req/Sec    46.28k     2.95k   51.85k    61.29%\n  Latency Distribution\n     50%    1.20ms\n     75%    1.61ms\n     90%    2.14ms\n     99%    2.87ms\n  285433 requests in 3.10s, 1.11GB read\nRequests/sec:  92045.94\nTransfer/sec:    367.89MB\n"
+        },
+        {
+          "req_s": 77757.29,
+          "latency_ms": {
+            "50": 1.41,
+            "99": 4.57
+          },
+          "peak_rss_mib": 12.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.65ms  847.07us  18.56ms   84.60%\n    Req/Sec    39.12k     5.57k   48.42k    72.58%\n  Latency Distribution\n     50%    1.41ms\n     75%    1.99ms\n     90%    2.57ms\n     99%    4.57ms\n  241091 requests in 3.10s, 0.94GB read\nRequests/sec:  77757.29\nTransfer/sec:    310.78MB\n"
+        },
+        {
+          "req_s": 79479.75,
+          "latency_ms": {
+            "50": 1.4,
+            "99": 3.27
+          },
+          "peak_rss_mib": 12.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.58ms  585.30us   4.85ms   72.12%\n    Req/Sec    39.96k     3.33k   48.00k    66.13%\n  Latency Distribution\n     50%    1.40ms\n     75%    1.83ms\n     90%    2.51ms\n     99%    3.27ms\n  246536 requests in 3.10s, 0.96GB read\nRequests/sec:  79479.75\nTransfer/sec:    317.67MB\n"
+        },
+        {
+          "req_s": 80501.74,
+          "latency_ms": {
+            "50": 1.37,
+            "99": 3.24
+          },
+          "peak_rss_mib": 12.328125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.56ms  582.58us   6.07ms   71.38%\n    Req/Sec    40.46k     2.89k   45.92k    70.00%\n  Latency Distribution\n     50%    1.37ms\n     75%    1.89ms\n     90%    2.44ms\n     99%    3.24ms\n  241594 requests in 3.00s, 0.94GB read\nRequests/sec:  80501.74\nTransfer/sec:    321.75MB\n"
+        }
+      ],
+      "after": [
+        {
+          "req_s": 87260.26,
+          "latency_ms": {
+            "50": 1.25,
+            "99": 3.08
+          },
+          "peak_rss_mib": 12.328125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.44ms  552.20us   5.49ms   72.44%\n    Req/Sec    43.85k     3.81k   51.69k    70.97%\n  Latency Distribution\n     50%    1.25ms\n     75%    1.76ms\n     90%    2.26ms\n     99%    3.08ms\n  270541 requests in 3.10s, 1.06GB read\nRequests/sec:  87260.26\nTransfer/sec:    348.77MB\n"
+        },
+        {
+          "req_s": 83148.58,
+          "latency_ms": {
+            "50": 1.33,
+            "99": 3.21
+          },
+          "peak_rss_mib": 12.359375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.51ms  575.24us   6.48ms   72.71%\n    Req/Sec    41.79k     3.34k   50.87k    79.03%\n  Latency Distribution\n     50%    1.33ms\n     75%    1.81ms\n     90%    2.38ms\n     99%    3.21ms\n  257877 requests in 3.10s, 1.01GB read\nRequests/sec:  83148.58\nTransfer/sec:    332.33MB\n"
+        },
+        {
+          "req_s": 80162.07,
+          "latency_ms": {
+            "50": 1.38,
+            "99": 3.25
+          },
+          "peak_rss_mib": 12.328125,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.57ms  588.08us   5.11ms   71.52%\n    Req/Sec    40.30k     2.91k   46.39k    67.74%\n  Latency Distribution\n     50%    1.38ms\n     75%    1.88ms\n     90%    2.46ms\n     99%    3.25ms\n  248705 requests in 3.10s, 0.97GB read\nRequests/sec:  80162.07\nTransfer/sec:    320.40MB\n"
+        },
+        {
+          "req_s": 74741.99,
+          "latency_ms": {
+            "50": 1.46,
+            "99": 3.61
+          },
+          "peak_rss_mib": 12.34375,
+          "wrk": "Running 3s test @ http://127.0.0.1:18149/file\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     1.68ms  658.04us   5.75ms   71.98%\n    Req/Sec    37.55k     3.64k   44.96k    70.97%\n  Latency Distribution\n     50%    1.46ms\n     75%    2.08ms\n     90%    2.63ms\n     99%    3.61ms\n  231756 requests in 3.10s, 0.90GB read\nRequests/sec:  74741.99\nTransfer/sec:    298.73MB\n"
+        }
+      ]
+    }
+  }
+}

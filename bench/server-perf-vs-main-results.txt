@@ -1,0 +1,21 @@
+Runtime benchmark: boomkat-perf versus local boomkat main
+
+Runtime source: 4255e0c for both binaries. Engine main: 229e7b7a; engine boomkat-perf: 8ef0ab04. Matching O3, single-module, relaxed FP, threaded dispatch and CONSOLE settings. C sources and native uWebSockets library are identical.
+
+Four alternating-order pairs per workload, fresh server for every sample, 1s warm-up +3s measured, wrk -t2 -c128 on loopback. Median per-run results. Latency and memory cells show main / perf. Peak RSS sampled every 100ms during measurement; fresh-process values exclude memory retained by previous workloads. Both binaries passed the HTTP lifecycle/native body suite. All 56 measured runs and warm-ups reported no socket or HTTP errors.
+
+| Workload | Main req/s | Perf req/s | Throughput change | p50 ms (main / perf) | p99 ms (main / perf) | Peak RSS MiB (main / perf) |
+|---|---:|---:|---:|---:|---:|---:|
+| Hello | 217,405 | 217,781 | +0.2% | 0.56 / 0.56 | 1.09 / 1.08 | 10.88 / 10.87 |
+| JSON | 180,619 | 179,477 | -0.6% | 0.68 / 0.69 | 1.22 / 1.23 | 11.16 / 11.23 |
+| Async immediate | 144,134 | 144,825 | +0.5% | 0.75 / 0.75 | 1.69 / 1.68 | 11.76 / 11.74 |
+| Async timer | 113,462 | 113,421 | -0.0% | 1.08 / 1.08 | 1.43 / 1.44 | 11.67 / 11.73 |
+| Echo 1KB | 143,212 | 144,790 | +1.1% | 0.84 / 0.83 | 1.43 / 1.42 | 12.63 / 12.63 |
+| Stream 8KB | 68,248 | 72,074 | +5.6% | 1.74 / 1.64 | 2.29 / 2.18 | 11.40 / 11.30 |
+| File 4KB | 94,632 | 94,269 | -0.4% | 1.17 / 1.18 | 2.75 / 2.74 | 12.21 / 12.27 |
+
+Streaming improved in all four pairs: +5.4%, +5.7%, +5.6%, +5.9%. Other median throughput changes range from -0.6% to +1.1%, which is within ordinary local-run noise. These results measure only the ten engine commits between local main and boomkat-perf; both sides contain the current native runtime response/stream implementation and main already contains the earlier async/promise work.
+
+Raw samples, full wrk output and binary SHA-256 hashes: bench/server-perf-vs-main.json.
+
+Reproduction: c3c build bkr; c3c build bkr-perf (sequential builds), then run /private/tmp/server-perf-vs-main.py.

@@ -1,0 +1,2797 @@
+{
+  "before_engine": "2bdab09b",
+  "after_engine": "8ef0ab04",
+  "method": "Seven alternating measured pairs after one warm-up; fresh process; matching O2 threaded release build flags; wall time and /usr/bin/time -l peak RSS. Output equality checked after normalizing benchmark timing fields.",
+  "sha256": {
+    "before": "ead012ace412c3834081a602ce19830d0fda9085db8866f7671a69631a97e6bf",
+    "after": "a29c4dc56195a094e0c0566761acbe447271c44f0204a434bcf66d08348fcbcf"
+  },
+  "results": [
+    {
+      "file": "benchmarks/bench_arithmetic.js",
+      "seconds": [
+        [
+          0.020403375005116686,
+          0.020879458999843337,
+          0.02081904200167628,
+          0.020898458002193365,
+          0.02081166600692086,
+          0.020552750000206288,
+          0.02103220799472183
+        ],
+        [
+          0.020894583998597227,
+          0.020805041000130586,
+          0.02114870799414348,
+          0.020943041003192775,
+          0.021057541998743545,
+          0.02091824999661185,
+          0.021052874995802995
+        ]
+      ],
+      "median": [
+        0.02081904200167628,
+        0.020943041003192775
+      ],
+      "change_percent": 0.5956037818959814,
+      "rss": [
+        [
+          4734976,
+          4702208,
+          4734976,
+          4734976,
+          4718592,
+          4734976,
+          4734976
+        ],
+        [
+          4702208,
+          4669440,
+          4702208,
+          4685824,
+          4685824,
+          4685824,
+          4685824
+        ]
+      ],
+      "outputs": [
+        [
+          "1543\n"
+        ],
+        [
+          "1543\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_array.js",
+      "seconds": [
+        [
+          0.008149417000822723,
+          0.008553334002499469,
+          0.008047124996664934,
+          0.008629999996628612,
+          0.00820650000241585,
+          0.008341209002537653,
+          0.00849000000016531
+        ],
+        [
+          0.008495458001561929,
+          0.008401999999477994,
+          0.008355874997505452,
+          0.008523208001861349,
+          0.008293582999613136,
+          0.008396500001254026,
+          0.00811229100509081
+        ]
+      ],
+      "median": [
+        0.008341209002537653,
+        0.008396500001254026
+      ],
+      "change_percent": 0.6628655234457215,
+      "rss": [
+        [
+          6307840,
+          6340608,
+          6324224,
+          6340608,
+          6324224,
+          6324224,
+          6356992
+        ],
+        [
+          6307840,
+          6258688,
+          6275072,
+          6275072,
+          6307840,
+          6307840,
+          6275072
+        ]
+      ],
+      "outputs": [
+        [
+          "1249975000\n"
+        ],
+        [
+          "1249975000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_async_frames.js",
+      "seconds": [
+        [
+          0.038153958004841115,
+          0.03850612499809358,
+          0.03783362499962095,
+          0.038307875001919456,
+          0.03806724999594735,
+          0.038827457996376324,
+          0.03839695799979381
+        ],
+        [
+          0.034222458001750056,
+          0.033804417005740106,
+          0.03432750000501983,
+          0.03495866699813632,
+          0.03441045899671735,
+          0.03426358299475396,
+          0.03361695799685549
+        ]
+      ],
+      "median": [
+        0.038307875001919456,
+        0.03426358299475396
+      ],
+      "change_percent": -10.557338424443675,
+      "rss": [
+        [
+          7847936,
+          7831552,
+          7847936,
+          7847936,
+          7864320,
+          7847936,
+          7847936
+        ],
+        [
+          7782400,
+          7733248,
+          7782400,
+          7782400,
+          7782400,
+          7749632,
+          7766016
+        ]
+      ],
+      "outputs": [
+        [
+          "{\"name\":\"narrow\",\"ms\":10,\"result\":100000}\n{\"name\":\"wide\",\"ms\":23,\"result\":103160}\n",
+          "{\"name\":\"narrow\",\"ms\":10,\"result\":100000}\n{\"name\":\"wide\",\"ms\":24,\"result\":103160}\n",
+          "{\"name\":\"narrow\",\"ms\":11,\"result\":100000}\n{\"name\":\"wide\",\"ms\":24,\"result\":103160}\n"
+        ],
+        [
+          "{\"name\":\"narrow\",\"ms\":10,\"result\":100000}\n{\"name\":\"wide\",\"ms\":19,\"result\":103160}\n",
+          "{\"name\":\"narrow\",\"ms\":10,\"result\":100000}\n{\"name\":\"wide\",\"ms\":20,\"result\":103160}\n",
+          "{\"name\":\"narrow\",\"ms\":11,\"result\":100000}\n{\"name\":\"wide\",\"ms\":20,\"result\":103160}\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_date.js",
+      "seconds": [
+        [
+          0.016330209000443574,
+          0.01714600000559585,
+          0.017797250002331566,
+          0.017428041996026877,
+          0.016450041002826765,
+          0.016832457993587013,
+          0.016637957996863406
+        ],
+        [
+          0.01705495799978962,
+          0.017701874996419065,
+          0.017049624999344815,
+          0.016581000003498048,
+          0.016428209004516248,
+          0.016522875004739035,
+          0.01635191700188443
+        ]
+      ],
+      "median": [
+        0.016832457993587013,
+        0.016581000003498048
+      ],
+      "change_percent": -1.4938875248330818,
+      "rss": [
+        [
+          7815168,
+          7831552,
+          7798784,
+          7798784,
+          7798784,
+          7798784,
+          7831552
+        ],
+        [
+          7749632,
+          7766016,
+          7733248,
+          7733248,
+          7766016,
+          7733248,
+          7766016
+        ]
+      ],
+      "outputs": [
+        [
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 1 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 3 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 1 ms (2000 iterations)\nconstruct+toISOString: 0 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 1 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 0 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 0 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 1 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 1 ms (2000 iterations)\ntoUTCString: 0 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 1 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 0 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 0 ms (2000 iterations)\nnew Date(string): 1 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 1 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 0 ms (2000 iterations)\ntoDateString: 1 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 0 ms (2000 iterations)\nnew Date(string): 1 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 1 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 0 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 1 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 0 ms (2000 iterations)\ntoDateString: 1 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 1 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n"
+        ],
+        [
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 1 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 1 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 1 ms (2000 iterations)\ntoUTCString: 0 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 0 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 1 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 1 ms (2000 iterations)\ntoUTCString: 0 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 0 ms (2000 iterations)\ndone\n",
+          "new Date(): 0 ms (2000 iterations)\nnew Date(ms): 1 ms (2000 iterations)\nnew Date(y,m,d,...): 0 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 1 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 0 ms (2000 iterations)\ntoISOString: 1 ms (2000 iterations)\ntoUTCString: 0 ms (2000 iterations)\ntoString: 1 ms (2000 iterations)\ntoDateString: 0 ms (2000 iterations)\ntoTimeString: 1 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 0 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 0 ms (2000 iterations)\nnew Date(string): 1 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 1 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 0 ms (2000 iterations)\ntoDateString: 1 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 0 ms (2000 iterations)\nconstruct+toISOString: 1 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n",
+          "new Date(): 1 ms (2000 iterations)\nnew Date(ms): 0 ms (2000 iterations)\nnew Date(y,m,d,...): 1 ms (2000 iterations)\nnew Date(string): 0 ms (2000 iterations)\nDate.parse: 0 ms (2000 iterations)\ngetTime: 0 ms (2000 iterations)\ngetFullYear: 0 ms (2000 iterations)\ngetMonth: 0 ms (2000 iterations)\ngetDate: 0 ms (2000 iterations)\ngetDay: 0 ms (2000 iterations)\ngetHours+getMinutes+getSeconds: 1 ms (2000 iterations)\ntoISOString: 0 ms (2000 iterations)\ntoUTCString: 1 ms (2000 iterations)\ntoString: 0 ms (2000 iterations)\ntoDateString: 1 ms (2000 iterations)\ntoTimeString: 0 ms (2000 iterations)\ntoLocaleString: 4 ms (2000 iterations)\nDate.now: 0 ms (2000 iterations)\nDate.UTC: 1 ms (2000 iterations)\nconstruct+toISOString: 0 ms (2000 iterations)\nsetFullYear: 1 ms (2000 iterations)\nsetMonth: 1 ms (2000 iterations)\nsetDate: 1 ms (2000 iterations)\ndone\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_function_call.js",
+      "seconds": [
+        [
+          0.02507891700224718,
+          0.025317917003121693,
+          0.025601541994547006,
+          0.02536566700291587,
+          0.025218541006324813,
+          0.025272375001804903,
+          0.02519008299714187
+        ],
+        [
+          0.025439332996029407,
+          0.025401624996447936,
+          0.02572229200450238,
+          0.026156749998335727,
+          0.025741707999259233,
+          0.02563979200203903,
+          0.02579649999825051
+        ]
+      ],
+      "median": [
+        0.025272375001804903,
+        0.02572229200450238
+      ],
+      "change_percent": 1.7802719477902018,
+      "rss": [
+        [
+          4734976,
+          4734976,
+          4751360,
+          4734976,
+          4734976,
+          4734976,
+          4751360
+        ],
+        [
+          4685824,
+          4718592,
+          4702208,
+          4702208,
+          4702208,
+          4718592,
+          4702208
+        ]
+      ],
+      "outputs": [
+        [
+          "26000000\n"
+        ],
+        [
+          "26000000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_gc_large_container.js",
+      "seconds": [
+        [
+          0.14592525000625756,
+          0.14609654100058833,
+          0.1445536669998546,
+          0.14549199999601115,
+          0.14629208400583593,
+          0.14721316599752754,
+          0.14622875000350177
+        ],
+        [
+          0.14455158299824689,
+          0.14585304199863458,
+          0.14357204199768603,
+          0.14642087499669287,
+          0.1443507910007611,
+          0.14475183399918023,
+          0.14434366700152168
+        ]
+      ],
+      "median": [
+        0.14609654100058833,
+        0.14455158299824689
+      ],
+      "change_percent": -1.057491157395185,
+      "rss": [
+        [
+          192249856,
+          192233472,
+          192249856,
+          192200704,
+          192249856,
+          192233472,
+          192249856
+        ],
+        [
+          192184320,
+          192217088,
+          192200704,
+          192184320,
+          192200704,
+          192200704,
+          192200704
+        ]
+      ],
+      "outputs": [
+        [
+          "large container and deep graph passed\n"
+        ],
+        [
+          "large container and deep graph passed\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_gc_native_reentry.js",
+      "seconds": [
+        [
+          0.012885458003438544,
+          0.013010124996071681,
+          0.012921500005177222,
+          0.013074624999717344,
+          0.012743999999656808,
+          0.013013417003094219,
+          0.013010667003982235
+        ],
+        [
+          0.012753333001455758,
+          0.012744542000291403,
+          0.013391416003287304,
+          0.013222124995081685,
+          0.012847958001657389,
+          0.012819791998481378,
+          0.012822666998545174
+        ]
+      ],
+      "median": [
+        0.013010124996071681,
+        0.012822666998545174
+      ],
+      "change_percent": -1.440862386665076,
+      "rss": [
+        [
+          11567104,
+          11534336,
+          11550720,
+          11534336,
+          11583488,
+          11583488,
+          11567104
+        ],
+        [
+          11517952,
+          11517952,
+          11501568,
+          11501568,
+          11517952,
+          11517952,
+          11517952
+        ]
+      ],
+      "outputs": [
+        [
+          "native reentry passed 6528000\n"
+        ],
+        [
+          "native reentry passed 6528000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_ic_monomorphic.js",
+      "seconds": [
+        [
+          0.0454680830007419,
+          0.04529970799922012,
+          0.04519900000013877,
+          0.04554216600081418,
+          0.0449663330000476,
+          0.04548412499570986,
+          0.04549350000161212
+        ],
+        [
+          0.04555566700582858,
+          0.04495129200222436,
+          0.04532212499907473,
+          0.04531791699992027,
+          0.04577279200020712,
+          0.04616349999560043,
+          0.045367582999460865
+        ]
+      ],
+      "median": [
+        0.0454680830007419,
+        0.045367582999460865
+      ],
+      "change_percent": -0.22103417309102813,
+      "rss": [
+        [
+          4751360,
+          4751360,
+          4751360,
+          4751360,
+          4751360,
+          4751360,
+          4751360
+        ],
+        [
+          4718592,
+          4702208,
+          4718592,
+          4734976,
+          4718592,
+          4702208,
+          4734976
+        ]
+      ],
+      "outputs": [
+        [
+          "PASS: 10000000\n"
+        ],
+        [
+          "PASS: 10000000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_ic_proto.js",
+      "seconds": [
+        [
+          0.07319879099668469,
+          0.0735062919993652,
+          0.07321712499833666,
+          0.07377825000003213,
+          0.07315220799500821,
+          0.07364812499872642,
+          0.07338599999638973
+        ],
+        [
+          0.07345633299701149,
+          0.07335774999955902,
+          0.07393704199785134,
+          0.07485954200092237,
+          0.07354154199856566,
+          0.07325645800301572,
+          0.07340541700250469
+        ]
+      ],
+      "median": [
+        0.07338599999638973,
+        0.07345633299701149
+      ],
+      "change_percent": 0.09583980680949455,
+      "rss": [
+        [
+          4734976,
+          4751360,
+          4734976,
+          4751360,
+          4751360,
+          4767744,
+          4751360
+        ],
+        [
+          4718592,
+          4734976,
+          4702208,
+          4734976,
+          4718592,
+          4702208,
+          4718592
+        ]
+      ],
+      "outputs": [
+        [
+          "PASS: 50000000\n"
+        ],
+        [
+          "PASS: 50000000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_loop.js",
+      "seconds": [
+        [
+          0.016940125002292916,
+          0.01675824999983888,
+          0.017167124999105,
+          0.01655554099852452,
+          0.016865624995261896,
+          0.017318750004051253,
+          0.016983459005132318
+        ],
+        [
+          0.016899040994758252,
+          0.016870457999175414,
+          0.01689125000120839,
+          0.017106042003433686,
+          0.01704591599991545,
+          0.017163917000289075,
+          0.017157082998892292
+        ]
+      ],
+      "median": [
+        0.016940125002292916,
+        0.01704591599991545
+      ],
+      "change_percent": 0.6244995099399464,
+      "rss": [
+        [
+          4669440,
+          4702208,
+          4702208,
+          4685824,
+          4669440,
+          4653056,
+          4718592
+        ],
+        [
+          4636672,
+          4636672,
+          4653056,
+          4669440,
+          4653056,
+          4685824,
+          4653056
+        ]
+      ],
+      "outputs": [
+        [
+          "2000000\n"
+        ],
+        [
+          "2000000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_memory_heavy.js",
+      "seconds": [
+        [
+          0.038619416001893114,
+          0.03868779099866515,
+          0.03856475000065984,
+          0.038496749999467283,
+          0.03862504199787509,
+          0.038649665999400895,
+          0.03883404099906329
+        ],
+        [
+          0.038602916996751446,
+          0.03853483399871038,
+          0.03887379200023133,
+          0.03868299999885494,
+          0.03854183299699798,
+          0.03857316700305091,
+          0.03885499999887543
+        ]
+      ],
+      "median": [
+        0.03862504199787509,
+        0.038602916996751446
+      ],
+      "change_percent": -0.05728149402364213,
+      "rss": [
+        [
+          34193408,
+          34209792,
+          34242560,
+          34193408,
+          34242560,
+          34242560,
+          34242560
+        ],
+        [
+          34160640,
+          34160640,
+          34177024,
+          34177024,
+          34209792,
+          34193408,
+          34177024
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_object.js",
+      "seconds": [
+        [
+          0.033679250002023764,
+          0.03374766699562315,
+          0.034719415998551995,
+          0.03389391700329725,
+          0.03407179200439714,
+          0.03455054199730512,
+          0.034452790998329874
+        ],
+        [
+          0.035040000002481975,
+          0.03483037499972852,
+          0.035388165997574106,
+          0.03478233400528552,
+          0.03493633300240617,
+          0.0344566669955384,
+          0.03484658299566945
+        ]
+      ],
+      "median": [
+        0.03407179200439714,
+        0.03484658299566945
+      ],
+      "change_percent": 2.2739954246384197,
+      "rss": [
+        [
+          4784128,
+          4784128,
+          4767744,
+          4784128,
+          4784128,
+          4800512,
+          4767744
+        ],
+        [
+          4718592,
+          4734976,
+          4734976,
+          4751360,
+          4767744,
+          4751360,
+          4751360
+        ]
+      ],
+      "outputs": [
+        [
+          "28560000\n"
+        ],
+        [
+          "28560000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_property_lookup.js",
+      "seconds": [
+        [
+          0.02618195900140563,
+          0.02623933299764758,
+          0.026158207998378202,
+          0.02661933299532393,
+          0.026626999999280088,
+          0.02631775000190828,
+          0.026588708999042865
+        ],
+        [
+          0.027060042004450224,
+          0.027345041999069508,
+          0.026824708002095576,
+          0.02644058300211327,
+          0.02691208300529979,
+          0.026719416004198138,
+          0.027053624995460268
+        ]
+      ],
+      "median": [
+        0.02631775000190828,
+        0.02691208300529979
+      ],
+      "change_percent": 2.2582971695848553,
+      "rss": [
+        [
+          4849664,
+          4849664,
+          4833280,
+          4849664,
+          4849664,
+          4849664,
+          4849664
+        ],
+        [
+          4833280,
+          4816896,
+          4816896,
+          4816896,
+          4816896,
+          4816896,
+          4816896
+        ]
+      ],
+      "outputs": [
+        [
+          "4800000\n"
+        ],
+        [
+          "4800000\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_recursion.js",
+      "seconds": [
+        [
+          0.03117245800240198,
+          0.030834709003102034,
+          0.030898417004209477,
+          0.030826750000414904,
+          0.030972540997026954,
+          0.03110420900338795,
+          0.030922832993383054
+        ],
+        [
+          0.031068541000422556,
+          0.031014957996376324,
+          0.03086733300006017,
+          0.03066354200564092,
+          0.0307745829995838,
+          0.030903457998647355,
+          0.031330708996392787
+        ]
+      ],
+      "median": [
+        0.030922832993383054,
+        0.030903457998647355
+      ],
+      "change_percent": -0.06265594986023526,
+      "rss": [
+        [
+          4685824,
+          4702208,
+          4718592,
+          4702208,
+          4685824,
+          4702208,
+          4702208
+        ],
+        [
+          4653056,
+          4636672,
+          4653056,
+          4669440,
+          4636672,
+          4669440,
+          4636672
+        ]
+      ],
+      "outputs": [
+        [
+          "514229\n"
+        ],
+        [
+          "514229\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_recursion_deep.js",
+      "seconds": [
+        [
+          0.11820425000041723,
+          0.11761529200157383,
+          0.11872758399840677,
+          0.11807820900139632,
+          0.11778983299882384,
+          0.11775270799989812,
+          0.11777854200045113
+        ],
+        [
+          0.1182729579959414,
+          0.11849654199613724,
+          0.11907141699339263,
+          0.11877962500147987,
+          0.11868545900506433,
+          0.11896449999767356,
+          0.11826791599742137
+        ]
+      ],
+      "median": [
+        0.11778983299882384,
+        0.11868545900506433
+      ],
+      "change_percent": 0.7603593480342452,
+      "rss": [
+        [
+          4685824,
+          4702208,
+          4702208,
+          4685824,
+          4685824,
+          4685824,
+          4702208
+        ],
+        [
+          4636672,
+          4653056,
+          4636672,
+          4669440,
+          4653056,
+          4653056,
+          4653056
+        ]
+      ],
+      "outputs": [
+        [
+          "2178309\n"
+        ],
+        [
+          "2178309\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_regexp.js",
+      "seconds": [
+        [
+          0.05227583399391733,
+          0.05270416699931957,
+          0.05234658300469164,
+          0.05217895800160477,
+          0.052189000001817476,
+          0.0525880419954774,
+          0.05211762500402983
+        ],
+        [
+          0.052146125002764165,
+          0.052003292003064416,
+          0.051880750004784204,
+          0.05238762500084704,
+          0.05243825000070501,
+          0.052168250003887806,
+          0.05198404100519838
+        ]
+      ],
+      "median": [
+        0.05227583399391733,
+        0.052146125002764165
+      ],
+      "change_percent": -0.2481241928502964,
+      "rss": [
+        [
+          11862016,
+          11812864,
+          11763712,
+          11780096,
+          11911168,
+          11862016,
+          11878400
+        ],
+        [
+          11763712,
+          11730944,
+          11730944,
+          11747328,
+          11747328,
+          11714560,
+          11796480
+        ]
+      ],
+      "outputs": [
+        [
+          "exec (literal): 0 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 0 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 5 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 0 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 0 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 8 ms (2000 iterations)\nmatch (global): 2 ms (2000 iterations)\nreplace (string): 1 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 0 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 0 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 0 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 0 ms (2000 iterations)\nexec global (loop): 8 ms (2000 iterations)\nmatch (global): 2 ms (2000 iterations)\nreplace (string): 1 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 0 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 0 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n"
+        ],
+        [
+          "exec (literal): 0 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 0 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 0 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 0 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 0 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 1 ms (2000 iterations)\nexec (groups): 0 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 8 ms (2000 iterations)\nmatch (global): 2 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 2 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 0 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 0 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 1 ms (2000 iterations)\nsearch: 1 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 0 ms (2000 iterations)\nemail test (invalid): 1 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 0 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 6 ms (2000 iterations)\nreplace ($1 backref): 2 ms (2000 iterations)\nsplit (string): 1 ms (2000 iterations)\nsplit (re): 3 ms (2000 iterations)\nsplit (re with groups): 2 ms (2000 iterations)\nsearch: 0 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n",
+          "exec (literal): 1 ms (2000 iterations)\nmatch (literal): 1 ms (2000 iterations)\ntest (literal): 0 ms (2000 iterations)\nexec (groups): 1 ms (2000 iterations)\nmatch (groups): 1 ms (2000 iterations)\nexec global (loop): 7 ms (2000 iterations)\nmatch (global): 3 ms (2000 iterations)\nreplace (string): 0 ms (2000 iterations)\nreplace (re, string): 1 ms (2000 iterations)\nreplace (re global, string): 2 ms (2000 iterations)\nreplace (re, function): 7 ms (2000 iterations)\nreplace ($1 backref): 1 ms (2000 iterations)\nsplit (string): 2 ms (2000 iterations)\nsplit (re): 2 ms (2000 iterations)\nsplit (re with groups): 2 ms (2000 iterations)\nsearch: 0 ms (2000 iterations)\ncompile+test: 15 ms (2000 iterations)\nemail test (valid): 1 ms (2000 iterations)\nemail test (invalid): 0 ms (2000 iterations)\nexec+replace mix: 1 ms (2000 iterations)\ndone\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_scene_churn.js",
+      "seconds": [
+        [
+          0.14409499999601394,
+          0.14395045900164405,
+          0.14431716700346442,
+          0.14350466700125253,
+          0.14490574999945238,
+          0.14451387499866541,
+          0.14481729199906113
+        ],
+        [
+          0.1429779169993708,
+          0.1429038339992985,
+          0.14220516700152075,
+          0.1431537919997936,
+          0.14336400000320282,
+          0.1426437919944874,
+          0.14266945800045505
+        ]
+      ],
+      "median": [
+        0.14431716700346442,
+        0.1429038339992985
+      ],
+      "change_percent": -0.9793242436168192,
+      "rss": [
+        [
+          130711552,
+          130695168,
+          130695168,
+          130695168,
+          130711552,
+          130678784,
+          130711552
+        ],
+        [
+          130629632,
+          130613248,
+          130646016,
+          130646016,
+          130629632,
+          130613248,
+          130646016
+        ]
+      ],
+      "outputs": [
+        [
+          "scene_churn: nodes=100000 frames=300 total=65ms worst_frame=1ms\n",
+          "scene_churn: nodes=100000 frames=300 total=66ms worst_frame=1ms\n",
+          "scene_churn: nodes=100000 frames=300 total=67ms worst_frame=1ms\n"
+        ],
+        [
+          "scene_churn: nodes=100000 frames=300 total=64ms worst_frame=1ms\n",
+          "scene_churn: nodes=100000 frames=300 total=65ms worst_frame=1ms\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [
+          66,
+          66,
+          66,
+          65,
+          67,
+          66,
+          66
+        ],
+        [
+          65,
+          64,
+          64,
+          64,
+          64,
+          65,
+          64
+        ]
+      ],
+      "scene_worst_frame_ms": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    {
+      "file": "benchmarks/bench_shape_no_call.js",
+      "seconds": [
+        [
+          0.021453749999636784,
+          0.02171312500286149,
+          0.021355999997467734,
+          0.023081250001268927,
+          0.023604750000231434,
+          0.021573750003881287,
+          0.021447166000143625
+        ],
+        [
+          0.02144912500079954,
+          0.033755958000256214,
+          0.02108195899927523,
+          0.02123720799863804,
+          0.02774637499533128,
+          0.021038790997408796,
+          0.021539416004088707
+        ]
+      ],
+      "median": [
+        0.021573750003881287,
+        0.02144912500079954
+      ],
+      "change_percent": -0.5776696358274491,
+      "rss": [
+        [
+          31899648,
+          31899648,
+          31866880,
+          31916032,
+          31916032,
+          31899648,
+          31834112
+        ],
+        [
+          31850496,
+          31866880,
+          31784960,
+          31850496,
+          31801344,
+          31850496,
+          31784960
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_shape_stress.js",
+      "seconds": [
+        [
+          0.024696792002941947,
+          0.02356816700194031,
+          0.02545958400150994,
+          0.025835791995632462,
+          0.02516608300356893,
+          0.023470624997571576,
+          0.023615082995092962
+        ],
+        [
+          0.023303624999243766,
+          0.023540207999758422,
+          0.023251208003784996,
+          0.026971624996804167,
+          0.022933959000511095,
+          0.030288209003629163,
+          0.023503874996094964
+        ]
+      ],
+      "median": [
+        0.024696792002941947,
+        0.023503874996094964
+      ],
+      "change_percent": -4.830250854867623,
+      "rss": [
+        [
+          31981568,
+          31965184,
+          31981568,
+          31965184,
+          31981568,
+          31948800,
+          31965184
+        ],
+        [
+          31899648,
+          31916032,
+          31850496,
+          31866880,
+          31850496,
+          31866880,
+          31866880
+        ]
+      ],
+      "outputs": [
+        [
+          "map.key_0=0 map.key_149999=149999\n"
+        ],
+        [
+          "map.key_0=0 map.key_149999=149999\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_string.js",
+      "seconds": [
+        [
+          0.024585958002717234,
+          0.0244714170039515,
+          0.024110375001328066,
+          0.02373529100441374,
+          0.024677500005054753,
+          0.024987917000544257,
+          0.024929125000198837
+        ],
+        [
+          0.024965750002593268,
+          0.025842875002126675,
+          0.02507758399588056,
+          0.02477175000240095,
+          0.024808667003526352,
+          0.0246505840041209,
+          0.02456454200000735
+        ]
+      ],
+      "median": [
+        0.024585958002717234,
+        0.024808667003526352
+      ],
+      "change_percent": 0.9058382056314596,
+      "rss": [
+        [
+          4685824,
+          4653056,
+          4653056,
+          4669440,
+          4653056,
+          4685824,
+          4653056
+        ],
+        [
+          4636672,
+          4685824,
+          4636672,
+          4636672,
+          4669440,
+          4669440,
+          4669440
+        ]
+      ],
+      "outputs": [
+        [
+          "Hello, World! 249999 true\n"
+        ],
+        [
+          "Hello, World! 249999 true\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/bench_valstack_copy.js",
+      "seconds": [
+        [
+          0.0323237499978859,
+          0.03327391699713189,
+          0.03322758300055284,
+          0.032271832998958416,
+          0.032857042002433445,
+          0.03253029200277524,
+          0.0326410420020693
+        ],
+        [
+          0.03261687500344124,
+          0.033539249998284504,
+          0.03317199999582954,
+          0.03243700000166427,
+          0.03255541700491449,
+          0.03271416700590635,
+          0.032795457998872735
+        ]
+      ],
+      "median": [
+        0.0326410420020693,
+        0.03271416700590635
+      ],
+      "change_percent": 0.22402778634460496,
+      "rss": [
+        [
+          4718592,
+          4718592,
+          4702208,
+          4718592,
+          4702208,
+          4702208,
+          4685824
+        ],
+        [
+          4669440,
+          4669440,
+          4669440,
+          4669440,
+          4669440,
+          4653056,
+          4669440
+        ]
+      ],
+      "outputs": [
+        [
+          "24073358014\n"
+        ],
+        [
+          "24073358014\n"
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_class.js",
+      "seconds": [
+        [
+          0.16409216699685203,
+          0.1643717499973718,
+          0.16364570800215006,
+          0.16079249999893364,
+          0.16314624999358784,
+          0.1628235410025809,
+          0.16257595799834235
+        ],
+        [
+          0.1605837919996702,
+          0.16115549999813084,
+          0.15989545900083613,
+          0.1607845000035013,
+          0.15890770800615428,
+          0.16032362500118325,
+          0.16056979099812452
+        ]
+      ],
+      "median": [
+        0.16314624999358784,
+        0.16056979099812452
+      ],
+      "change_percent": -1.5792327409085982,
+      "rss": [
+        [
+          6750208,
+          6782976,
+          6766592,
+          6766592,
+          6799360,
+          6782976,
+          6766592
+        ],
+        [
+          6733824,
+          6733824,
+          6750208,
+          6750208,
+          6750208,
+          6750208,
+          6750208
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_closure_capture.js",
+      "seconds": [
+        [
+          0.05249100000219187,
+          0.052681583001685794,
+          0.052736792000359856,
+          0.05238820900558494,
+          0.053028834001452196,
+          0.05257504199835239,
+          0.052143167005851865
+        ],
+        [
+          0.05119783300324343,
+          0.052739958999154624,
+          0.052368332995683886,
+          0.05182495899498463,
+          0.05269362500257557,
+          0.05191654100053711,
+          0.05250462500407593
+        ]
+      ],
+      "median": [
+        0.05257504199835239,
+        0.052368332995683886
+      ],
+      "change_percent": -0.3931694484903714,
+      "rss": [
+        [
+          4653056,
+          4653056,
+          4653056,
+          4653056,
+          4636672,
+          4653056,
+          4669440
+        ],
+        [
+          4620288,
+          4603904,
+          4603904,
+          4620288,
+          4603904,
+          4636672,
+          4620288
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_destructuring.js",
+      "seconds": [
+        [
+          0.11166475000209175,
+          0.111316499998793,
+          0.1108633329931763,
+          0.11074529199686367,
+          0.11192404200119199,
+          0.11253704199771164,
+          0.11094037500151899
+        ],
+        [
+          0.11085220799577655,
+          0.1109246659980272,
+          0.11128458299936028,
+          0.11087454100197647,
+          0.11078116700082319,
+          0.10949837500083959,
+          0.11128966700198362
+        ]
+      ],
+      "median": [
+        0.111316499998793,
+        0.11087454100197647
+      ],
+      "change_percent": -0.39702918868391723,
+      "rss": [
+        [
+          9207808,
+          9207808,
+          9207808,
+          9224192,
+          9224192,
+          9224192,
+          9207808
+        ],
+        [
+          9142272,
+          9175040,
+          9142272,
+          9142272,
+          9125888,
+          9158656,
+          9158656
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_forof.js",
+      "seconds": [
+        [
+          0.05525545800628606,
+          0.05422950000502169,
+          0.05454162499518134,
+          0.05453854200459318,
+          0.054696624996722676,
+          0.054845082995598204,
+          0.05452391599828843
+        ],
+        [
+          0.053972209003404714,
+          0.05414229199959664,
+          0.05425149999791756,
+          0.05360412499430822,
+          0.053906665998511016,
+          0.05377308300376171,
+          0.05390920899662888
+        ]
+      ],
+      "median": [
+        0.05454162499518134,
+        0.05390920899662888
+      ],
+      "change_percent": -1.159510738098346,
+      "rss": [
+        [
+          22446080,
+          22446080,
+          22462464,
+          22462464,
+          22446080,
+          22462464,
+          22413312
+        ],
+        [
+          22380544,
+          22380544,
+          22413312,
+          22413312,
+          22413312,
+          22380544,
+          22413312
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_let_loop.js",
+      "seconds": [
+        [
+          0.07411141700140433,
+          0.07238629199855495,
+          0.07206987500103423,
+          0.07383275000029244,
+          0.07123449999926379,
+          0.07492945799458539,
+          0.07367295800213469
+        ],
+        [
+          0.06976791699707974,
+          0.07287487500434509,
+          0.07010574999731034,
+          0.07212191599683138,
+          0.07047970900021028,
+          0.07121945800463436,
+          0.07234666699514491
+        ]
+      ],
+      "median": [
+        0.07367295800213469,
+        0.07121945800463436
+      ],
+      "change_percent": -3.3302585698123277,
+      "rss": [
+        [
+          71270400,
+          71286784,
+          71270400,
+          71286784,
+          71303168,
+          71286784,
+          71286784
+        ],
+        [
+          71237632,
+          71237632,
+          71237632,
+          71254016,
+          71254016,
+          71221248,
+          71221248
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_promise.js",
+      "seconds": [
+        [
+          0.1572351670038188,
+          0.1569597080015228,
+          0.1574553750033374,
+          0.15590133299701847,
+          0.15755566699954215,
+          0.15555324999877485,
+          0.1573897920025047
+        ],
+        [
+          0.15450579099706374,
+          0.15711454199481523,
+          0.1554867090017069,
+          0.15792770800180733,
+          0.1565872500068508,
+          0.15522162499837577,
+          0.15692950000084238
+        ]
+      ],
+      "median": [
+        0.1572351670038188,
+        0.1565872500068508
+      ],
+      "change_percent": -0.41206875619131944,
+      "rss": [
+        [
+          189431808,
+          189382656,
+          189431808,
+          189431808,
+          189431808,
+          189382656,
+          189431808
+        ],
+        [
+          189366272,
+          189333504,
+          189366272,
+          189366272,
+          189333504,
+          189366272,
+          189366272
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_spread_rest.js",
+      "seconds": [
+        [
+          0.03363004199491115,
+          0.03355454200209351,
+          0.03479404099925887,
+          0.034104292004485615,
+          0.03365866600506706,
+          0.034197208005934954,
+          0.033605332995648496
+        ],
+        [
+          0.034104792001016904,
+          0.03667416700045578,
+          0.03443533399695298,
+          0.03423941700020805,
+          0.03408970900636632,
+          0.03413016699778382,
+          0.034111708002456
+        ]
+      ],
+      "median": [
+        0.03365866600506706,
+        0.03413016699778382
+      ],
+      "change_percent": 1.4008308964050364,
+      "rss": [
+        [
+          4816896,
+          4833280,
+          4816896,
+          4833280,
+          4816896,
+          4816896,
+          4833280
+        ],
+        [
+          4767744,
+          4751360,
+          4751360,
+          4784128,
+          4767744,
+          4767744,
+          4751360
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_template_literal.js",
+      "seconds": [
+        [
+          0.07353720799437724,
+          0.0725577080011135,
+          0.07534204099647468,
+          0.07379225000477163,
+          0.0742849579983158,
+          0.07267283400142333,
+          0.07417945800261805
+        ],
+        [
+          0.07341120799537748,
+          0.0728363750022254,
+          0.07435933299711905,
+          0.07341900000028545,
+          0.07247300000017276,
+          0.07325937499990687,
+          0.07406266700127162
+        ]
+      ],
+      "median": [
+        0.07379225000477163,
+        0.07341120799537748
+      ],
+      "change_percent": -0.5163713118511937,
+      "rss": [
+        [
+          4653056,
+          4669440,
+          4653056,
+          4653056,
+          4653056,
+          4653056,
+          4653056
+        ],
+        [
+          4620288,
+          4636672,
+          4636672,
+          4620288,
+          4636672,
+          4620288,
+          4636672
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    }
+  ],
+  "targeted_21_pairs": [
+    {
+      "file": "benchmarks/bench_memory_heavy.js",
+      "seconds": [
+        [
+          0.038290292002784554,
+          0.03875245800008997,
+          0.03871466699638404,
+          0.03832350000448059,
+          0.03833183299866505,
+          0.038589415999013,
+          0.03821925000374904,
+          0.03826370900060283,
+          0.03888204200484324,
+          0.03857837500254391,
+          0.0389132080017589,
+          0.03858054200100014,
+          0.038928791000216734,
+          0.03876658299850533,
+          0.03834958399966126,
+          0.03880620899872156,
+          0.03857962500478607,
+          0.03849433399591362,
+          0.03858316700643627,
+          0.03858004200446885,
+          0.038787042001786176
+        ],
+        [
+          0.03898574999766424,
+          0.03913362499588402,
+          0.038320832994941156,
+          0.03852550000010524,
+          0.03888133299915353,
+          0.03829341700475197,
+          0.0386778329993831,
+          0.038533042003109585,
+          0.03834320800524438,
+          0.03870779200224206,
+          0.03839995900489157,
+          0.03890112500084797,
+          0.03837079199729487,
+          0.038331417003064416,
+          0.03851170800044201,
+          0.03841416700015543,
+          0.039129790995502844,
+          0.03852516700135311,
+          0.03872433299693512,
+          0.038550333003513515,
+          0.03854762500122888
+        ]
+      ],
+      "median": [
+        0.03858054200100014,
+        0.038533042003109585
+      ],
+      "change_percent": -0.12311905283581837,
+      "rss": [
+        [
+          34242560,
+          34209792,
+          34193408,
+          34242560,
+          34242560,
+          34226176,
+          34209792,
+          34242560,
+          34209792,
+          34242560,
+          34226176,
+          34242560,
+          34242560,
+          34226176,
+          34226176,
+          34193408,
+          34242560,
+          34226176,
+          34242560,
+          34209792,
+          34242560
+        ],
+        [
+          34177024,
+          34209792,
+          34177024,
+          34209792,
+          34177024,
+          34193408,
+          34160640,
+          34209792,
+          34209792,
+          34160640,
+          34193408,
+          34177024,
+          34209792,
+          34209792,
+          34177024,
+          34177024,
+          34193408,
+          34209792,
+          34193408,
+          34177024,
+          34209792
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    },
+    {
+      "file": "benchmarks/es6/bench_template_literal.js",
+      "seconds": [
+        [
+          0.07369512500008568,
+          0.074349374997837,
+          0.07310983399656834,
+          0.07456033400376327,
+          0.07302445800451096,
+          0.073691334000614,
+          0.07352483299473533,
+          0.07521574999555014,
+          0.07215754200296942,
+          0.0746929579981952,
+          0.07298283300042385,
+          0.07671141699393047,
+          0.07398912500502774,
+          0.07295337499817833,
+          0.07368020799913211,
+          0.07355275000008987,
+          0.07212662500387523,
+          0.07409399999596644,
+          0.07251304099918343,
+          0.07380087499768706,
+          0.0739136670017615
+        ],
+        [
+          0.07135987499350449,
+          0.07257133399980376,
+          0.07326720800483599,
+          0.07239124999614432,
+          0.07270483399770455,
+          0.07187004199658986,
+          0.07364225000492297,
+          0.07314729100471595,
+          0.07283066699892515,
+          0.07212716600042768,
+          0.07350429099460598,
+          0.07232366700191051,
+          0.07278062499972293,
+          0.07174966599995969,
+          0.0719131669975468,
+          0.07202370799495839,
+          0.07206841700099176,
+          0.07302633400104241,
+          0.07244554199860431,
+          0.07774654199602082,
+          0.0727188329983619
+        ]
+      ],
+      "median": [
+        0.073691334000614,
+        0.07257133399980376
+      ],
+      "change_percent": -1.5198530682059785,
+      "rss": [
+        [
+          4653056,
+          4653056,
+          4685824,
+          4653056,
+          4653056,
+          4669440,
+          4653056,
+          4653056,
+          4685824,
+          4685824,
+          4653056,
+          4669440,
+          4653056,
+          4685824,
+          4653056,
+          4669440,
+          4653056,
+          4653056,
+          4669440,
+          4653056,
+          4653056
+        ],
+        [
+          4636672,
+          4636672,
+          4620288,
+          4620288,
+          4620288,
+          4653056,
+          4620288,
+          4620288,
+          4620288,
+          4636672,
+          4636672,
+          4636672,
+          4620288,
+          4653056,
+          4636672,
+          4620288,
+          4636672,
+          4636672,
+          4620288,
+          4620288,
+          4636672
+        ]
+      ],
+      "outputs": [
+        [
+          ""
+        ],
+        [
+          ""
+        ]
+      ],
+      "scene_total_ms": [
+        [],
+        []
+      ],
+      "scene_worst_frame_ms": [
+        [],
+        []
+      ]
+    }
+  ],
+  "bisect": {
+    "properties_only_48914407": [
+      {
+        "file": "benchmarks/bench_memory_heavy.js",
+        "seconds": [
+          [
+            0.03851554200082319,
+            0.03840333300468046,
+            0.038520708003488835,
+            0.03856516600353643,
+            0.03902258300513495,
+            0.03843920800136402,
+            0.038491416999022476,
+            0.03821445900393883,
+            0.03879583299567457,
+            0.03874641599395545,
+            0.03861004200007301
+          ],
+          [
+            0.03832524999597808,
+            0.03822325000510318,
+            0.03841649999958463,
+            0.03822641699662199,
+            0.03889670799981104,
+            0.03846175000217045,
+            0.03851145900262054,
+            0.03916466599912383,
+            0.03843083399988245,
+            0.03875654200237477,
+            0.038595291996898595
+          ]
+        ],
+        "median": [
+          0.038520708003488835,
+          0.03846175000217045
+        ],
+        "change_percent": -0.15305534185158232,
+        "rss": [
+          [
+            34193408,
+            34226176,
+            34242560,
+            34242560,
+            34242560,
+            34193408,
+            34193408,
+            34209792,
+            34242560,
+            34242560,
+            34242560
+          ],
+          [
+            34209792,
+            34177024,
+            34209792,
+            34209792,
+            34177024,
+            34209792,
+            34209792,
+            34209792,
+            34209792,
+            34177024,
+            34209792
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      },
+      {
+        "file": "benchmarks/es6/bench_template_literal.js",
+        "seconds": [
+          [
+            0.07291770799929509,
+            0.07328929199866252,
+            0.07350116700399667,
+            0.07200870799715631,
+            0.07403916700422997,
+            0.07468408300337614,
+            0.07299845899979118,
+            0.07266700000036508,
+            0.07250070799636887,
+            0.0738826250017155,
+            0.07249737499660114
+          ],
+          [
+            0.09855537499970524,
+            0.10086450000380864,
+            0.09772037500079023,
+            0.09867370899883099,
+            0.09858450000319863,
+            0.0960696249967441,
+            0.0999085000003106,
+            0.10003779200633289,
+            0.09793291700043483,
+            0.09707512499880977,
+            0.09883895899838535
+          ]
+        ],
+        "median": [
+          0.07299845899979118,
+          0.09858450000319863
+        ],
+        "change_percent": 35.05011113108654,
+        "rss": [
+          [
+            4669440,
+            4669440,
+            4669440,
+            4653056,
+            4685824,
+            4685824,
+            4669440,
+            4653056,
+            4653056,
+            4669440,
+            4653056
+          ],
+          [
+            4669440,
+            4685824,
+            4685824,
+            4669440,
+            4669440,
+            4653056,
+            4669440,
+            4685824,
+            4669440,
+            4685824,
+            4669440
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      }
+    ],
+    "method_fusion_d1465414": [
+      {
+        "file": "benchmarks/bench_memory_heavy.js",
+        "seconds": [
+          [
+            0.039090332997147925,
+            0.03924849999748403,
+            0.039008334002573974,
+            0.038663833001919556,
+            0.03891374999511754,
+            0.03861550000146963,
+            0.03880270799709251,
+            0.0383265409982414,
+            0.03864666599838529,
+            0.038596040998527315,
+            0.03892116600036388,
+            0.03852283400192391,
+            0.038929582995478995,
+            0.038534334002179094,
+            0.03861920799681684
+          ],
+          [
+            0.04351958299957914,
+            0.04311574999883305,
+            0.042891500001132954,
+            0.04241991700109793,
+            0.042223791002470534,
+            0.042179999996733386,
+            0.04275641599815572,
+            0.04249312500178348,
+            0.04434233299980406,
+            0.04354520799824968,
+            0.04231058400182519,
+            0.042406583997944836,
+            0.04260904200054938,
+            0.042606791997968685,
+            0.04249908299971139
+          ]
+        ],
+        "median": [
+          0.038663833001919556,
+          0.042606791997968685
+        ],
+        "change_percent": 10.198055107090308,
+        "rss": [
+          [
+            34226176,
+            34209792,
+            34242560,
+            34242560,
+            34226176,
+            34193408,
+            34242560,
+            34242560,
+            34209792,
+            34193408,
+            34209792,
+            34209792,
+            34209792,
+            34242560,
+            34242560
+          ],
+          [
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408,
+            34193408
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      }
+    ]
+  },
+  "discarded_experiments": {
+    "object_method_shortcut": [
+      {
+        "file": "benchmarks/bench_memory_heavy.js",
+        "seconds": [
+          [
+            0.03997979199630208,
+            0.03949433399975533,
+            0.039621916999749374,
+            0.038815624997369014,
+            0.03876287499588216,
+            0.038816082997072954,
+            0.03903166699456051,
+            0.03890125000179978,
+            0.03925258399976883,
+            0.03892820799956098,
+            0.03896220799651928,
+            0.03874620800343109,
+            0.03912891600339208,
+            0.03965037500165636,
+            0.03941054199822247,
+            0.03917324999929406,
+            0.03904820900061168,
+            0.03861995800252771,
+            0.039057292000507005,
+            0.03940537499875063,
+            0.0394354590025614
+          ],
+          [
+            0.04356437500246102,
+            0.04382791699754307,
+            0.043198667000979185,
+            0.04280649999418529,
+            0.04242816599435173,
+            0.04290183400007663,
+            0.042653249998693354,
+            0.042581499998050276,
+            0.04471687499608379,
+            0.043577666998317,
+            0.0425285419987631,
+            0.04291141699650325,
+            0.04312920899974415,
+            0.0424476659973152,
+            0.04299745800381061,
+            0.04272099999798229,
+            0.04322070800117217,
+            0.04322183300246252,
+            0.04292633300065063,
+            0.04364154100039741,
+            0.04280041600577533
+          ]
+        ],
+        "median": [
+          0.039057292000507005,
+          0.04292633300065063
+        ],
+        "change_percent": 9.906065684465283,
+        "rss": [
+          [
+            34242560,
+            34193408,
+            34242560,
+            34193408,
+            34193408,
+            34209792,
+            34242560,
+            34193408,
+            34242560,
+            34209792,
+            34242560,
+            34242560,
+            34242560,
+            34242560,
+            34242560,
+            34226176,
+            34242560,
+            34226176,
+            34226176,
+            34242560,
+            34242560
+          ],
+          [
+            34144256,
+            34209792,
+            34177024,
+            34160640,
+            34177024,
+            34209792,
+            34160640,
+            34209792,
+            34209792,
+            34177024,
+            34177024,
+            34177024,
+            34193408,
+            34209792,
+            34209792,
+            34160640,
+            34160640,
+            34160640,
+            34209792,
+            34209792,
+            34193408
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      }
+    ],
+    "method_quickening": [
+      {
+        "file": "benchmarks/bench_memory_heavy.js",
+        "seconds": [
+          [
+            0.03892141599499155,
+            0.03833166699769208,
+            0.03789762499945937,
+            0.038433124995208345,
+            0.03835729200363858,
+            0.03821779200370656,
+            0.03821970800345298,
+            0.038394290997530334,
+            0.038310833006107714,
+            0.03828645800240338,
+            0.03846562500257278,
+            0.03876608400605619,
+            0.03822779100300977,
+            0.038492958003189415,
+            0.03824604200053727,
+            0.03855887499958044,
+            0.03847133299859706,
+            0.038178499999048654,
+            0.038318667000567075,
+            0.03862291599944001,
+            0.03845824999734759
+          ],
+          [
+            0.042675791002693586,
+            0.04226962499524234,
+            0.04219712499616435,
+            0.04136299999663606,
+            0.0418961670002318,
+            0.04203645799861988,
+            0.042107041997951455,
+            0.042443165999429766,
+            0.042988166998839006,
+            0.0419980000006035,
+            0.04188883299502777,
+            0.04186229199694935,
+            0.04193712499545654,
+            0.04221083399897907,
+            0.04196408400457585,
+            0.04174524999689311,
+            0.04204774999379879,
+            0.04215874999499647,
+            0.042205749996355735,
+            0.04246537500148406,
+            0.04220870800054399
+          ]
+        ],
+        "median": [
+          0.03835729200363858,
+          0.042107041997951455
+        ],
+        "change_percent": 9.775846516894827,
+        "rss": [
+          [
+            34242560,
+            34209792,
+            34242560,
+            34242560,
+            34209792,
+            34193408,
+            34242560,
+            34193408,
+            34226176,
+            34242560,
+            34209792,
+            34226176,
+            34209792,
+            34209792,
+            34209792,
+            34193408,
+            34242560,
+            34226176,
+            34226176,
+            34209792,
+            34242560
+          ],
+          [
+            34095104,
+            34095104,
+            34095104,
+            34078720,
+            34160640,
+            34095104,
+            34095104,
+            34144256,
+            34095104,
+            34078720,
+            34095104,
+            34095104,
+            34095104,
+            34078720,
+            34095104,
+            34095104,
+            34078720,
+            34095104,
+            34078720,
+            34095104,
+            34078720
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      },
+      {
+        "file": "benchmarks/es6/bench_template_literal.js",
+        "seconds": [
+          [
+            0.07285995799611555,
+            0.07316612500289921,
+            0.07381391600210918,
+            0.0737257500004489,
+            0.07223112500651041,
+            0.072676625000895,
+            0.07387720900442218,
+            0.07344283300335519,
+            0.07516504199884366,
+            0.07373112499772105,
+            0.07322854200174334,
+            0.07302358299784828,
+            0.07367679100570967,
+            0.07331579200399574,
+            0.07428279099985957,
+            0.07431795899901772,
+            0.07373891599854687,
+            0.07354037500044797,
+            0.07321850000153063,
+            0.07337666599778458,
+            0.0754212500032736
+          ],
+          [
+            0.07376166700123576,
+            0.0739581670059124,
+            0.07225691699568415,
+            0.07326008399832062,
+            0.0715027080004802,
+            0.07356691700260853,
+            0.07412879099865677,
+            0.07427450000250246,
+            0.0738382499985164,
+            0.07197091700072633,
+            0.07269287500093924,
+            0.07306283299840288,
+            0.07367716699809534,
+            0.07341341700521298,
+            0.07525816600536928,
+            0.07307858300191583,
+            0.07213541700184578,
+            0.07316079099837225,
+            0.07362004100286867,
+            0.07162579200667096,
+            0.0732503330000327
+          ]
+        ],
+        "median": [
+          0.07354037500044797,
+          0.07326008399832062
+        ],
+        "change_percent": -0.3811389350756422,
+        "rss": [
+          [
+            4669440,
+            4669440,
+            4669440,
+            4669440,
+            4685824,
+            4653056,
+            4669440,
+            4669440,
+            4669440,
+            4653056,
+            4669440,
+            4653056,
+            4653056,
+            4669440,
+            4653056,
+            4653056,
+            4669440,
+            4653056,
+            4653056,
+            4685824,
+            4653056
+          ],
+          [
+            4587520,
+            4587520,
+            4587520,
+            4603904,
+            4603904,
+            4603904,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520,
+            4587520
+          ]
+        ],
+        "outputs": [
+          [
+            ""
+          ],
+          [
+            ""
+          ]
+        ],
+        "scene_total_ms": [
+          [],
+          []
+        ],
+        "scene_worst_frame_ms": [
+          [],
+          []
+        ]
+      }
+    ]
+  }
+}

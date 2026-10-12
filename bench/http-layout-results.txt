@@ -1,0 +1,28 @@
+Native Request/Response fast-path experiment
+
+Runtime baseline 4255e0c; engine 229e7b7a on both sides; matching O3 threaded builds. Candidate reverted under the requirement for general runtime gains. The final candidate reused two validated Request layouts and four guarded Response field layouts; it kept original metadata capture and spare body-request capacity.
+
+Four alternating-order pairs per workload, fresh servers, 1s warm-up +3s measured, wrk -t2 -c128. Median per-run results. Latency and memory cells show baseline / candidate. Zero HTTP or socket errors.
+
+| Workload | Baseline req/s | Candidate req/s | Change | p50 ms | p99 ms | Peak RSS MiB |
+|---|---:|---:|---:|---:|---:|---:|
+| hello | 218,918 | 223,030 | +1.9% | 0.56 / 0.55 | 1.08 / 1.06 | 10.92 / 11.09 |
+| json | 181,682 | 182,670 | +0.5% | 0.68 / 0.68 | 1.17 / 1.18 | 11.41 / 11.44 |
+| async | 144,635 | 145,221 | +0.4% | 0.75 / 0.75 | 1.69 / 1.68 | 11.88 / 11.94 |
+| timer | 113,533 | 113,839 | +0.3% | 1.08 / 1.07 | 1.43 / 1.42 | 11.82 / 11.90 |
+| echo | 143,786 | 146,121 | +1.6% | 0.83 / 0.82 | 1.42 / 1.40 | 12.65 / 12.86 |
+| stream | 68,481 | 68,545 | +0.1% | 1.73 / 1.73 | 2.27 / 2.27 | 11.39 / 11.58 |
+| file | 93,677 | 93,768 | +0.1% | 1.19 / 1.19 | 2.74 / 2.76 | 12.48 / 12.49 |
+
+Changing URL queries and request headers on every request: 187,714 -> 189,459 req/s (+0.9%), four alternating pairs. This remains too small to claim a broad improvement.
+
+Discarded subexperiment: exact metadata reuse helped repeated requests but slowed changing-input requests by 1.2%; it was removed before final confirmation. The initial layout candidate also reduced body-request capacity from 8 to 5 slots, causing extra growth on body consumption and a 2.1% echo slowdown. Matching baseline capacity removed that slowdown.
+
+Validation:
+- Normal release HTTP suite and baseline-matched request/response mutation tests passed.
+- Normal ASAN HTTP suite and mutation tests passed (leak detection disabled).
+- Targeted mutation tests also passed with GC_STRESS, GC_VERIFY and POOL_BYPASS.
+- Release retention stress: 5.9 MiB RSS growth over 1000 repeated stream/promise responses.
+- Full forced-GC streaming retention stress aborts with GC_VERIFY incremental reachability mismatch on BOTH unchanged baseline and candidate; this is a pre-existing unresolved issue. Reproduce with c3c build bkr-perf-asan -D GC_STRESS -D GC_VERIFY -D POOL_BYPASS, then BKR_BIN="$PWD/out/bkr-perf-asan" BKR_HTTP_STRESS=1 ASAN_OPTIONS=detect_leaks=0 python3 tests/run_http.py.
+
+Candidate source: bench/http-layout-candidate.patch. Raw final samples and binary hashes: bench/http-layout-final.json and bench/http-layout-final-changing.json. Earlier screens: bench/http-layout-screen.json, bench/http-metadata-screen.json and bench/http-metadata-changing.json.

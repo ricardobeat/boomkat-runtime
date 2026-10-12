@@ -1,0 +1,207 @@
+diff --git a/runtime/http.c3 b/runtime/http.c3
+--- a/runtime/http.c3
++++ b/runtime/http.c3
+@@ -266,6 +266,9 @@
+ // fastTypes(Request.prototype, Response.prototype, ctText, ctJson)
+ fn void js_fast_types(JsCtx ctx, void* udata) {
+     if (!ctx.arg(0).tv.is_object() || !ctx.arg(1).tv.is_object()) return;
++    g_response_layouts = {};
++    g_response_layout_next = 0;
++    g_request_layouts = {};
+     g_fast.request_proto = (HObject*)ctx.arg(0).tv.get_heapptr();
+     g_fast.response_proto = (HObject*)ctx.arg(1).tv.get_heapptr();
+     g_fast.ct_text = ctx.arg(2).tv;
+@@ -296,27 +299,18 @@
+ 
+ fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
+     Heap* h      = g_rt.rt.heap;
+-    HObject* req = h.alloc_object(OBJECT)!;
+-    h.set_prototype(req, g_fast.request_proto);
+-    TVal m;
+-    g_rt.load(method, &m);
+-    TVal id;
+-    id.set_number((double)c.id);
+-    req.put_prop(g_fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
+-    req.put_prop(g_fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
++    TVal[5] values;
++    g_rt.load(method, &values[0]);
++    values[1].set_number((double)c.id);
+     // Metadata belongs to the Request even when the response has ended.
+     JsValue url  = g_rt.string(c.url_now())!;
+     JsValue blob = g_rt.string(c.blob_now())!;
+-    TVal metadata;
+-    g_rt.load(url, &metadata);
+-    req.put_prop(g_fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
+-    g_rt.load(blob, &metadata);
+-    req.put_prop(g_fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
++    g_rt.load(url, &values[2]);
++    g_rt.load(blob, &values[3]);
+     if (has_body) {
+-        TVal b;
+-        b.set_object(new_u8(copy_bytes(body))!);
+-        req.put_prop(g_fast.k_body, b, hobject::PROP_FLAGS_WEC, h);
+-    }
++        values[4].set_object(new_u8(copy_bytes(body))!);
++    }
++    HObject* req = request_object(h, &values[0], has_body)!;
+     TVal rv;
+     rv.set_object(req);
+     return g_rt.root(rv);
+@@ -334,12 +328,24 @@
+     if (!g_rt.load(result, &rv) || !rv.is_object()) return false;
+     HObject* o = (HObject*)rv.get_heapptr();
+     if (o.prototype != g_fast.response_proto) return false;
+-    if (!fast_get(o, g_fast.k_headers).is_null()) return false;
+-    TVal used = fast_get(o, g_fast.k_used);
++    TVal[5] values;
++    bool cached = response_values(o, &values[0]);
++    if (!cached) {
++        values[0] = fast_get(o, g_fast.k_headers);
++        // Preserve short-circuit lookup order for unusual layouts.
++        if (!values[0].is_null()) return false;
++        values[1] = fast_get(o, g_fast.k_used);
++        if (!values[1].is_boolean() || values[1].get_boolean()) return false;
++        values[2] = fast_get(o, g_fast.k_status);
++        if (!values[2].is_fastint() || values[2].get_fastint() != 200) return false;
++        values[3] = fast_get(o, g_fast.k_ct);
++    }
++    if (!values[0].is_null()) return false;
++    TVal used = values[1];
+     if (!used.is_boolean() || used.get_boolean()) return false;
+-    TVal status = fast_get(o, g_fast.k_status);
++    TVal status = values[2];
+     if (!status.is_fastint() || status.get_fastint() != 200) return false;
+-    TVal ct = fast_get(o, g_fast.k_ct);
++    TVal ct = values[3];
+     String blob;
+     if (ct.is_null()) {
+         blob = "";
+@@ -350,7 +356,7 @@
+     } else {
+         return false;
+     }
+-    TVal b     = fast_get(o, g_fast.k_body);
++    TVal b     = cached ? values[4] : fast_get(o, g_fast.k_body);
+     JsArg body = { .tv = b };
+     bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_fast.file_proto;
+     if (!b.is_null() && !b.is_string() && !body.is_bytes() && !file) return false;
+diff --git a/runtime/http_layout.c3 b/runtime/http_layout.c3
+new file mode 100644
+--- /dev/null
++++ b/runtime/http_layout.c3
+@@ -0,0 +1,115 @@
++module bkr;
++
++import boomkat::heap;
++import boomkat::hobject;
++import boomkat::hstring;
++import boomkat::types;
++
++struct ResponseLayout {
++    bool valid;
++    uint epoch;
++    uint shape;
++    uint proto_shape;
++    uint shape_generation;
++    uint proto_generation;
++    uint[5] indices;
++    bool[5] inherited;
++}
++
++ResponseLayout[4] g_response_layouts;
++uint g_response_layout_next;
++
++// Values and backing storage remain live; only immutable layout information
++// is cached. The recycle epoch protects both shape identities.
++fn bool response_values(HObject* response, TVal* values) {
++    heap::Heap* h  = g_rt.rt.heap;
++    HObject* proto = g_fast.response_proto;
++    if (response.get_class() != OBJECT || response.flags.exotic_proxyobj || proto.flags.exotic_proxyobj
++        || response.in_dict_mode(
++        h
++    ) || proto.in_dict_mode(h)) return false;
++    uint generation        = response.shape_generation(h);
++    uint proto_generation  = proto.shape_generation(h);
++    ResponseLayout* layout = null;
++    foreach (&entry : g_response_layouts) {
++        if (entry.valid && entry.epoch == h.shape_recycle_epoch && entry.shape == response.shape_id
++            && entry.proto_shape == proto.shape_id
++            && entry.shape_generation == generation
++            && entry.proto_generation == proto_generation) {
++            layout = entry;
++            break;
++        }
++    }
++    if (layout == null) {
++        ResponseLayout next;
++        HString*[5] keys = { g_fast.k_headers, g_fast.k_used, g_fast.k_status, g_fast.k_ct, g_fast.k_body };
++        foreach (i, key : keys) {
++            HObject* owner = response;
++            int index      = owner.find_prop_idx(key, h);
++            if (index < 0) {
++                owner = proto;
++                index = owner.find_prop_idx(key, h);
++                next.inherited[i] = true;
++            }
++            if (index < 0 || owner.get_prop_flags((uint)index, h).is_accessor) return false;
++            next.indices[i] = (uint)index;
++        }
++        next.valid = true;
++        next.epoch = h.shape_recycle_epoch;
++        next.shape = response.shape_id;
++        next.proto_shape = proto.shape_id;
++        next.shape_generation = generation;
++        next.proto_generation = proto_generation;
++        layout = &g_response_layouts[g_response_layout_next++ % g_response_layouts.len];
++        *layout = next;
++    }
++    PropValue* own       = response.prop_values();
++    PropValue* inherited = proto.prop_values();
++    for (uint i = 0; i < 5; i++) {
++        values[i] = (layout.inherited[i] ? inherited : own)[layout.indices[i]].get();
++    }
++    return true;
++}
++
++struct RequestLayout {
++    bool valid;
++    uint epoch;
++    uint shape;
++}
++
++RequestLayout[2] g_request_layouts;
++
++// A fresh request defines these own data properties in a fixed order. The
++// first request establishes the layout; later requests initialize its slots
++// through the engine's ownership and publication barriers.
++fn HObject*? request_object(heap::Heap* h, TVal* values, bool body) {
++    RequestLayout* layout = &g_request_layouts[body ? 1 : 0];
++    uint count            = body ? 5 : 4;
++    HObject* request;
++    if (layout.valid && layout.epoch == h.shape_recycle_epoch) {
++        request = h.alloc_object(OBJECT)!;
++        // Body consumption adds _used and can materialize _headers. Match
++        // ordinary property growth so those writes do not immediately grow.
++        if (body) {
++            request.prop_alloc = h.pool_alloc(8 * PropValue::size)!;
++            request.prop_capacity = 8;
++        }
++        h.init_object_shape(request, layout.shape)!;
++        h.set_prototype(request, g_fast.request_proto);
++        for (uint i = 0; i < count; i++) {
++            h.store_slot_ref(request, &request.prop_values()[i], &values[i]);
++        }
++    } else {
++        request = h.alloc_object(OBJECT)!;
++        h.set_prototype(request, g_fast.request_proto);
++        HString*[5] keys = { g_fast.k_method, g_fast.k_id, g_fast.k_url, g_fast.k_header_blob, g_fast.k_body };
++        for (uint i = 0; i < count; i++) {
++            if (!request.put_prop(keys[i], values[i], hobject::PROP_FLAGS_WEC, h)) return heap::HEAP_ALLOC_FAULT~;
++        }
++        if (!request.in_dict_mode(h)) {
++            request.get_shape(h).shared = true;
++            *layout = { true, h.shape_recycle_epoch, request.shape_id };
++        }
++    }
++    return request;
++}
