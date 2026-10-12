@@ -308,6 +308,7 @@ fn void? boot() {
     install_natives(FS_NATIVES)!;
     install_natives(PROC_NATIVES)!;
     install_natives(TIMER_NATIVES)!;
+    install_natives(IMMEDIATE_NATIVES)!;
     g_rt.exec(PRELUDE, "<prelude>")!;
     g_rt.exec(FETCH, "<fetch>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
@@ -322,6 +323,7 @@ fn void? boot() {
     g_describe = bk_get("describe")!;
     init_guard();
     init_timers();
+    init_immediates();
     init_res();
     init_http()!;
 }
