@@ -1,0 +1,14 @@
+{
+  "baseline": [
+    "fetch",
+    "return",
+    "ReadableStreamDefaultController",
+    "Sink"
+  ],
+  "winner": [
+    "fetch",
+    "return",
+    "ReadableStreamDefaultController",
+    "Sink"
+  ]
+}

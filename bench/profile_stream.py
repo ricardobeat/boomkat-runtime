@@ -75,6 +75,7 @@ def sample_self(path):
 
 parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['sample','ablate','ops'])
 parser.add_argument('--prefix',default='stream-profile',help='Result filename prefix in bench/')
+parser.add_argument('--route',default='stream',help='Workload route for sample mode')
 args=parser.parse_args()
 if not re.fullmatch(r'[a-zA-Z0-9_-]+',args.prefix):parser.error('prefix must be a filename component')
 results={}
@@ -86,8 +87,8 @@ with tempfile.TemporaryDirectory(prefix='bkr-stream-profile-',dir='/private/tmp'
             with (temp/'server.log').open('w') as log:
                 p=start('bkr',ROOT/'bench/servers/bkr.js',log)
                 try:
-                    wrk('stream',1)
-                    w=subprocess.Popen(['wrk','-t2','-c128','-d5s',f'http://127.0.0.1:{PORT}/stream'],stdout=subprocess.DEVNULL)
+                    wrk(args.route,1)
+                    w=subprocess.Popen(['wrk','-t2','-c128','-d5s',f'http://127.0.0.1:{PORT}/{args.route}'],stdout=subprocess.DEVNULL)
                     time.sleep(.5)
                     path=f'/private/tmp/bkr-stream-current-{rep}.sample.txt'
                     subprocess.run(['sample',str(p.pid),'2','-file',path],capture_output=True,check=True)

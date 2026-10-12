@@ -1,0 +1,89 @@
+Runtime latency experiments
+
+Winners: fa4f80e native immediate queue; aa08bb2 direct stream dispatch.
+Baseline runtime: 27b20c5. All timed Boomkat builds use engine main 27ced8f5.
+Bun 1.3.13. O3, threaded dispatch. No engine changes.
+
+3 interleaved rounds, fresh server per cell, wrk -t2 -c128, 1s warmup +3s measured.
+No concurrent builds, profiling, or other benchmarks. All variants served 128 simultaneous valid hello responses.
+No HTTP/socket errors. RSS sampled every 100ms. Values below are medians.
+Established server scripts unchanged: Bun uses async fetch, Boomkat sync fetch with deferred results.
+Changing inputs vary query, Host and X-Test every request.
+
+Each combined cell lists baseline / winner / Bun. Memory is last.
+
+| Workload | Requests/s | Winner change | p50 ms | p99 ms | Peak RSS MiB |
+|---|---:|---:|---:|---:|---:|
+| hello | 240,079 / 242,384 / 222,963 | +1.0% | 0.516 / 0.512 / 0.560 | 0.990 / 0.990 / 0.890 | 11.34 / 11.00 / 43.77 |
+| json | 204,113 / 205,374 / 203,653 | +0.6% | 0.604 / 0.597 / 0.613 | 1.140 / 1.140 / 1.040 | 11.41 / 11.11 / 42.98 |
+| async | 159,378 / 170,114 / 183,123 | +6.7% | 0.675 / 0.634 / 0.625 | 1.550 / 1.480 / 1.330 | 11.84 / 11.59 / 53.89 |
+| timer | 115,289 / 115,250 / 114,650 | -0.0% | 1.060 / 1.060 / 1.100 | 1.410 / 1.410 / 1.430 | 11.73 / 11.42 / 57.17 |
+| echo | 151,523 / 152,075 / 166,547 | +0.4% | 0.789 / 0.786 / 0.748 | 1.380 / 1.370 / 1.190 | 12.69 / 12.42 / 48.44 |
+| stream | 70,397 / 75,731 / 109,655 | +7.6% | 1.680 / 1.570 / 1.150 | 2.220 / 2.090 / 1.500 | 11.50 / 11.12 / 74.59 |
+| file | 95,195 / 95,611 / 51,337 | +0.4% | 1.170 / 1.180 / 2.460 | 2.730 / 2.710 / 2.770 | 12.39 / 12.17 / 37.73 |
+| changing | 226,422 / 225,276 / 210,550 | -0.5% | 0.533 / 0.537 / 0.575 | 1.090 / 1.100 / 1.160 | 11.36 / 11.08 / 42.81 |
+
+CPU profiles: 3 independent 2s macOS sample captures per workload/build, nominal 1ms sampling, after warmup.
+Main-thread exclusive symbols; profiling separate from timings. Inlining and sampling noise limit attribution.
+These fractions are not absolute per-request cost or instruction counts.
+
+| Workload/build | VM symbols | find_prop_idx | sendto + recvfrom |
+|---|---:|---:|---:|
+| Async baseline | 13.5% | 3.9% | 43.5% |
+| Async winner | 10.7% | 2.9% | 46.7% |
+| Stream baseline | 36.0% | 3.3% | 25.5% |
+| Stream winner | 36.6% | 3.4% | 22.3% |
+
+Experiments and decisions:
+- Repull scheduling: discarded. Target stream gains were approximately zero. The default queue fills before
+  _repull is set, so avoiding a redundant task on other paths does not improve this workload.
+  Equal-size byte/1/8/64 chunk pairs: latency-pull-screen.json.
+- Native immediate queue: kept. Isolated 3-pair async screen: 158,922 ->169,327 req/s (+6.5%).
+  Registry handles and a linked queue remove JS callback records, rest arrays, map iteration pairs and apply dispatch.
+  One checkpoint per batch is retained. Nested callbacks wait for the next turn; cancellation reaches detached batches.
+  Builtin callbacks are supported. Root-allocation failures throw instead of scheduling a missing callback.
+- Guarded queueMicrotask: discarded. Removing the intermediate settled promise gained only 0.1-1.1% in minimal cases.
+  It retained the downstream promise, thenable adoption and rejection behavior, with mutation/species fallbacks.
+  Guard complexity was not justified. Raw pairs: latency-microtask-screen.json.
+- Direct native stream dispatch: kept. Isolated 3-pair screen: 70,012 ->76,107 req/s (+8.7%).
+  Ordinary responses enter the existing pump without handled/send and repeated response checks.
+  The guarded instanceof helper routes custom hasInstance/accessors through JS. Queueing, pull order, framing,
+  cancellation, errors and backpressure remain in the existing pump.
+
+The minimized one-byte, two-pull diagnostic reports the SAME sequence on both builds:
+  fetch -> return -> ReadableStreamDefaultController -> Sink
+The first pull still precedes the HTTP pump. The earlier inference that native fetch finished before the startup
+microtask was wrong for this workload. Source and trace: latency-order.js and latency-order.json.
+
+Async VM/lookup shares fall; stream VM share remains substantial after the dispatch gain.
+The profiles do not establish a GC latency improvement: these changes remove scheduling and wrapper work.
+
+Validation:
+- 63 native web differential cases and HTTP request/response layout mutations against the saved baseline.
+- Immediate tests: invalid callbacks, nested turns, promise ordering, pending/running batch cancellation,
+  callback arguments, invalid cancellation IDs, builtin callbacks.
+- New stream tests passed on both baseline and candidate: delayed promise response, Response subclass,
+  custom status/headers, and exactly one observable custom hasInstance getter invocation.
+- Existing HTTP lifecycle suite: HEAD, errors, start, delayed/empty pulls, slow clients, disconnects and backpressure.
+  Stream and timer API tests also passed.
+- Fresh ASAN build: immediate and HTTP lifecycle suites passed, leak detection disabled.
+  ASAN engine perf 632a6852 carries the same ownership patch as timed engine main 27ced8f5.
+- Release retention stress: 5.9 MiB RSS growth over 1000 repeated stream/promise responses, within 32 MiB bound.
+- git diff --check passed.
+
+Remaining gap:
+We lead Bun on hello/file median latency, with JSON/timer throughput near ties. Bun still has better hello/JSON tails
+and leads async, echo and stream. Async p50 is close; p99 remains behind.
+Stream is 75.7k vs Bun 109.7k: matching throughput requires about 45% more capacity, or 31% less service cost
+at equal CPU use. Another small property cache is unlikely to close that gap.
+The next experiment should isolate stream/controller construction and the normal first pull, then native pump
+bookkeeping, using byte/one-chunk/many-chunk controls and the same ordering trace. Preserve observable scheduling.
+
+Reproduce:
+Save the baseline binary from runtime 27b20c5 before building the winners. Build C3 targets sequentially.
+  cp out/bkr /private/tmp/bkr-latency-baseline
+  c3c build bkr
+  python3 bench/latency-ab.py --binary baseline=/private/tmp/bkr-latency-baseline --binary winner="$PWD/out/bkr" --bun --rounds 3 --report bench/latency-final.json
+Minimal stream cases: add --server bench/latency-cases.js --workloads bytes,one,stream,batch,many.
+CPU sampling: BKR_BIN=... python3 bench/profile_stream.py sample --route async --prefix ...
+Raw timings, complete wrk output, binary hashes, source fingerprints and client checks: latency-final.json.
