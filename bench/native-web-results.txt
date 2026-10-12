@@ -37,14 +37,14 @@ Validation:
 - Python syntax, C3 formatting and diff whitespace checks pass.
 
 Correctness fixes:
-- Object.defineProperty replacement of existing data slots acquires the new string reference and releases the old one, including mapped argument replacements. Native Response allocation timing exposed a use-after-free of a retained Request method string in the old implementation; optimized ASAN confirmed the string was reclaimed during sweeping. The fix is in boomkat-perf; engine main is untouched.
+- Object.defineProperty replacement of existing data slots acquires the new string reference and releases the old one, including mapped argument replacements. Native Response allocation timing exposed a use-after-free of a retained Request method string in the old implementation; optimized ASAN confirmed the string was reclaimed during sweeping. The fix is commit 632a6852 in boomkat-perf and is also cherry-picked onto engine main as 27ced8f5.
 - Shared URL fast parser checks the end of the input before reading a second dot.
 - Native installation validates arguments, rejects repeated installation and checks persistent key/root allocation.
 
 Limits:
 - Native paths handle the common supported cases; complex URLs, coercion, custom instance checks, prototype setters and complex Response options use JS initializers. This preserves current runtime behavior rather than extending web API conformance.
 - Full forced-GC streaming retention has a previously recorded baseline incremental reachability failure (see bench/http-layout-results.txt); this work does not claim to resolve that separate collector issue.
-- Native implementation and validation artifacts are retained in runtime. The engine ownership fix is commit 632a6852 in boomkat-perf. Existing test/report artifacts from earlier experiments are preserved.
+- Native implementation and validation artifacts are retained in runtime. The engine ownership fix is commit 632a6852 in boomkat-perf and 27ced8f5 on engine main. Existing test/report artifacts from earlier experiments are preserved.
 
 Final binary SHA256:
 - baseline: 3d51dc516afa68abdd9b3f258b3c3bce1277f1d7feb5abdcf5918d5d60d55195
