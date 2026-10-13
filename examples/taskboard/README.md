@@ -85,12 +85,10 @@ crypto and TypeScript transpiler. It uses the same SQL, prepared statements,
 authorization, request limits and WAL/FULL durability. The same vendored
 Preact sources render the browser UI.
 
-Passwords use the identical Argon2id profile, including a 16-byte salt, so
-either runtime can open the other's database. Bun's built-in password hasher
-fixes its salt at 32 bytes; the adapter instead uses OpenSSL 3.2+ through Bun
-FFI on at most two workers. On Apple Silicon it defaults to Homebrew's
-`/opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib`; set `TASKBOARD_LIBCRYPTO`
-to override the library path. Linux defaults to `libcrypto.so.3`.
+Both runtimes generate Argon2id hashes with the same profile and a 32-byte salt,
+and verify existing hashes with 16-byte salts. Bun uses its native asynchronous
+`Bun.password` API, with at most two password jobs in flight. No OpenSSL FFI
+password adapter is needed.
 
 Check parity and run the load test from the repository root:
 
@@ -135,7 +133,7 @@ compiled once at startup; there is no bundling or request-time compilation.
 The static route allowlist exposes browser modules without exposing server
 sources or database files.
 
-Passwords use C3 stdlib Argon2id, with a random 16-byte salt and a 32-byte
+Passwords use C3 stdlib Argon2id, with a random 32-byte salt and a 32-byte
 hash (`m=19456 KiB, t=2, p=1`), matching an
 [OWASP recommended profile](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
 Hashing runs on native workers, with at most two jobs in flight. The app

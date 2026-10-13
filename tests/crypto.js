@@ -19,6 +19,8 @@ for(const size of [-1,0.5,65537,NaN,Infinity,'2']){let threw=false;try{randomByt
 const pass='correct horse battery staple\0é😀';
 const encoded=await hashPassword(pass);
 assert(encoded.startsWith('$argon2id$v=19$m=19456,t=2,p=1$'),'Argon2id profile');
+assert(encoded.split('$')[4].length===43,'32-byte salt default');
+assert(await verifyPassword('legacy interoperability password','$argon2id$v=19$m=19456,t=2,p=1$hM9yHCmigUB10aHhBQUEoA$7XPUfhUnsZwki7aCYB5K39AOaKVAe3FeQYjOJqlBjms'),'legacy 16-byte salt');
 assert(await verifyPassword(pass,encoded),'round trip');
 assert(!await verifyPassword(pass+'x',encoded),'wrong password');
 for(const bad of ['',encoded.replace('19456','99999999'),encoded.slice(0,-1),encoded+'x','$argon2id$v=19$m=19456,t=2,p=1$'+'!'.repeat(66)])assert(!await verifyPassword(pass,bad),'invalid hash rejected');

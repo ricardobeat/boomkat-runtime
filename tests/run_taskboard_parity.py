@@ -18,6 +18,8 @@ def run(command):
     return result.stdout.strip()
 
 password = 'cross runtime password compatibility'
+legacy_password = 'legacy interoperability password'
+legacy_hash = '$argon2id$v=19$m=19456,t=2,p=1$hM9yHCmigUB10aHhBQUEoA$7XPUfhUnsZwki7aCYB5K39AOaKVAe3FeQYjOJqlBjms'
 platform = json.dumps(str(APP / 'bun/platform.ts'))
 with tempfile.TemporaryDirectory(prefix='taskboard-parity-') as directory:
     script = Path(directory) / 'password.js'
@@ -26,4 +28,5 @@ with tempfile.TemporaryDirectory(prefix='taskboard-parity-') as directory:
     bun_hash = run([BUN, '-e', f'import {{hashPassword,verifyPassword}} from {platform}; if (!await verifyPassword({json.dumps(password)},{json.dumps(bkr_hash)})) throw Error("BKR hash rejected"); console.log(await hashPassword({json.dumps(password)})); process.exit(0);'])
     script.write_text('import {verifyPassword} from "crypto"; if (!await verifyPassword(' + json.dumps(password) + ',' + json.dumps(bun_hash) + ')) throw Error("Bun hash rejected"); console.log("passed");')
     assert run([BKR, '--no-prompt', '--allow-read=' + directory, str(script)]) == 'passed'
+    assert run([BUN, '-e', f'import {{verifyPassword}} from {platform}; if (!await verifyPassword({json.dumps(legacy_password)},{json.dumps(legacy_hash)})) throw Error("Legacy hash rejected"); console.log("passed");']) == 'passed'
 print('Identical application logic and bidirectional Argon2id compatibility: passed')

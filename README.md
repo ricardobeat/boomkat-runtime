@@ -78,7 +78,8 @@ It includes full, pinned Preact sources and browser modules; no npm or build ste
 comparison for equal-length inputs; unequal lengths return false immediately.
 
 `await hashPassword(password)` returns a salted Argon2id PHC string using C3's
-stdlib (`m=19456 KiB, t=2, p=1`, 16-byte salt, 32-byte hash).
+stdlib (`m=19456 KiB, t=2, p=1`, 32-byte salt, 32-byte hash).
+Verification also accepts existing 16-byte salts.
 `await verifyPassword(password, encoded)` verifies that fixed profile and
 returns false for malformed hashes or other profiles. Passwords are bounded
 to 4096 UTF-8 bytes. Password hashing runs on worker threads with at most two

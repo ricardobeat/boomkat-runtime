@@ -35,8 +35,8 @@ export const timingSafeEqual = (a: Uint8Array, b: Uint8Array) =>
 	a.length === b.length && nativeEqual(a, b);
 
 const format =
-	/^\$argon2id\$v=19\$m=19456,t=2,p=1\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$/;
-const workers: { worker: Worker; busy: boolean }[] = [];
+	/^\$argon2id\$v=19\$m=19456,t=2,p=1\$(?:[A-Za-z0-9+/]{22}|[A-Za-z0-9+/]{43})\$[A-Za-z0-9+/]{43}$/;
+let passwordJobs = 0;
 async function passwordJob(
 	password: string,
 	encoded?: string,
@@ -46,33 +46,25 @@ async function passwordJob(
 	if (Buffer.byteLength(password) > 4096)
 		throw new RangeError("password exceeds 4096 UTF-8 bytes");
 	if (encoded !== undefined && !format.test(encoded)) return false;
-	let slot = workers.find((slot) => !slot.busy);
-	if (!slot && workers.length < 2) {
-		slot = {
-			worker: new Worker(new URL("./password-worker.ts", import.meta.url).href),
-			busy: false,
-		};
-		workers.push(slot);
-	}
-	if (!slot)
+	if (passwordJobs >= 2)
 		throw Object.assign(new Error("password hashing workers are busy"), {
 			code: "BUSY",
 		});
-	slot.busy = true;
-	const current = slot;
+	passwordJobs++;
 	try {
-		return await new Promise((resolve, reject) => {
-			current.worker.onmessage = ({ data }) =>
-				data.error ? reject(new Error(data.error)) : resolve(data.result);
-			current.worker.onerror = (event) => {
-				current.worker.terminate();
-				workers.splice(workers.indexOf(current), 1);
-				reject(new Error(event.message));
-			};
-			current.worker.postMessage({ password, encoded });
-		});
+		if (encoded === undefined)
+			return await Bun.password.hash(password, {
+				algorithm: "argon2id",
+				memoryCost: 19456,
+				timeCost: 2,
+			});
+		try {
+			return await Bun.password.verify(password, encoded);
+		} catch {
+			return false;
+		}
 	} finally {
-		current.busy = false;
+		passwordJobs--;
 	}
 }
 export const hashPassword = (password: string) =>

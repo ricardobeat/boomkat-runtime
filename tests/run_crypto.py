@@ -11,7 +11,7 @@ openssl=os.environ.get('OPENSSL_BIN') or ('/opt/homebrew/opt/openssl@3/bin/opens
 if openssl:
  algorithms=subprocess.run([openssl,'list','-kdf-algorithms'],capture_output=True,text=True)
  if 'ARGON2ID' in algorithms.stdout:
-  phc=r.stdout.splitlines()[0].split('$');salt=base64.b64decode(phc[4]+'==');expected=base64.b64decode(phc[5]+'=')
+  phc=r.stdout.splitlines()[0].split('$');salt=base64.b64decode(phc[4]+'='*(-len(phc[4])%4));expected=base64.b64decode(phc[5]+'='*(-len(phc[5])%4))
   reference=subprocess.run([openssl,'kdf','-keylen','32','-binary','-kdfopt','pass:interoperability password','-kdfopt','hexsalt:'+salt.hex(),'-kdfopt','iter:2','-kdfopt','lanes:1','-kdfopt','memcost:19456','ARGON2ID'],capture_output=True,timeout=30)
   assert reference.returncode==0,reference.stderr
   assert reference.stdout==expected,'C3/OpenSSL Argon2id mismatch'

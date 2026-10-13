@@ -23,10 +23,13 @@ struct PasswordTask {
 }
 
 fn bool password_format(String encoded) {
-    if (encoded.len != PASSWORD_PREFIX.len + 22 + 1 + 43 || !encoded.starts_with(PASSWORD_PREFIX)) return false;
-    if (encoded[PASSWORD_PREFIX.len + 22] != '$') return false;
+    usz salt_chars;
+    if (encoded.len == PASSWORD_PREFIX.len + 22 + 1 + 43) { salt_chars = 22; }
+    else if (encoded.len == PASSWORD_PREFIX.len + 43 + 1 + 43) { salt_chars = 43; }
+    else { return false; }
+    if (!encoded.starts_with(PASSWORD_PREFIX) || encoded[PASSWORD_PREFIX.len + salt_chars] != '$') return false;
     for (usz i = PASSWORD_PREFIX.len; i < encoded.len; i++) {
-        if (i == PASSWORD_PREFIX.len + 22) continue;
+        if (i == PASSWORD_PREFIX.len + salt_chars) continue;
         char c = encoded[i];
         if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+'
             || c == '/')) return false;
@@ -57,7 +60,7 @@ fn void password_work(Task* task) {
             if (decoded.version != 19 || decoded.algorithm != Argon2Algorithm.ARGON2_ID || decoded.mem_size != 19456
                 || decoded.iterations != 2
                 || decoded.lanes != 1
-                || decoded.salt.len != 16
+                || (decoded.salt.len != 16 && decoded.salt.len != 32)
                 || decoded.hash.len != 32
                 || decoded.key.len
                 || decoded.assoc.len
@@ -67,7 +70,7 @@ fn void password_work(Task* task) {
         }
         return;
     }
-    char[16] salt;
+    char[32] salt;
     arc4random_buf(&salt, salt.len);
     Argon2Options opts = {
         .algorithm = Argon2Algorithm.ARGON2_ID,
