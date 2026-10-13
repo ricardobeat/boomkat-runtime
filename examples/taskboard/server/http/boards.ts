@@ -1,4 +1,4 @@
-import { body, json } from "../../lib/http.ts";
+import { body, json, jsonText } from "../../lib/http.ts";
 import { id } from "../../lib/validation.ts";
 import type { RouteRequest } from "http";
 import type { Boards } from "../domain/boards.ts";
@@ -10,7 +10,10 @@ export function boardHandlers(boards: Boards) {
 			return json({ id: boards.create(session.user_id, await body(req)) }, 201);
 		},
 		get(req: RouteRequest, session: Session) {
-			return json(boards.get(id(req.params.boardId), session.user_id));
+			const boardId = id(req.params.boardId);
+			return boards.getJSON
+				? jsonText(boards.getJSON(boardId, session.user_id))
+				: json(boards.get(boardId, session.user_id));
 		},
 		remove(req: RouteRequest, session: Session) {
 			boards.remove(id(req.params.boardId), session.user_id);

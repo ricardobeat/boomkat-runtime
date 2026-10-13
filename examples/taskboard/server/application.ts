@@ -17,7 +17,14 @@ export async function startTaskboard(platform: Platform) {
 		db.exec(await platform.readText(root + "/schema.sql"));
 		// Let SQLite read database pages directly; WAL writes keep FULL durability.
 		db.exec("PRAGMA mmap_size=268435456");
-		const services = await createServices(db, platform);
+		const extra = platform.args[3];
+		if (extra !== undefined && extra !== "--snapshot-cache")
+			throw new Error("unknown Taskboard option: " + extra);
+		const services = await createServices(
+			db,
+			platform,
+			extra === "--snapshot-cache",
+		);
 		const assets = await createAssets(platform, root);
 		const routes = createRoutes(services, platform, origin);
 		for (const [path, response] of Object.entries(assets)) {

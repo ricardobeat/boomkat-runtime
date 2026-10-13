@@ -6,8 +6,8 @@ export const baseHeaders = {
 	"x-content-type-options": "nosniff",
 	"referrer-policy": "same-origin",
 };
-export function json(value: unknown, status = 200, extra = {}) {
-	return new Response(JSON.stringify(value), {
+export function jsonText(text: string, status = 200, extra = {}) {
+	return new Response(text, {
 		status,
 		headers: {
 			...baseHeaders,
@@ -16,6 +16,10 @@ export function json(value: unknown, status = 200, extra = {}) {
 		},
 	});
 }
+export function json(value: unknown, status = 200, extra = {}) {
+	return jsonText(JSON.stringify(value), status, extra);
+}
+
 const enc = new TextEncoder();
 export async function body(req: Request) {
 	if (

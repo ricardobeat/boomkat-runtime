@@ -9,10 +9,14 @@ import { createAccounts } from "./domain/accounts.ts";
 import type { Database } from "sqlite";
 import type { Crypto } from "./platform.ts";
 
-export async function createServices(db: Database, crypto: Crypto) {
+export async function createServices(
+	db: Database,
+	crypto: Crypto,
+	snapshotCache = false,
+) {
 	const store = createStore(db);
 	const access = createAccess(store);
-	const boards = createBoards(store, access);
+	const boards = createBoards(store, access, snapshotCache);
 	return {
 		accounts: await createAccounts(store, crypto, boards),
 		boards,

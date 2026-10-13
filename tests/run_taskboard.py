@@ -31,6 +31,7 @@ def main():
   def start():
    log=open(Path(directory)/'server.log','w+')
    command=([BUN,str(APP/'server.bun.ts'),str(port),directory] if RUNTIME=='bun' else [str(BIN),'--no-prompt',f'--allow-net=127.0.0.1:{port}',f'--allow-read={APP},{directory}',f'--allow-write={directory}',str(APP/'server.ts'),str(port),directory])
+   if os.environ.get("TASKBOARD_SNAPSHOT_CACHE") == "1": command += [base, "--snapshot-cache"]
    p=subprocess.Popen(command,stdout=log,stderr=log)
    for _ in range(100):
     if p.poll() is not None:log.seek(0);raise AssertionError(log.read())

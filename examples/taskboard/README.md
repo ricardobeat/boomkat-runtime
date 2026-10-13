@@ -48,6 +48,22 @@ The positional arguments are `port`, `data-directory`, and optional public
   examples/taskboard/server.ts 9090 /tmp/taskboard
 ```
 
+### Optional board snapshot cache
+
+The default path queries and serializes each board request. To enable the shared
+snapshot cache on either runtime, pass `--snapshot-cache` after the origin:
+
+```sh
+bun examples/taskboard/server.bun.ts 8081 /tmp/taskboard-bun http://127.0.0.1:8081 --snapshot-cache
+```
+
+Boomkat accepts the same four application arguments. Authentication and board
+membership are checked on every request. The cache holds at most 64 snapshots
+and 4 MiB of string payload, invalidates on local or external SQLite writes, and
+clears and bypasses stored snapshots during transactions. SQLite builds without
+JSON functions use the ordinary row path. Cached results must be reported as a
+separate workload; the default load benchmark remains uncached.
+
 System SQLite 3.31+ must be available. Grant read and write permissions for
 the database **directory**, including its WAL/SHM sidecars. The default
 `examples/taskboard/data/` is gitignored. This sample binds only to loopback.
