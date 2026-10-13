@@ -58,6 +58,8 @@ fn HObject*? new_u8(char[] data) {
     view.extra_ptr().view.byte_length = (uint)data.len;
     view.extra_ptr().view.length_tracking = false;
     builtins::typedarray_link_view(h, buf, view);
+    // Ownership includes the backing store, so its bytes contribute to GC pressure.
+    h.account_auxiliary_allocation(data.len);
     return view;
 }
 
