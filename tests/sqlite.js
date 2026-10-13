@@ -51,6 +51,30 @@ throws(() => db.prepare("SELECT 1; SELECT 2"), "multiple prepared statements acc
 throws(() => db.exec("SELECT 1\0; CREATE TABLE hidden(x)"), "NUL SQL accepted");
 assert(db.query("SELECT 1; -- trailing comment").get()["1"] === 1, "trailing comment rejected");
 throws(() => new Statement(), "statement constructor exposed native handles");
+// Native positional calls must retain normal method receivers and fallback semantics.
+const positional = db.prepare("SELECT ? AS value");
+assert(positional instanceof Statement, "native receiver lost Statement prototype");
+assert(positional.get.name === "get" && positional.get.length === 0, "native method metadata");
+assert(Statement.prototype.get.call(positional, 17).value === 17, "borrowed statement method");
+throws(() => Statement.prototype.get.call({}, 17), "forged statement receiver accepted");
+throws(() => positional.get.call(new Proxy(positional, {}), 17), "proxy receiver bypassed statement identity");
+assert(positional.get([23]).value === 23, "explicit positional array fallback");
+const getterError = new Error("binding getter");
+let caughtGetter;
+let getterCalls = 0;
+const getterArray = [];
+Object.defineProperty(getterArray, 0, { get() { getterCalls++; return 29; } });
+assert(positional.get(getterArray).value === 29 && getterCalls === 1, "binding array getter semantics");
+const getterNamed = db.prepare("SELECT :value AS value");
+try { getterNamed.get({ get value() { throw getterError; } }); }
+catch (error) { caughtGetter = error; }
+assert(caughtGetter === getterError, "binding getter exception identity");
+positional.get = () => ({ value: 31 });
+assert(positional.get().value === 31, "statement method override");
+delete positional.get;
+assert(positional.get(37).value === 37, "statement prototype method restoration");
+positional.finalize();
+throws(() => Statement.prototype.get.call(positional, 41), "native method ignored finalization");
 const count = db.query("SELECT COUNT(*) AS n FROM t");
 const transaction = db.transaction(name => insert.run(name, null, 1));
 transaction("third");

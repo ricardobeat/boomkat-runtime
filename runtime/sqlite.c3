@@ -7,6 +7,7 @@ import boomkat::hobject;
 import boomkat::hbigint;
 import boomkat::hstring;
 import boomkat::types;
+import boomkat::builtins;
 import libc;
 import std::collections::map;
 
@@ -87,7 +88,44 @@ SqlApi g_sql;
 void* g_sql_library;
 HashMap{ulong, SqlDatabase*} g_sql_databases;
 HashMap{ulong, SqlStatement*} g_sql_statements;
-ulong g_sql_next_id = 1;
+ulong g_sql_next_id        =  1;
+long g_sql_statement_class = -1;
+JsValue[3] g_sql_statement_fallback;
+
+// Host objects carry an ID, never a borrowed statement pointer: close/finalize
+// can invalidate the resource while the JavaScript object remains reachable.
+fn void sql_statement_object_free(void* payload, void* user) => mem::free(payload);
+
+fn void js_sqlite_statement_class(JsCtx ctx, void* user) {
+    JsArg proto = ctx.arg(0);
+    if (!proto.tv.is_object()) return ctx.throw_error(TYPE, "invalid statement prototype");
+    if (g_sql_statement_class >= 0) return ctx.throw_error(TYPE, "statement class already registered");
+    g_sql_statement_class = ctx.ctx.heap.register_host_class(
+        (void*)&sql_statement_object_free,
+        null,
+        null,
+        null,
+        proto.tv.get_heapptr()
+    );
+    if (g_sql_statement_class < 0) return ctx.throw_error(ERROR, "SQLite allocation failed");
+    for (uint i = 0; i < 3; i++) g_sql_statement_fallback[i] = ctx.persist(ctx.arg(i + 1))!!;
+}
+
+fn void js_sqlite_statement_object(JsCtx ctx, void* user) {
+    if (g_sql_statement_class < 0) return ctx.throw_error(TYPE, "statement class is not initialized");
+    SqlStatement* stmt = sql_statement(ctx);
+    if (!stmt) return;
+    HObject*? obj = ctx.ctx.heap.alloc_object(HOST);
+    if (catch obj) return ctx.throw_error(ERROR, "SQLite allocation failed");
+    ulong* id = mem::new(ulong);
+    *id = stmt.id;
+    (*obj.extra_ptr()).host.payload = id;
+    (*obj.extra_ptr()).host.class_id = (uint)g_sql_statement_class;
+    ctx.ctx.heap.set_prototype(obj, ctx.ctx.heap.host_class_at((uint)g_sql_statement_class).proto);
+    JsArg result;
+    result.tv.set_object(obj);
+    ctx.ret(result);
+}
 
 struct SqlDatabase {
     void* handle;
@@ -626,19 +664,8 @@ fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
     }
 }
 
-fn void js_sqlite_query(JsCtx ctx, void* user) {
+fn void sql_execute(JsCtx ctx, SqlStatement* stmt, HObject* bindings, uint count, int mode) {
     @pool() {
-        SqlStatement* stmt = sql_statement(ctx);
-        if (!stmt) return;
-        JsArg params = ctx.arg(1);
-        if (!params.tv.is_object() || ((HObject*)params.tv.get_heapptr()).get_class() != ARRAY) {
-            return ctx.throw_error(TYPE, "SQLite bindings must be an array");
-        }
-        HObject* bindings = params.tv.get_heapptr();
-        uint count        = *bindings.array_len_ptr();
-        if (count != (uint)g_sql.bind_parameter_count(
-            stmt.handle
-        )) return ctx.throw_error(RANGE, "incorrect SQLite parameter count");
         g_sql.reset(stmt.handle);
         g_sql.clear_bindings(stmt.handle);
         defer {
@@ -646,10 +673,9 @@ fn void js_sqlite_query(JsCtx ctx, void* user) {
             g_sql.clear_bindings(stmt.handle);
         }
         for (uint i = 0; i < count; i++) {
-            TVal value = bindings.get_array_idx(i) ?? (TVal) { };
+            TVal value = bindings ? (bindings.get_array_idx(i) ?? (TVal) { }) : ctx.arg(i).tv;
             if (!sql_bind(ctx, stmt, i, value)) return;
         }
-        int mode = ctx.arg(2).as_int(); // 0 all, 1 get, 2 run
         HObject* output;
         if (mode != 1 && mode != 2) {
             output = sql_object(ctx, ARRAY) ?? null;
@@ -715,6 +741,51 @@ fn void js_sqlite_query(JsCtx ctx, void* user) {
     };
 }
 
+fn void js_sqlite_query(JsCtx ctx, void* user) {
+    SqlStatement* stmt = sql_statement(ctx);
+    if (!stmt) return;
+    JsArg params = ctx.arg(1);
+    if (!params.tv.is_object() || ((HObject*)params.tv.get_heapptr()).get_class() != ARRAY) return ctx.throw_error(
+        TYPE,
+        "SQLite bindings must be an array"
+    );
+    HObject* bindings = params.tv.get_heapptr();
+    uint count        = *bindings.array_len_ptr();
+    if (count != (uint)g_sql.bind_parameter_count(
+        stmt.handle
+    )) return ctx.throw_error(RANGE, "incorrect SQLite parameter count");
+    sql_execute(ctx, stmt, bindings, count, ctx.arg(2).as_int());
+}
+
+fn void sql_native_statement(JsCtx ctx, int mode) {
+    JsArg receiver = ctx.this_value();
+    if (!receiver.tv.is_object()) return ctx.throw_error(TYPE, "invalid SQLite statement");
+    HObject* obj = receiver.tv.get_heapptr();
+    if (obj.get_class() != HOST
+        || (*obj.extra_ptr()).host.class_id != (uint)g_sql_statement_class) return ctx.throw_error(
+        TYPE,
+        "invalid SQLite statement"
+    );
+    uint count = builtins::host_argc(ctx.ctx);
+    // Arrays, named objects and their getters use the original validation path.
+    // Do not retain a resource pointer across that JavaScript call.
+    if (count == 1 && ctx.arg(0).tv.is_object()) {
+        JsArg[1] args = { ctx.arg(0) };
+        if (try result = ctx.call(ctx.value(g_sql_statement_fallback[mode]), args[..], receiver)) ctx.ret(result);
+        return;
+    }
+    ulong id           = *(ulong*)(*obj.extra_ptr()).host.payload;
+    SqlStatement* stmt = g_sql_statements.get(id) ?? null;
+    if (!stmt) return ctx.throw_error(TYPE, "statement is finalized or its database is closed");
+    if (count != (uint)g_sql.bind_parameter_count(
+        stmt.handle
+    )) return ctx.throw_error(RANGE, "incorrect SQLite parameter count");
+    sql_execute(ctx, stmt, null, count, mode);
+}
+fn void js_sqlite_all(JsCtx ctx, void* user) => sql_native_statement(ctx, 0);
+fn void js_sqlite_get(JsCtx ctx, void* user) => sql_native_statement(ctx, 1);
+fn void js_sqlite_run(JsCtx ctx, void* user) => sql_native_statement(ctx, 2);
+
 fn void js_sqlite_finalize(JsCtx ctx, void* user) {
     @pool() {
         if (try stmt = g_sql_statements.get(sql_id(ctx.arg(0)))) sql_finalize(stmt);
@@ -723,6 +794,11 @@ fn void js_sqlite_finalize(JsCtx ctx, void* user) {
 fn void js_sqlite_version(JsCtx ctx, void* user) => ctx.ret_string(g_sql.libversion().str_view());
 
 const Native[] SQLITE_NATIVES = {
+    { "sqliteStatementClass", &js_sqlite_statement_class, 4 },
+    { "sqliteStatement", &js_sqlite_statement_object, 1 },
+    { "sqliteAll", &js_sqlite_all, 0 },
+    { "sqliteGet", &js_sqlite_get, 0 },
+    { "sqliteRun", &js_sqlite_run, 0 },
     { "sqliteOpen", &js_sqlite_open, 2 },
     { "sqliteClose", &js_sqlite_close, 1 },
     { "sqliteExec", &js_sqlite_exec, 2 },

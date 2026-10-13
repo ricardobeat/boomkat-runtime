@@ -47,8 +47,13 @@ function bindings(names, args) {
 export class Statement {
     constructor(token, db, id) {
         if (token !== internal) throw new TypeError("use database.prepare() to create a statement");
-        try { statements.set(this, { db, database: databaseState(db), id, names: bk.sqliteParams(id), finalized: false }); }
+        let statement;
+        try {
+            statement = bk.sqliteStatement(id);
+            statements.set(statement, { db, database: databaseState(db), id, names: bk.sqliteParams(id), finalized: false });
+        }
         catch (error) { bk.sqliteFinalize(id); throw error; }
+        return statement;
     }
     all(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 0); }
     get(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 1); }
@@ -60,6 +65,15 @@ export class Statement {
         s.finalized = true;
     }
 }
+
+bk.sqliteStatementClass(Statement.prototype, Statement.prototype.all, Statement.prototype.get, Statement.prototype.run);
+for (const [name, method] of [["all", bk.sqliteAll], ["get", bk.sqliteGet], ["run", bk.sqliteRun]])
+    Object.defineProperty(method, "name", { value: name, configurable: true });
+Object.defineProperties(Statement.prototype, {
+    all: { value: bk.sqliteAll, writable: true, configurable: true },
+    get: { value: bk.sqliteGet, writable: true, configurable: true },
+    run: { value: bk.sqliteRun, writable: true, configurable: true },
+});
 
 export class Database {
     constructor(path = ":memory:", { readonly = false } = {}) {
