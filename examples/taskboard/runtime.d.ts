@@ -52,6 +52,7 @@ declare module "sqlite" {
 		finalize(): void;
 	}
 	export class Database {
+		readonly inTransaction: boolean;
 		constructor(path?: string, options?: { readonly?: boolean });
 		exec(sql: string): void;
 		prepare(sql: string): Statement;

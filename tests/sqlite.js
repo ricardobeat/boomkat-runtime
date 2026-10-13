@@ -3,6 +3,20 @@ const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const throws = (fn, message) => { let thrown = false; try { fn(); } catch (_) { thrown = true; } assert(thrown, message); };
 assert(typeof version === "string", "SQLite version missing");
 const db = new Database();
+assert(db.inTransaction === false, "new database is in a transaction");
+db.exec("BEGIN; SAVEPOINT nested");
+assert(db.inTransaction === true, "explicit transaction not detected");
+db.exec("ROLLBACK TO nested; RELEASE nested");
+assert(db.inTransaction === true, "outer transaction lost after savepoint release");
+db.exec("ROLLBACK");
+assert(db.inTransaction === false, "rollback left transaction active");
+db.transaction(() => {
+    assert(db.inTransaction === true, "transaction callback not active");
+    db.transaction(() => assert(db.inTransaction === true, "nested callback not active"))();
+})();
+assert(db.inTransaction === false, "transaction release left active state");
+throws(() => Object.getOwnPropertyDescriptor(Database.prototype,"inTransaction").get.call({}), "invalid transaction receiver accepted");
+
 db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT UNIQUE, data BLOB, n INTEGER); CREATE INDEX names ON t(name);");
 const insert = db.prepare("INSERT INTO t(name, data, n) VALUES (?, ?, ?)");
 const result = insert.run("café😀", new Uint8Array([0, 1, 255]), 42);
@@ -87,7 +101,8 @@ throws(db.transaction(async () => { insert.run("async", null, 1); }), "async tra
 assert(count.get().n === 5, "async transaction did not roll back");
 const originalError = __bk.error;
 let errorEntries = 0;
-__bk.error = () => { errorEntries++; db.close(); };
+__bk.error = () => { errorEntries++; db.close();
+throws(() => db.inTransaction, "closed database transaction state accepted"); };
 let constraint;
 try { insert.run("second", null, 1); } catch (error) { constraint = error; }
 __bk.error = originalError;

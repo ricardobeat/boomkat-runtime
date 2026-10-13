@@ -79,6 +79,7 @@ export class Database {
     constructor(path = ":memory:", { readonly = false } = {}) {
         databases.set(this, { id: bk.sqliteOpen(String(path), Boolean(readonly)), closed: false });
     }
+    get inTransaction() { return bk.sqliteInTransaction(databaseState(this).id); }
     exec(sql) { bk.sqliteExec(databaseState(this).id, String(sql)); }
     prepare(sql) { return new Statement(internal, this, bk.sqlitePrepare(databaseState(this).id, String(sql))); }
     query(sql) { return this.prepare(sql); }

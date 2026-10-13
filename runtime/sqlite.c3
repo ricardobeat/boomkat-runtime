@@ -41,6 +41,7 @@ alias SqlColumnText = fn char*(void*, CInt);
 alias SqlColumnBlob = fn char*(void*, CInt);
 alias SqlColumnBytes = fn CInt(void*, CInt);
 alias SqlChanges = fn CInt(void*);
+alias SqlGetAutocommit = fn CInt(void*);
 alias SqlLastInsertRowid = fn long(void*);
 alias SqlLibversion = fn ZString();
 alias SqlLibversionNumber = fn CInt();
@@ -76,6 +77,7 @@ struct SqlApi {
     SqlColumnBlob column_blob;
     SqlColumnBytes column_bytes;
     SqlChanges changes;
+    SqlGetAutocommit get_autocommit;
     SqlLastInsertRowid last_insert_rowid;
     SqlLibversion libversion;
     SqlLibversionNumber libversion_number;
@@ -203,6 +205,8 @@ fn bool load_sqlite(void* library) {
     if (!api.column_bytes) return false;
     api.changes = (SqlClose)libc::dlsym(library, "sqlite3_changes");
     if (!api.changes) return false;
+    api.get_autocommit = (SqlGetAutocommit)libc::dlsym(library, "sqlite3_get_autocommit");
+    if (!api.get_autocommit) return false;
     api.last_insert_rowid = (SqlLastInsertRowid)libc::dlsym(library, "sqlite3_last_insert_rowid");
     if (!api.last_insert_rowid) return false;
     api.libversion = (SqlLibversion)libc::dlsym(library, "sqlite3_libversion");
@@ -477,6 +481,12 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
         opened = true;
         ctx.ret_number((double)db.id);
     };
+}
+
+// Autocommit also detects explicit SQL transactions and nested savepoints.
+fn void js_sqlite_in_transaction(JsCtx ctx, void* user) {
+    SqlDatabase* db = sql_database(ctx);
+    if (db) ctx.ret_bool(g_sql.get_autocommit(db.handle) == 0);
 }
 
 fn void js_sqlite_close(JsCtx ctx, void* user) {
@@ -801,6 +811,7 @@ const Native[] SQLITE_NATIVES = {
     { "sqliteRun", &js_sqlite_run, 0 },
     { "sqliteOpen", &js_sqlite_open, 2 },
     { "sqliteClose", &js_sqlite_close, 1 },
+    { "sqliteInTransaction", &js_sqlite_in_transaction, 1 },
     { "sqliteExec", &js_sqlite_exec, 2 },
     { "sqlitePrepare", &js_sqlite_prepare, 2 },
     { "sqliteParams", &js_sqlite_params, 1 },

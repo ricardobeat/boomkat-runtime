@@ -152,6 +152,9 @@ changes affect new connections. OS sandbox restrictions still apply. `:memory:`
 needs no file grants.
 
 `prepare(sql)` and its alias `query(sql)` each create one reusable statement.
+`inTransaction` reports whether the connection has an active transaction, including
+explicit SQL transactions and savepoints. Reading it after closing throws.
+
 `all(...values)` returns rows, `get(...values)` returns the first row or `undefined`,
 and `run(...values)` returns `{ changes, lastInsertRowid }`. Bindings accept positional
 arguments, an array, or an object with named parameters (bare or `:`, `$`, `@` prefixed).
