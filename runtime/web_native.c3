@@ -248,7 +248,7 @@ fn HObject*? web_host_function(
     Heap* h,
     String name,
     builtins::HostFunc handler,
-    NativeWebClass* cls,
+    void* cls,
     int arity,
     bool constructable
 ) {
@@ -355,4 +355,131 @@ fn void js_native_class(JsCtx ctx, void* user) {
     ctx.ret(result);
 }
 
-const Native[] WEB_NATIVES = { { "nativeClass", &js_native_class, 6 } };
+struct NativeHeadersBlob {
+    HObject* prototype;
+    TVal iterator;
+    TVal next;
+    HString* map_key;
+    HString* cookies_key;
+    HString* next_key;
+    HString* blob_key;
+    TVal blob_method;
+    JsValue[9] roots;
+}
+NativeHeadersBlob g_native_headers_blob;
+
+// A getter or proxy may run guest code; let the JS implementation perform
+// those lookups in order. A plain data method can be checked without effects.
+fn bool web_method_is(HObject* obj, HString* key, TVal expected, Heap* h) {
+    for (uint depth = 0; obj && depth < 32; depth++, obj = obj.prototype) {
+        if (obj.flags.exotic_proxyobj) return false;
+        int index = obj.find_prop_idx(key, h);
+        if (index < 0) continue;
+        if (obj.get_prop_flags((uint)index, h).is_accessor) return false;
+        return obj.prop_values()[(uint)index].get().get_raw_bits() == expected.get_raw_bits();
+    }
+    return false;
+}
+
+fn bool web_headers_blob(Heap* h, HObject* obj, builtins::StrBuf* output, bool ascii_only = false) {
+    NativeHeadersBlob* cls = &g_native_headers_blob;
+    TVal map_value, cookies;
+    bool fast              = obj && obj.prototype == cls.prototype && web_method_is(
+        obj,
+        cls.blob_key,
+        cls.blob_method,
+        h
+    ) && web_own_data(
+        obj,
+        cls.map_key,
+        h,
+        &map_value
+    ) && web_own_data(obj, cls.cookies_key, h, &cookies) && cookies.is_null() && map_value.is_object();
+    HObject* map           = fast ? map_value.get_heapptr() : null;
+    fast = fast && map.get_class() == MAP && web_method_is(
+        map,
+        builtins::ensure_iterator_symbol(h),
+        cls.iterator,
+        h
+    ) && web_method_is(h.map_iterator_proto, cls.next_key, cls.next, h);
+    usz length;
+    if (fast) {
+        for (uint i = 0; i + 1 < map.array_used; i += 2) {
+            TVal key = map.array_part()[i].get();
+            if (key.is_deleted()) continue;
+            TVal value = map.array_part()[i + 1].get();
+            if (!key.is_string() || !value.is_string() || ((HString*)key.get_heapptr()).is_symbol()
+                || ((HString*)value.get_heapptr()).is_symbol()
+                || (ascii_only
+                    && (!((HString*)key.get_heapptr()).is_ascii() || !((HString*)value.get_heapptr()).is_ascii()))) {
+                fast = false;
+                break;
+            }
+            length += ((HString*)key.get_heapptr()).blen + (usz)((HString*)value.get_heapptr()).blen + 2;
+        }
+    }
+    if (!fast) return false;
+    // All values and methods are now known to need no coercion or callbacks.
+    // Reserve once and copy entries in Map insertion order, skipping deletions.
+    if (!output.reserve(length)) return false;
+    for (uint i = 0; i + 1 < map.array_used; i += 2) {
+        TVal key = map.array_part()[i].get();
+        if (key.is_deleted()) continue;
+        HString* name  = key.get_heapptr();
+        HString* value = map.array_part()[i + 1].get().get_heapptr();
+        hstring::copy_short(output.data + output.len, name.get_cstr(), name.blen);
+        output.len += name.blen;
+        output.data[output.len++] = '\n';
+        hstring::copy_short(output.data + output.len, value.get_cstr(), value.blen);
+        output.len += value.blen;
+        output.data[output.len++] = '\n';
+    }
+    return true;
+}
+
+fn void native_headers_blob(BuiltinContext* raw, void* user) {
+    JsCtx ctx              = { .ctx = raw };
+    NativeHeadersBlob* cls = user;
+    TVal receiver          = ctx.this_value().tv;
+    HObject* obj           = receiver.is_object() ? receiver.get_heapptr() : null;
+    builtins::StrBuf output;
+    output.init(raw.heap);
+    defer output.free();
+    if (web_headers_blob(raw.heap, obj, &output)) return ctx.ret_string((String)output.bytes());
+    if (output.failed) return ctx.throw_error(RANGE, "Invalid string length");
+    if (try result = ctx.call(ctx.value(cls.roots[1]), { }, ctx.this_value())) ctx.ret(result);
+}
+
+fn void js_native_headers_blob(JsCtx ctx, void* user) {
+    NativeHeadersBlob* cls = &g_native_headers_blob;
+    if (cls.prototype || !ctx.arg(0).tv.is_object()) return ctx.throw_error(TYPE, "Invalid Headers prototype");
+    for (uint i = 0; i < 4; i++) cls.roots[i] = ctx.persist(ctx.arg(i))!!;
+    cls.prototype = ctx.arg(0).tv.get_heapptr();
+    cls.iterator = ctx.arg(2).tv;
+    cls.next = ctx.arg(3).tv;
+    String[3] names = { "_map", "_cookies", "next" };
+    HString*[3] keys;
+    for (uint i = 0; i < 3; i++) {
+        JsArg key = ctx.string(names[i]);
+        cls.roots[i + 4] = ctx.persist(key)!!;
+        keys[i] = key.tv.get_heapptr();
+    }
+    cls.map_key = keys[0];
+    cls.cookies_key = keys[1];
+    cls.next_key = keys[2];
+    HObject*? made = web_host_function(ctx.ctx.heap, "_blob", &native_headers_blob, cls, 0, false);
+    if (catch made) return ctx.throw_error(ERROR, "Native Headers allocation failed");
+    JsArg result;
+    result.tv.set_object(made);
+    JsArg key = ctx.string("_blob");
+    cls.blob_key = key.tv.get_heapptr();
+    cls.roots[7] = ctx.persist(key)!!;
+    cls.blob_method = result.tv;
+    cls.roots[8] = ctx.persist(result)!!;
+    ctx.ret(result);
+}
+
+const Native[] WEB_NATIVES = {
+    { "nativeClass", &js_native_class, 6 },
+    { "nativeHeadersBlob", &js_native_headers_blob, 4 },
+};

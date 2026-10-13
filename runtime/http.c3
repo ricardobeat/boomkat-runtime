@@ -146,7 +146,10 @@ struct FastTypes {
     HObject* file_proto;
     HString* k_file_path;
     HString* k_params;
-    JsValue[11] keep;
+    HString* k_blob;
+    TVal blob_method;
+    TVal response_ctor;
+    JsValue[14] keep;
 }
 
 FastTypes g_fast;
@@ -308,6 +311,11 @@ fn void js_fast_types(JsCtx ctx, void* udata) {
     g_fast.k_header_blob = fast_key(8, "_headerBlob");
     g_fast.k_file_path = fast_key(9, "_path");
     g_fast.k_params = fast_key(10, "params");
+    g_fast.k_blob = fast_key(11, "_blob");
+    g_fast.blob_method = g_fast.response_proto.get_prop_proto(g_fast.k_blob, ctx.ctx.heap) ?? (TVal) { };
+    g_fast.keep[12] = ctx.persist((JsArg) { .tv = g_fast.blob_method })!!;
+    g_fast.response_ctor = ctx.get_prop(ctx.arg(1), "constructor")!!.tv;
+    g_fast.keep[13] = ctx.persist((JsArg) { .tv = g_fast.response_ctor })!!;
 }
 
 // fetchFor(index, fetch, server): call this server's handler straight from C3.
@@ -357,21 +365,35 @@ fn TVal fast_get(HObject* o, HString* key) {
     return v;
 }
 
-// A plain 200 Response with a string, bytes or empty body and no Headers
-// object is written from C3; anything else goes back to the prelude.
+// Ordinary 200 responses are written from C3 when their body and header
+// serialization need no guest callbacks; other responses use the prelude.
 fn bool respond_fast(Conn* c, JsValue result) {
     TVal rv;
     if (!g_rt.load(result, &rv) || !rv.is_object()) return false;
     HObject* o = (HObject*)rv.get_heapptr();
     if (o.prototype != g_fast.response_proto) return false;
-    if (!fast_get(o, g_fast.k_headers).is_null()) return false;
+    if (!web_method_is(o, g_fast.k_blob, g_fast.blob_method, g_rt.rt.heap)) return false;
+    TVal headers = fast_get(o, g_fast.k_headers);
+    builtins::StrBuf header_blob;
+    header_blob.init(g_rt.rt.heap);
+    defer header_blob.free();
     TVal used = fast_get(o, g_fast.k_used);
     if (!used.is_boolean() || used.get_boolean()) return false;
     TVal status = fast_get(o, g_fast.k_status);
     if (!status.is_fastint() || status.get_fastint() != 200) return false;
     TVal ct = fast_get(o, g_fast.k_ct);
     String blob;
-    if (ct.is_null()) {
+    if (!headers.is_null()) {
+        bool match;
+        if (!web_instanceof(g_rt.rt.heap, rv, g_fast.response_ctor, &match) || !match) return false;
+        if (!headers.is_object() || !web_headers_blob(
+            g_rt.rt.heap,
+            headers.get_heapptr(),
+            &header_blob,
+            true
+        )) return false;
+        blob = (String)header_blob.bytes();
+    } else if (ct.is_null()) {
         blob = "";
     } else if (ct.is_string() && ct.get_heapptr() == g_fast.ct_text.get_heapptr()) {
         blob = BLOB_TEXT;

@@ -31,6 +31,20 @@ const server = serve({
             await new Promise(resolve => setTimeout(resolve, 2));
             return text(req.params.id);
         },
+        "/headers/:kind": req => {
+            const h = new Headers({ "x-first": "one", "x-delete": "gone" });
+            h.delete("x-delete"); h.set("x-second", "two");
+            const response = new Response("headers", { headers: h });
+            if (req.params.kind === "iterator") response.headers._map[Symbol.iterator] = function* () { yield ["x-custom", "iterator"]; };
+            if (req.params.kind === "header-method") response.headers._blob = () => "x-custom\nheader-method\n";
+            if (req.params.kind === "response-method") response._blob = () => "x-custom\nresponse-method\n";
+            if (req.params.kind === "cookies") { response.headers.append("set-cookie", "a=1"); response.headers.append("set-cookie", "b=2"); }
+            if (req.params.kind === "instance-guard") Object.defineProperty(Response, Symbol.hasInstance, { configurable: true, get() {
+                delete Response[Symbol.hasInstance]; response.headers.set("x-classified", "yes");
+                return Function.prototype[Symbol.hasInstance];
+            } });
+            return response;
+        },
         "/throw/:id": () => { throw new Error("route error"); },
         "/reject/:id": async () => { throw new Error("async route error"); },
         "/disabled": false,

@@ -53,6 +53,17 @@ with tempfile.TemporaryDirectory(prefix='bkr-http-routes-') as directory:
             for _ in range(3): assert call('/cached',status=201) == b'cached'
             assert call('/cached','HEAD',status=201) == b''
             assert call('/bytes','POST',b'') == bytes([0,1,255])
+            for kind in ['normal', 'iterator', 'header-method', 'response-method', 'cookies', 'instance-guard']:
+                with urllib.request.urlopen(f'http://127.0.0.1:{port}/headers/{kind}') as response:
+                    assert response.read() == b'headers'
+                    if kind in ['iterator', 'header-method', 'response-method']:
+                        assert response.headers['x-custom'] == kind
+                        assert response.headers.get('x-first') is None
+                    else:
+                        assert response.headers['x-first'] == 'one' and response.headers['x-second'] == 'two'
+                        assert response.headers.get('x-delete') is None
+                    if kind == 'instance-guard': assert response.headers['x-classified'] == 'yes'
+                    if kind == 'cookies': assert response.headers.get_all('set-cookie') == ['a=1', 'b=2']
             assert call('/throw/1',status=503) == b'route error'
             assert call('/reject/1',status=503) == b'async route error'
             assert call('/disabled',status=404) == b'fallback'

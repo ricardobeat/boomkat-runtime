@@ -953,6 +953,11 @@ class Headers {
         return h;
     }
 }
+Object.defineProperty(Headers.prototype, "_blob", {
+    value: bk.nativeHeadersBlob(Headers.prototype, Headers.prototype._blob,
+        Map.prototype[Symbol.iterator], Object.getPrototypeOf(new Map().entries()).next),
+    writable: true, configurable: true,
+});
 hidden(Headers, { INTERNAL });
 def("Headers", Headers);
 

@@ -188,6 +188,73 @@ for (const [ctor, key, args] of [[URL, "_raw", ["http://example.com/a"]],
         } finally { Object.defineProperty(ctor.prototype, key, saved); }
     });
 }
+observe("Headers blob order and mutations", () => {
+    const h = new Headers({"X-One":" first ", "x-two":"second"});
+    const first = h._blob();
+    h.append("X-One", "third"); h.delete("x-two"); h.set("x-last", "last");
+    return [first, h._blob(), new Headers()._blob(), h._blob.name, h._blob.length];
+});
+observe("Headers blob Unicode and NUL", () => new Headers({"x-text":"é😀\0\ud800"})._blob());
+observe("Headers blob cookies", () => {
+    const h = new Headers({"x-first":"yes"});
+    h.append("set-cookie", "one=1"); h.append("set-cookie", "two=2");
+    return h._blob();
+});
+observe("Headers blob borrowed receiver", () => Headers.prototype._blob.call({_map:new Map([["x","yes"]]),_cookies:null}));
+observe("Headers blob numeric map values", () => {
+    const h = new Headers(); h._map.set("x-number", 17); return h._blob();
+});
+observe("Headers blob Symbol value", () => {
+    const h = new Headers(); h._map.set("x-symbol", Symbol()); return h._blob();
+});
+observe("Headers blob iterator and cookies order", () => {
+    const h = new Headers(), order=[];
+    h._map[Symbol.iterator] = function* () { order.push("iterator"); yield ["x","yes"]; order.push("end"); };
+    Object.defineProperty(h,"_cookies",{get(){order.push("cookies");return null;}});
+    return [h._blob(), order];
+});
+observe("Headers blob Map iterator override", () => {
+    const saved=Map.prototype[Symbol.iterator]; let calls=0;
+    try {
+        Map.prototype[Symbol.iterator]=function*(){calls++;yield ["changed","yes"];};
+        return [new Headers({x:"original"})._blob(), calls];
+    } finally {Map.prototype[Symbol.iterator]=saved;}
+});
+observe("Headers blob Map iterator next override", () => {
+    const proto=Object.getPrototypeOf(new Map().entries()),saved=proto.next;let calls=0;
+    try {
+        proto.next=function(){calls++;return {done:true};};
+        return [new Headers({x:"original"})._blob(),calls];
+    } finally {proto.next=saved;}
+});
+observe("Headers blob Map iterator next getter", () => {
+    const proto=Object.getPrototypeOf(new Map().entries()),saved=Object.getOwnPropertyDescriptor(proto,"next");let calls=0;
+    try {
+        Object.defineProperty(proto,"next",{configurable:true,get(){calls++;return saved.value;}});
+        return [new Headers({x:"original"})._blob(),calls];
+    } finally {Object.defineProperty(proto,"next",saved);}
+});
+observe("Headers blob accessor fields", () => {
+    const h=new Headers({x:"original"}),map=h._map,order=[];
+    Object.defineProperty(h,"_map",{get(){order.push("map");return map;}});
+    Object.defineProperty(h,"_cookies",{get(){order.push("cookies");return null;}});
+    return [h._blob(),order];
+});
+observe("Headers blob proxy receiver", () => {
+    const h=new Headers({x:"original"}),order=[];
+    const proxy=new Proxy(h,{get(target,key,receiver){order.push(key);return Reflect.get(target,key,receiver);}});
+    return [Headers.prototype._blob.call(proxy),order];
+});
+observe("Headers blob proxy map", () => {
+    const h=new Headers(),order=[];
+    h._map=new Proxy(new Map(),{get(target,key){order.push(String(key));if(key===Symbol.iterator)return function*(){yield ["x","proxy"];};return Reflect.get(target,key);}});
+    return [h._blob(),order];
+});
+observe("Headers blob throwing iterator", () => {
+    const h=new Headers(),error=new Error("iterator stopped");
+    h._map[Symbol.iterator]=()=>{throw error;};
+    try{h._blob();}catch(caught){return caught===error;}
+});
 for (let i = 0; i < (args[0] === "stress" ? 300 : 30000); i++) new URL("http://example.com/churn?" + i);
 observe("retained after churn", () => [new URL("http://example.com/a").pathname, new Response("x")._body]);
 console.log(JSON.stringify(rows));
