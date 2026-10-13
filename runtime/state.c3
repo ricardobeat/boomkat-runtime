@@ -94,6 +94,7 @@ struct RuntimeState {
     ulong next_worker;
     JsValue worker_event;
     WatchdogState* watchdog_state;
+    uint http_workers;
 }
 
 tlocal RuntimeState g_runtime = {
@@ -102,4 +103,5 @@ tlocal RuntimeState g_runtime = {
     .sql_next_id = 1,
     .sql_statement_class = -1,
     .next_worker = 1,
+    .http_workers = 1,
 };

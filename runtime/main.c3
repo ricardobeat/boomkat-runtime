@@ -346,7 +346,7 @@ fn void? boot() {
 
 fn void usage() {
     io::eprintn(
-        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] script.js [args...]"
+        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
 }
@@ -367,6 +367,11 @@ fn void? parse_args(String[] argv) {
         }
         if (a.starts_with("--time-limit=")) {
             g_runtime.time_limit_ms = a[13..].to_long() ?? USAGE~!;
+            continue;
+        }
+        if (a.starts_with("--http-workers=")) {
+            g_runtime.http_workers = a[15..].to_uint() ?? USAGE~!;
+            if (g_runtime.http_workers < 1 || g_runtime.http_workers > 64) return USAGE~;
             continue;
         }
         if (!parse_perm_flag(a)!) return USAGE~;

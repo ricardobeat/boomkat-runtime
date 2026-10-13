@@ -7,6 +7,8 @@ declare module "http" {
 		port: number;
 		url: URL;
 		finished: Promise<void>;
+		readonly workers: number;
+		ready: Promise<Server>;
 		stop(force?: boolean): Promise<void>;
 	}
 	export type RouteHandler = (

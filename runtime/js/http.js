@@ -98,14 +98,30 @@ export function serve(opts, fetch) {
         port: bound,
         url: new URL(`http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${bound}/`),
         finished,
+        get workers() { return bk.httpPoolCount(index); },
         stop(force = false) {
             bk.stop(index, force);
-            closed();
-            return Promise.resolve();
+            if (!bk.httpPoolPending(index)) { closed(); return finished; }
+            const check = () => {
+                if (bk.httpPoolPending(index)) setTimeout(check, 1);
+                else closed();
+            };
+            check();
+            return finished;
         },
     };
     h.server = server;
     bk.fetchFor(index, fetch, server);
+    try { bk.httpPoolStart(index); }
+    catch (error) { server.stop(true); throw error; }
+    server.ready = new Promise(resolve => {
+        const check = () => {
+            if (server.workers >= bk.httpPoolTarget() || bk.httpPoolCount(index) === 0) resolve(server);
+            else setTimeout(check, 1);
+        };
+        check();
+    });
+    if (bk.httpPoolTarget() > 1) server.ready.then(() => console.log(`HTTP workers ready: ${server.workers}`));
     if (opts.onListen) opts.onListen(server);
     return server;
 }

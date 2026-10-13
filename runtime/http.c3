@@ -65,7 +65,17 @@ struct Server {
     JsValue fetch;
     JsValue server_value;
     List{Route*} routes;
+    String hostname;
+    int requested_port;
+    int port;
+    uint pool_live;
+    bool pool_started;
 }
+
+extern fn void uws_app_pool_init(UwsApp* app);
+extern fn CInt uws_app_pool_join(UwsApp* app, UwsApp* parent);
+extern fn CInt uws_app_pool_count(UwsApp* app);
+extern fn CInt uws_app_pool_idle(UwsApp* app);
 
 // A response fixed at serve() time, answered without entering JS.
 struct Static {
@@ -1162,6 +1172,13 @@ fn void js_serve(JsCtx ctx, void* udata) {
         uint index  = ctx.arg(0).id();
         String host = ctx.arg(1).as_string() ?? "0.0.0.0";
         int port    = ctx.arg(2).as_int(8080);
+        Server* parent = g_runtime.worker ? g_runtime.worker.http_server : null;
+        if ((parent || g_runtime.http_workers > 1) && g_runtime.servers.len()) {
+            return ctx.throw_error(TYPE, "HTTP worker mode supports one serve() per entry module");
+        }
+        if (parent && (host != parent.hostname || port != parent.requested_port)) {
+            return ctx.throw_error(TYPE, "HTTP worker listener configuration differs from its parent");
+        }
         if (!check_net(host, port)) {
             ctx.throw_coded(
                 "PERMISSION_DENIED",
@@ -1176,13 +1193,16 @@ fn void js_serve(JsCtx ctx, void* udata) {
         s.statics.init(mem);
         s.routes.init(mem);
         s.app = uws_app_new(&on_request, s);
-        CInt bound = uws_app_listen(s.app, host.zstr_tcopy(), port);
+        s.hostname = host.copy(mem);
+        s.requested_port = port;
+        CInt bound = parent ? parent.port : uws_app_listen(s.app, host.zstr_tcopy(), port);
         if (bound < 0) {
             ctx.throw_coded("EADDRINUSE", string::tformat("could not listen on %s", describe(host, port)));
             uws_app_stop(s.app, 1);
             return;
         }
         g_runtime.servers.push(s);
+        s.port = bound;
         ctx.ret_number(bound);
     };
 }
@@ -1190,14 +1210,71 @@ fn void js_serve(JsCtx ctx, void* udata) {
 // stop(index, force)
 fn void js_stop(JsCtx ctx, void* udata) {
     uint index = ctx.arg(0).id();
+    bool force = ctx.arg(1).as_bool() ?? false;
     foreach (s : g_runtime.servers) {
         if (s.index != index || s.stopped) continue;
         s.stopped = true;
-        uws_app_stop(s.app, ctx.arg(1).as_bool() ?? false ? 1 : 0);
+        @pool() {
+            ulong[] ids = g_runtime.workers.keys(tmem);
+            foreach (id : ids) {
+                WorkerThread* w = g_runtime.workers.get(id)!!;
+                if (w.http_server == s) {
+                    if (force) { worker_request_stop(w); }
+                    else { worker_request_http_drain(w); }
+                }
+            }
+        };
+        uws_app_stop(s.app, force ? 1 : 0);
     }
 }
 
+fn void js_http_pool_start(JsCtx ctx, void* user) {
+    foreach (s : g_runtime.servers) {
+        if (s.index != ctx.arg(0).id() || s.pool_started) continue;
+        s.pool_started = true;
+        Server* parent = g_runtime.worker ? g_runtime.worker.http_server : null;
+        if (parent) {
+            if (!uws_app_pool_join(s.app, parent.app)) return ctx.throw_error(ERROR, "HTTP worker pool is stopping");
+        } else if (g_runtime.http_workers > 1) {
+            if (!check_path(READ, canonical(g_runtime.main))) return ctx.throw_coded("PERMISSION_DENIED", "HTTP worker entry read access denied");
+            uws_app_pool_init(s.app);
+            for (uint i = 1; i < g_runtime.http_workers; i++) {
+                WorkerThread*? w = start_worker(g_runtime.main, string::tformat("http-%d", i), s);
+                if (catch w) return ctx.throw_error(ERROR, "Cannot create HTTP worker");
+                s.pool_live++;
+            }
+        }
+        return;
+    }
+}
+
+fn void js_http_pool_count(JsCtx ctx, void* user) {
+    foreach (s : g_runtime.servers) if (s.index == ctx.arg(0).id()) {
+        ctx.ret_number(s.stopped ? 0 : uws_app_pool_count(s.app)); return;
+    }
+    ctx.ret_number(0);
+}
+
+fn void js_http_pool_pending(JsCtx ctx, void* user) {
+    foreach (s : g_runtime.servers) if (s.index == ctx.arg(0).id()) {
+        bool draining;
+        if (s.stopped && g_runtime.http_workers > 1) {
+            draining = !uws_app_pool_idle(s.app);
+            // Retire idle main-loop keep-alive sockets once all responses drain.
+            if (!draining && !s.pool_live) uws_app_stop(s.app, 1);
+        }
+        ctx.ret_number((double)(s.pool_live + (draining ? 1u : 0u))); return;
+    }
+    ctx.ret_number(0);
+}
+
+fn void js_http_pool_target(JsCtx ctx, void* user) => ctx.ret_number(g_runtime.http_workers);
+
 const Native[] HTTP_NATIVES = {
+    { "httpPoolStart", &js_http_pool_start, 1 },
+    { "httpPoolCount", &js_http_pool_count, 1 },
+    { "httpPoolPending", &js_http_pool_pending, 1 },
+    { "httpPoolTarget", &js_http_pool_target, 0 },
     { "serve", &js_serve, 3 },
     { "staticRoute", &js_static_route, 6 },
     { "httpRoute", &js_http_route, 5 },

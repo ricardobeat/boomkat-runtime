@@ -13,6 +13,7 @@ import std::io;
 const usz WORKER_QUEUE_BYTES   = 64 * 1024 * 1024;
 const usz WORKER_MESSAGE_BYTES = 16 * 1024 * 1024;
 uint g_worker_live;
+faultdef WORKER_LIMIT, WORKER_CREATE_FAILED;
 
 fn bool worker_reserve_slot() {
     uint count = mem::@atomic_load(g_worker_live);
@@ -42,6 +43,8 @@ struct WorkerPacket {
 
 struct WorkerThread {
     ulong id;
+    Server* http_server;
+    String[] arguments;
     String path;
     String name;
     Permissions permissions;
@@ -121,11 +124,29 @@ fn void worker_deliver_parent(void* arg) {
     while (packets) {
         WorkerPacket* p = packets;
         packets = p.next;
-        worker_emit(w.id, p.kind, p);
+        if (w.http_server) {
+            if (p.kind == 1 && !w.http_server.stopped) {
+                io::eprintfn("error: HTTP worker failed: %s", p.text);
+                g_runtime.exit_code = 1;
+                exit_now();
+            }
+        } else {
+            worker_emit(w.id, p.kind, p);
+        }
         worker_packet_free(p);
     }
     if (!finished) return;
     (void)w.thread.join();
+    if (w.http_server) {
+        w.http_server.pool_live--;
+        if (!w.http_server.stopped) {
+            io::eprintn("error: HTTP worker exited unexpectedly");
+            g_runtime.exit_code = 1;
+            exit_now();
+        }
+    }
+    foreach (value : w.arguments) free(value.ptr);
+    free(w.arguments.ptr);
     ulong id = w.id;
     g_runtime.workers.remove(id);
     w.lock.destroy();
@@ -185,6 +206,37 @@ fn void worker_request_stop(WorkerThread* w) {
 }
 
 fn void worker_stop_deferred(void* arg) => worker_stop();
+
+fn void worker_http_poll_idle(void* arg) {
+    if (g_runtime.closing) return;
+    foreach (server : g_runtime.servers) {
+        if (!uws_app_pool_idle(server.app)) {
+            (void)timer_start(1, &worker_http_poll_idle, null);
+            return;
+        }
+    }
+    worker_stop();
+}
+
+fn void worker_http_drain(void* arg) {
+    if (g_runtime.closing) return;
+    foreach (server : g_runtime.servers) {
+        server.stopped = true;
+        uws_app_stop(server.app, 0);
+    }
+    worker_http_poll_idle(null);
+}
+
+fn void worker_request_http_drain(WorkerThread* w) {
+    w.lock.@in_lock() {
+        if (w.stopping || w.finished) return;
+        if (w.loop) {
+            uws_loop_defer(w.loop, &worker_http_drain, w);
+        } else {
+            w.stopping = true;
+        } // no request has reached an unbooted worker
+    };
+}
 
 fn void worker_stop() {
     if (!g_runtime.worker || g_runtime.closing) return;
@@ -260,6 +312,7 @@ fn int worker_thread_main(void* arg) {
         g_runtime.perms = w.permissions;
         g_runtime.main = w.path;
         g_runtime.args.init(mem);
+        foreach (value : w.arguments) g_runtime.args.push(value);
         bool booted;
         if (catch boot_error = boot()) {
             worker_report_error(g_runtime.rt.last_error());
@@ -327,6 +380,37 @@ fn int worker_thread_main(void* arg) {
     return 0;
 }
 
+fn WorkerThread*? start_worker(String filename, String name, Server* server = null) {
+    if (!worker_reserve_slot()) return WORKER_LIMIT~;
+    WorkerThread* w = mem::new(WorkerThread);
+    w.id = g_runtime.next_worker++;
+    w.path = filename.copy(mem);
+    w.name = name.copy(mem);
+    w.parent_loop = g_runtime.loop;
+    w.time_limit = g_runtime.time_limit_ms;
+    w.http_server = server;
+    if (server) {
+        w.arguments = mem::new_array(String, g_runtime.args.len());
+        foreach (i, value : g_runtime.args) w.arguments[i] = value.copy(mem);
+    }
+    clone_permissions(&w.permissions);
+    w.lock.init()!!;
+    if (catch w.thread.create(&worker_thread_main, w)) {
+        free_permissions(&w.permissions);
+        foreach (value : w.arguments) free(value.ptr);
+        free(w.arguments.ptr);
+        w.lock.destroy();
+        free(w.path.ptr);
+        free(w.name.ptr);
+        free(w);
+        worker_release_slot();
+        return WORKER_CREATE_FAILED~;
+    }
+    g_runtime.workers.set(w.id, w);
+    hold();
+    return w;
+}
+
 fn void js_worker_start(JsCtx ctx, void* user) {
     @pool() {
         String requested = ctx.arg(0).as_string() ?? "";
@@ -339,28 +423,12 @@ fn void js_worker_start(JsCtx ctx, void* user) {
             canonical(filename)
         )) return ctx.throw_coded("PERMISSION_DENIED", "Worker module read access denied");
         if (g_runtime.closing) return ctx.throw_error(ERROR, "Runtime is closing");
-        if (!worker_reserve_slot()) return ctx.throw_error(RANGE, "Too many workers");
-        WorkerThread* w = mem::new(WorkerThread);
-        w.id = g_runtime.next_worker++;
-        w.path = filename.copy(mem);
-        w.name = (ctx.arg(1).as_string() ?? "").copy(mem);
-        w.parent_loop = g_runtime.loop;
-        w.time_limit = g_runtime.time_limit_ms;
-        clone_permissions(&w.permissions);
-        w.lock.init()!!;
-        if (catch w.thread.create(&worker_thread_main, w)) {
-            // No worker acquired the permission snapshot.
-            free_permissions(&w.permissions);
-            w.lock.destroy();
-            free(w.path.ptr);
-            free(w.name.ptr);
-            free(w);
-            worker_release_slot();
-            return ctx.throw_error(ERROR, "Cannot create worker thread");
-        }
-        g_runtime.workers.set(w.id, w);
-        hold();
-        ctx.ret_number((double)w.id);
+        WorkerThread*? worker = start_worker(filename, ctx.arg(1).as_string() ?? "");
+        if (catch err = worker) return ctx.throw_error(
+            err == WORKER_LIMIT ? RANGE : ERROR,
+            err == WORKER_LIMIT ? "Too many workers" : "Cannot create worker thread"
+        );
+        ctx.ret_number((double)worker.id);
     };
 }
 
@@ -672,6 +740,7 @@ fn void free_worker_resources() {
             free(route.keys.ptr);
             free(route);
         }
+        free(server.hostname.ptr);
         server.routes.free();
         free(server);
     }

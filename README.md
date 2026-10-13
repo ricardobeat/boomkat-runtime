@@ -95,6 +95,33 @@ and 32,768 graph objects/entries. `structuredClone` uses the same codec.
 python3 tests/run_workers.py
 ```
 
+### HTTP server workers
+
+Run an HTTP entry module with `--http-workers=N` (1–64) to use N server VMs
+in one process, including the main VM. The runtime owns one listener and
+distributes accepted connections round-robin. Keep-alive requests stay on their
+connection's worker; handlers and response bodies execute directly in that VM.
+
+```sh
+./out/bkr --http-workers=4 --allow-net=127.0.0.1:8080 \
+  --allow-read=examples/taskboard --allow-write=examples/taskboard/data \
+  examples/taskboard/server.ts 8080 examples/taskboard/data
+```
+
+Each replica re-executes the same entry module with the same arguments and
+permissions. This mode supports one `serve()` per entry module. Module globals,
+caches and in-memory rate limits are per VM. Use a shared store for policies
+that must apply across workers. Taskboard opens a SQLite connection in each VM
+against one WAL database and waits up to five seconds for write locks.
+
+`server.workers` reports joined server VMs. On the main server,
+`await server.ready` waits for the configured count. `stop()` drains active responses and their buffered bytes
+before closing replicas; `stop(true)` interrupts them. Replica failures end
+the process rather than silently reducing the pool.
+
+Validation: `python3 tests/run_http_workers.py` checks balanced distribution,
+request bodies, forced shutdown and graceful completion of large responses.
+
 ### Native crypto
 
 `randomBytes(size)` returns a system-random Uint8Array (0–65536 bytes).
