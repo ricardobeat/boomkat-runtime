@@ -1,0 +1,44 @@
+import { serve } from "http";
+import { args } from "process";
+
+const text = (value, status = 200) => new Response(value, { status });
+const json = value => new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
+const fixed = text("cached", 201);
+const server = serve({
+    hostname: "127.0.0.1", port: Number(args[0]),
+    routes: {
+        "/items/:id": {
+            GET: req => json({ id: req.params.id, query: new URL(req.url).search }),
+            POST: async req => {
+                const body = await req.text();
+                await new Promise(resolve => setTimeout(resolve, 2));
+                return json({ id: req.params.id, body });
+            },
+        },
+        "/items/new": { GET: text("exact") },
+        "/pairs/:first/:second": req => json(req.params),
+        "/special/:__proto__/:constructor": req => json(req.params),
+        "/api/*": text("wildcard"),
+        "/api/:id": req => text("parameter:" + req.params.id),
+        "/api/exact": text("exact-api"),
+        "/method": { GET: () => text("get"), POST: text("post", 202), DELETE: () => text("delete") },
+        "/cached": fixed,
+        "/bytes": { POST: new Response(new Uint8Array([0, 1, 255])) },
+        "/async/:id": async req => {
+            await new Promise(resolve => setTimeout(resolve, 2));
+            return text(req.params.id);
+        },
+        "/throw/:id": () => { throw new Error("route error"); },
+        "/reject/:id": async () => { throw new Error("async route error"); },
+        "/disabled": false,
+    },
+    fetch: () => text("fallback", 404),
+    error: e => text(e.message, 503),
+    onListen: () => console.log("READY"),
+});
+// Invalid route definitions must fail before binding any sockets.
+for (const routes of [null, [], { "bad": text("bad") }, { "/:id/:id": text("bad") }, { "/x": { BAD: () => text("bad") } }, { "/x": {} }]) {
+    let rejected = false;
+    try { serve({ hostname: "127.0.0.1", port: Number(args[0]), routes }); } catch (e) { rejected = e instanceof TypeError; }
+    if (!rejected) throw new Error("invalid routes accepted");
+}

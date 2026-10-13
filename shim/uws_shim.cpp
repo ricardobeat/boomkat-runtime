@@ -50,6 +50,28 @@ uws_app *uws_app_new(uws_req_cb cb, void *user) {
     return (uws_app *)a;
 }
 
+void uws_app_route(uws_app *app, const char *method, const char *path, uws_req_cb cb, void *user) {
+    App *a = (App *)app;
+    auto handler = [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)res); };
+    std::string m(method);
+    if (m == "GET") a->app.get(path, std::move(handler));
+    else if (m == "HEAD") a->app.head(path, std::move(handler));
+    else if (m == "POST") a->app.post(path, std::move(handler));
+    else if (m == "PUT") a->app.put(path, std::move(handler));
+    else if (m == "PATCH") a->app.patch(path, std::move(handler));
+    else if (m == "DELETE") a->app.del(path, std::move(handler));
+    else if (m == "OPTIONS") a->app.options(path, std::move(handler));
+    else if (m == "TRACE") a->app.trace(path, std::move(handler));
+    else if (m == "CONNECT") a->app.connect(path, std::move(handler));
+    else a->app.any(path, std::move(handler));
+}
+
+size_t uws_req_parameter(uws_req *req, unsigned short index, const char **out) {
+    std::string_view value = ((Req *)req)->getParameter(index);
+    *out = value.data();
+    return value.size();
+}
+
 // The bound port, or -1.
 int uws_app_listen(uws_app *app, const char *host, int port) {
     App *a = (App *)app;

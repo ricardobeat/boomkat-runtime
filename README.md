@@ -27,7 +27,7 @@ built-in or an error, and remote imports are not supported.
 
 | module | surface |
 |---|---|
-| `http` | `serve({ port, hostname, fetch, onListen })` -> `{ port, finished, stop(force) }` |
+| `http` | `serve({ port, hostname, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }` |
 | `net` | `connect({ hostname, port, tls })`, `listen({ hostname, port })`, `resolve(host)`; connections expose `read`, `write`, `closeWrite`, `close`, `readable`, `writable` |
 | `file` | `body`, `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
 | `process` | `args`, `pid`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
@@ -89,6 +89,36 @@ hashing API, separate from the global Web Crypto random helpers.
 Validation: `python3 tests/run_transpile.py`, `python3 tests/run_crypto.py`, and
 `python3 tests/run_taskboard.py`. The crypto check compares Argon2id output
 against OpenSSL when its ARGON2ID KDF is available.
+
+### HTTP routes
+
+Routes are matched by uWebSockets' native tree. Exact paths take precedence over
+`:parameter` paths, followed by terminal `/*` wildcards. Handlers receive decoded
+`request.params` and may return a Response or a promise. A fixed buffered Response
+is copied at startup and served without entering JavaScript.
+
+```js
+import { serve } from "http";
+serve({
+    port: 8080,
+    routes: {
+        "/health": new Response("OK"),
+        "/users/:id": {
+            GET: req => Response.json({ id: req.params.id }),
+            POST: async req => Response.json(await req.json()),
+        },
+        "/api/*": new Response("Not found", { status: 404 }),
+    },
+    fetch: () => new Response("Not found", { status: 404 }),
+});
+```
+
+`fetch` is optional with `routes`; unmatched requests default to 404. A route may
+also be one handler for every method. Method maps support GET, HEAD, POST, PUT,
+PATCH, DELETE, OPTIONS, TRACE and CONNECT; GET supplies HEAD when HEAD is absent.
+A route set to `false` delegates to the fallback handler. Static responses must
+have unused, buffered bodies; stream and file bodies belong in handlers. The
+existing `static` option remains available for fixed GET/HEAD assets.
 
 ### Optional SQLite
 

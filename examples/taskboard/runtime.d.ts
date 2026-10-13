@@ -1,12 +1,45 @@
 // Editor declarations for Boomkat's native modules. No Node types/dependencies.
 declare module "http" {
+	export interface RouteRequest extends Request {
+		params: Record<string, string>;
+	}
+	export interface Server {
+		port: number;
+		url: URL;
+		finished: Promise<void>;
+		stop(force?: boolean): Promise<void>;
+	}
+	export type RouteHandler = (
+		request: RouteRequest,
+		server: Server,
+	) => Response | Promise<Response>;
+	export type MethodHandlers = Partial<
+		Record<
+			| "GET"
+			| "HEAD"
+			| "POST"
+			| "PUT"
+			| "PATCH"
+			| "DELETE"
+			| "OPTIONS"
+			| "TRACE"
+			| "CONNECT",
+			RouteHandler | Response
+		>
+	>;
+	export type Routes = Record<
+		string,
+		RouteHandler | Response | MethodHandlers | false
+	>;
 	export function serve(options: {
 		hostname?: string;
 		port?: number;
 		static?: Record<string, Response>;
-		fetch(request: Request): Response | Promise<Response>;
-		onListen?: (server: { port: number; url: URL }) => void;
-	}): { port: number; url: URL; stop(force?: boolean): Promise<void> };
+		routes?: Routes;
+		fetch?: (request: Request) => Response | Promise<Response>;
+		error?: (error: unknown) => Response | Promise<Response>;
+		onListen?: (server: Server) => void;
+	}): Server;
 }
 declare module "sqlite" {
 	export class Statement {

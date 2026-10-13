@@ -28,6 +28,8 @@ struct UwsHeader {
 }
 
 extern fn UwsApp* uws_app_new(UwsReqCb cb, void* user);
+extern fn void uws_app_route(UwsApp* app, ZString method, ZString path, UwsReqCb cb, void* user);
+extern fn sz uws_req_parameter(UwsReq* req, ushort index, char** out);
 extern fn CInt uws_app_listen(UwsApp* app, ZString host, CInt port);
 extern fn void uws_app_stop(UwsApp* app, CInt force);
 
@@ -62,6 +64,7 @@ struct Server {
     HashMap{String, Static} statics;
     JsValue fetch;
     JsValue server_value;
+    List{Route*} routes;
 }
 
 // A response fixed at serve() time, answered without entering JS.
@@ -72,11 +75,22 @@ struct Static {
     char[] body;
 }
 
+// uWS owns the route tree; its callback selects a rooted handler directly.
+struct Route {
+    Server* server;
+    JsValue handler;
+    JsValue[] keys;
+    bool fixed;
+    Static response;
+}
+
 // A request in flight. While the uWS request callback runs, the URL and
 // headers are read straight from `req`; a Conn that outlives the callback
 // captures them first, since uWS reuses the request buffer.
 struct Conn {
     Server* server;
+    Route* route;
+    JsValue params;
     ulong id;
     UwsRes* res;
     bool aborted;
@@ -131,7 +145,8 @@ struct FastTypes {
     HString* k_header_blob;
     HObject* file_proto;
     HString* k_file_path;
-    JsValue[10] keep;
+    HString* k_params;
+    JsValue[11] keep;
 }
 
 FastTypes g_fast;
@@ -185,6 +200,7 @@ fn Conn* conn_find(ulong id) {
 fn void conn_free(Conn* c) {
     g_conns[(sz)(c.id & SLOT_MASK)] = null;
     g_free_slots.push((uint)(c.id & SLOT_MASK));
+    if (!c.params.is_empty()) g_rt.release(c.params);
     if (c.method.len) free(c.method.ptr);
     if (c.url.len) free(c.url.ptr);
     if (c.blob.len) free(c.blob.ptr);
@@ -291,6 +307,7 @@ fn void js_fast_types(JsCtx ctx, void* udata) {
     g_fast.k_url = fast_key(7, "_url");
     g_fast.k_header_blob = fast_key(8, "_headerBlob");
     g_fast.k_file_path = fast_key(9, "_path");
+    g_fast.k_params = fast_key(10, "params");
 }
 
 // fetchFor(index, fetch, server): call this server's handler straight from C3.
@@ -321,6 +338,10 @@ fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
     req.put_prop(g_fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
     g_rt.load(blob, &metadata);
     req.put_prop(g_fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
+    if (!c.params.is_empty()) {
+        g_rt.load(c.params, &metadata);
+        req.put_prop(g_fast.k_params, metadata, hobject::PROP_FLAGS_WEC, h);
+    }
     if (has_body) {
         TVal b;
         b.set_object(new_u8(copy_bytes(body))!);
@@ -430,7 +451,7 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
         if (catch req) return;
         JsValue thrown;
         JsValue[2] args = { req, s.server_value };
-        JsValue? r      = call_catch(s.fetch, args[..], &thrown);
+        JsValue? r      = call_catch(c.route ? c.route.handler : s.fetch, args[..], &thrown);
         if (catch err = r) {
             if (thrown.is_empty()) {
                 if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
@@ -921,20 +942,103 @@ fn void on_data(void* user, char* chunk, sz len, CInt last) {
     };
 }
 
+fn int route_hex(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+fn String route_decode(String raw) {
+    if (!raw.contains("%")) return utf8_clean((char[])raw, false) ?? "";
+    char[] decoded = mem::temp_array(char, raw.len);
+    usz written;
+    for (usz i = 0; i < raw.len; i++) {
+        if (raw[i] == '%' && i + 2 < raw.len) {
+            int hi = route_hex(raw[i + 1]);
+            int lo = route_hex(raw[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                decoded[written++] = (char)((hi << 4) | lo);
+                i += 2;
+                continue;
+            }
+        }
+        decoded[written++] = raw[i];
+    }
+    return utf8_clean(decoded[:written], false) ?? "";
+}
+
+fn JsValue? route_params(Route* route, UwsReq* req) {
+    Heap* heap      = g_rt.rt.heap;
+    HObject* params = heap.alloc_object(OBJECT)!;
+    heap.set_prototype(params, null);
+    TVal value;
+    value.set_object(params);
+    JsValue result = g_rt.root(value)!;
+    foreach (i, key : route.keys) {
+        char* data;
+        sz length    = uws_req_parameter(req, (ushort)i, &data);
+        JsValue text = g_rt.string(route_decode((String)data[:length]))!;
+        TVal k;
+        g_rt.load(key, &k);
+        g_rt.load(text, &value);
+        if (!params.put_prop(k.get_heapptr(), value, hobject::PROP_FLAGS_WEC, heap)) return boomkat::OUT_OF_MEMORY~;
+    }
+    return result;
+}
+
 fn void on_request(void* user, UwsReq* req, UwsRes* res) {
-    Server* s = user;
+    request_arrive((Server*)user, null, req, res);
+}
+
+fn void on_route(void* user, UwsReq* req, UwsRes* res) {
+    Route* route = user;
+    if (route.fixed) {
+        Static* response = &route.response;
+        char* method;
+        sz length        = uws_req_method(req, &method);
+        write_head(res, response.status, response.status_text, response.blob);
+        if ((String)method[:length] == "HEAD" || response.status == 204 || response.status == 304) {
+            uws_res_end_empty(res);
+        } else {
+            uws_res_end(res, response.body.ptr, response.body.len);
+        }
+        return;
+    }
+    request_arrive(route.server, route, req, res);
+}
+
+fn void request_arrive(Server* s, Route* route, UwsReq* req, UwsRes* res) {
     char* mp;
-    sz ml     = uws_req_method(req, &mp);
+    sz ml = uws_req_method(req, &mp);
     char* up;
-    sz ul     = uws_req_url(req, &up);
+    sz ul = uws_req_url(req, &up);
     char* qp;
-    sz ql     = uws_req_query(req, &qp);
-    if (s.statics.len() && serve_static(s, (String)mp[:ml], (String)up[:ul], res)) return;
+    sz ql = uws_req_query(req, &qp);
+    if (!route && s.statics.len() && serve_static(s, (String)mp[:ml], (String)up[:ul], res)) return;
     @pool() {
         String method = (String)mp[:ml];
         UwsHeader[MAX_HEADERS] hbuf;
         CInt nh       = uws_req_headers(req, &hbuf, MAX_HEADERS);
         Conn* c       = conn_new(s, res);
+        c.route = route;
+        c.in_request = true;
+        if (route) {
+            bool ready;
+            g_rt.@scope() {
+                if (try params = route_params(route, req)) {
+                    if (try owned = g_rt.persist(params)) {
+                        c.params = owned;
+                        ready = true;
+                    }
+                }
+            };
+            if (!ready) {
+                finish_plain(c, 500, "Internal Server Error");
+                conn_free(c);
+                return;
+            }
+        }
         c.req = req;
         c.hdrs = hbuf[:nh];
         c.path = (String)up[:ul];
@@ -945,6 +1049,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
             c.body.init(mem, 1024);
             uws_res_on_aborted(res, &on_aborted, c);
             uws_res_on_data(res, &on_data, (void*)(usz)c.id);
+            c.in_request = false;
             return;
         }
         c.in_request = true;
@@ -993,6 +1098,63 @@ fn void js_static_route(JsCtx ctx, void* udata) {
     }
 }
 
+// httpRoute(index, method, pattern, handler, parameterNames)
+fn void js_http_route(JsCtx ctx, void* udata) {
+    @pool() {
+        uint index  = ctx.arg(0).id();
+        JsArg names = ctx.arg(4);
+        if (!names.tv.is_object() || ((HObject*)names.tv.get_heapptr()).get_class() != ARRAY) return ctx.throw_error(
+            TYPE,
+            "route parameters must be an array"
+        );
+        HObject* keys = names.tv.get_heapptr();
+        uint count    = *keys.array_len_ptr();
+        if (count > 100) return ctx.throw_error(RANGE, "too many route parameters");
+        for (uint i = 0; i < count; i++) {
+            TVal key = keys.get_array_idx(i) ?? (TVal) { };
+            if (!key.is_string()) return ctx.throw_error(TYPE, "route parameter names must be strings");
+        }
+
+        foreach (server : g_servers) {
+            if (server.index != index) continue;
+            Route* route = mem::new(Route);
+            route.server = server;
+            route.handler = ctx.persist(ctx.arg(3)) ?? (JsValue) { };
+            route.keys = mem::new_array(JsValue, count);
+            for (uint i = 0; i < count; i++) {
+                JsArg name = { .tv = keys.get_array_idx(i) ?? (TVal) { } };
+                route.keys[i] = ctx.persist(name) ?? (JsValue) { };
+            }
+            server.routes.push(route);
+            String method = ctx.arg(1).as_string() ?? "*";
+            String path   = ctx.arg(2).as_string() ?? "";
+            uws_app_route(server.app, method.zstr_tcopy(), path.zstr_tcopy(), &on_route, route);
+            return;
+        }
+    };
+}
+
+// httpStaticRoute(index, method, pattern, status, statusText, headers, body)
+fn void js_http_static_route(JsCtx ctx, void* udata) {
+    @pool() {
+        uint index = ctx.arg(0).id();
+        foreach (server : g_servers) {
+            if (server.index != index) continue;
+            Route* route = mem::new(Route);
+            route.server = server;
+            route.fixed = true;
+            route.response = { ctx.arg(3)
+                .as_int(200), ((String)ctx.arg(4)
+                    .bytes()).copy(mem), ((String)ctx.arg(5).bytes()).copy(mem), copy_bytes(ctx.arg(6).bytes()) };
+            server.routes.push(route);
+            String method = ctx.arg(1).as_string() ?? "*";
+            String path   = ctx.arg(2).as_string() ?? "";
+            uws_app_route(server.app, method.zstr_tcopy(), path.zstr_tcopy(), &on_route, route);
+            return;
+        }
+    };
+}
+
 // serve(index, hostname, port) -> bound port
 fn void js_serve(JsCtx ctx, void* udata) {
     @pool() {
@@ -1010,6 +1172,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
         s.index = index;
         s.index_value = g_rt.number(index)!!;
         s.statics.init(mem);
+        s.routes.init(mem);
         s.app = uws_app_new(&on_request, s);
         CInt bound = uws_app_listen(s.app, host.zstr_tcopy(), port);
         if (bound < 0) {
@@ -1035,6 +1198,8 @@ fn void js_stop(JsCtx ctx, void* udata) {
 const Native[] HTTP_NATIVES = {
     { "serve", &js_serve, 3 },
     { "staticRoute", &js_static_route, 6 },
+    { "httpRoute", &js_http_route, 5 },
+    { "httpStaticRoute", &js_http_static_route, 7 },
     { "fastTypes", &js_fast_types, 5 },
     { "fetchFor", &js_fetch_for, 3 },
     { "httpFulfilled", &js_http_fulfilled, 1 },
