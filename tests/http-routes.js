@@ -1,9 +1,12 @@
 import { serve } from "http";
-import { args } from "process";
+import { args, main } from "process";
+import { readText } from "file";
 
 const text = (value, status = 200) => new Response(value, { status });
 const json = value => new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
 const fixed = text("cached", 201);
+// Starting after await must retain the server ID used by error callbacks.
+await readText(main);
 const server = serve({
     hostname: "127.0.0.1", port: Number(args[0]),
     routes: {

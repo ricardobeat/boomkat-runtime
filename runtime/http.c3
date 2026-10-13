@@ -1170,7 +1170,8 @@ fn void js_serve(JsCtx ctx, void* udata) {
         }
         Server* s = mem::new(Server);
         s.index = index;
-        s.index_value = g_rt.number(index)!!;
+        // serve may run inside an async completion scope; the ID outlives it.
+        s.index_value = ctx.persist(ctx.number(index))!!;
         s.statics.init(mem);
         s.routes.init(mem);
         s.app = uws_app_new(&on_request, s);

@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='bkr-http-routes-') as directory:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     with open(Path(directory) / 'server.log', 'w+') as log:
-        proc = subprocess.Popen([str(BIN), '--no-prompt', f'--allow-net=127.0.0.1:{port}',
+        proc = subprocess.Popen([str(BIN), '--no-prompt', f'--allow-net=127.0.0.1:{port}', f'--allow-read={ROOT}/tests',
             str(ROOT / 'tests/http-routes.js'), str(port)], stdout=log, stderr=log)
         try:
             for _ in range(100):
