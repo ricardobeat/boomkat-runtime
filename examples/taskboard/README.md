@@ -102,8 +102,10 @@ measurement per case, and records latency, errors, CPU and peak RSS.
 - `server/domain/`: account/session, team, board, list, card, and image operations,
   plus membership checks. Domain methods operate on values and return data;
   they do not construct HTTP responses.
-- `server/http/`: routing, cookies/CSRF, request parsing, response handling,
-  and static assets. Browser sources are served from an explicit allowlist.
+- `server/http/`: a declarative native route table, per-method controllers,
+  cookies/CSRF, request parsing, response handling, and static assets. Browser
+  sources are served from an explicit allowlist. Both runtimes use their native
+  route tree; controllers read decoded `request.params` without URL parsing.
 - `lib/`: reusable errors, HTTP/JSON helpers, validation, prepared statement
   caching, auth rate limits, and image signature detection.
 - `app.tsx`: browser entry point. `client/components/` contains the app shell,

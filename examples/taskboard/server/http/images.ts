@@ -1,43 +1,60 @@
-import { baseHeaders, json, fail } from "../../lib/http.ts";
+import { baseHeaders, json } from "../../lib/http.ts";
 import { id } from "../../lib/validation.ts";
-import type { RouteContext } from "./context.ts";
+import type { RouteRequest } from "http";
+import type { Services } from "../services.ts";
+import type { Session } from "../domain/accounts.ts";
 
-export async function uploadImage(ctx: RouteContext, cardId: number) {
-	const { req, userId, services } = ctx;
-	services.images.prepareUpload(
-		cardId,
-		userId,
-		Number(req.headers.get("content-length") || 0),
-	);
-	const bytes = new Uint8Array(await req.arrayBuffer());
-	const imageId = services.images.add(
-		cardId,
-		userId,
-		bytes,
-		req.headers.get("content-type") || "",
-		req.headers.get("x-file-name") || "image",
-	);
-	return json({ id: imageId }, 201);
-}
-export function imageRoutes(ctx: RouteContext) {
-	const { parts, method, services, userId } = ctx;
-	if (parts.length === 3) {
-		const imageId = id(parts[2]);
-		if (method === "GET" || method === "HEAD") {
-			const row = services.images.get(imageId, userId, method === "HEAD");
-			return new Response(method === "HEAD" ? null : row.data, {
-				headers: {
-					...baseHeaders,
-					"content-type": row.mime,
-					"content-length": String(row.size),
-					"content-security-policy": "default-src 'none'; sandbox",
-				},
-			});
-		}
-		if (method === "DELETE") {
-			services.images.remove(imageId, userId);
-			return json({ ok: true });
-		}
+export function imageHandlers(images: Services["images"]) {
+	function response(
+		req: RouteRequest,
+		session: Session,
+		metadataOnly: boolean,
+	) {
+		const row = images.get(
+			id(req.params.imageId),
+			session.user_id,
+			metadataOnly,
+		);
+		return new Response(metadataOnly ? null : row.data, {
+			headers: {
+				...baseHeaders,
+				"content-type": row.mime,
+				"content-length": String(row.size),
+				"content-security-policy": "default-src 'none'; sandbox",
+			},
+		});
 	}
-	fail(404, "Not found");
+	return {
+		async upload(req: RouteRequest, session: Session) {
+			const cardId = id(req.params.cardId);
+			images.prepareUpload(
+				cardId,
+				session.user_id,
+				Number(req.headers.get("content-length") || 0),
+			);
+			const bytes = new Uint8Array(await req.arrayBuffer());
+			return json(
+				{
+					id: images.add(
+						cardId,
+						session.user_id,
+						bytes,
+						req.headers.get("content-type") || "",
+						req.headers.get("x-file-name") || "image",
+					),
+				},
+				201,
+			);
+		},
+		get(req: RouteRequest, session: Session) {
+			return response(req, session, false);
+		},
+		head(req: RouteRequest, session: Session) {
+			return response(req, session, true);
+		},
+		remove(req: RouteRequest, session: Session) {
+			images.remove(id(req.params.imageId), session.user_id);
+			return json({ ok: true });
+		},
+	};
 }

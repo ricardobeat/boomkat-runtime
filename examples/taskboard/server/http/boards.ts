@@ -1,23 +1,20 @@
-import { body, json, fail } from "../../lib/http.ts";
+import { body, json } from "../../lib/http.ts";
 import { id } from "../../lib/validation.ts";
-import type { RouteContext } from "./context.ts";
+import type { RouteRequest } from "http";
+import type { Boards } from "../domain/boards.ts";
+import type { Session } from "../domain/accounts.ts";
 
-export function boardRoutes(ctx: RouteContext): Response | Promise<Response> {
-	const { parts, method, services, userId } = ctx;
-	if (parts.length === 2 && method === "POST") return create(ctx);
-	if (parts.length === 3) {
-		const boardId = id(parts[2]);
-		if (method === "GET") return json(services.boards.get(boardId, userId));
-		if (method === "DELETE") {
-			services.boards.remove(boardId, userId);
+export function boardHandlers(boards: Boards) {
+	return {
+		async create(req: RouteRequest, session: Session) {
+			return json({ id: boards.create(session.user_id, await body(req)) }, 201);
+		},
+		get(req: RouteRequest, session: Session) {
+			return json(boards.get(id(req.params.boardId), session.user_id));
+		},
+		remove(req: RouteRequest, session: Session) {
+			boards.remove(id(req.params.boardId), session.user_id);
 			return json({ ok: true });
-		}
-	}
-	fail(404, "Not found");
-}
-async function create(ctx: RouteContext) {
-	return json(
-		{ id: ctx.services.boards.create(ctx.userId, await body(ctx.req)) },
-		201,
-	);
+		},
+	};
 }

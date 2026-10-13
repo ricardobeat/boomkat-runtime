@@ -1,37 +1,35 @@
-import { body, json, fail } from "../../lib/http.ts";
+import { body, json } from "../../lib/http.ts";
 import { sessionCookie } from "./auth.ts";
-import type { Accounts } from "../domain/accounts.ts";
-import type { RouteContext } from "./context.ts";
+import type { RouteRequest } from "http";
+import type { Accounts, Session } from "../domain/accounts.ts";
 
-export async function signIn(
-	req: Request,
-	action: string,
-	accounts: Accounts,
-	origin: string,
-) {
-	const input = await body(req);
-	const result =
-		action === "register"
-			? await accounts.register(input)
-			: await accounts.login(input);
-	return json(
-		{ user: result.user, csrf: result.csrf },
-		action === "register" ? 201 : 200,
-		{ "set-cookie": sessionCookie(result.token, origin) },
-	);
-}
-export function accountRoutes(ctx: RouteContext, origin: string) {
-	const { parts, method, session, services, userId } = ctx;
-	if (parts.length === 2 && parts[1] === "me" && method === "GET")
-		return json({
-			user: { id: userId, name: session.name, email: session.email },
-			csrf: session.csrf,
-		});
-	if (parts.length === 2 && parts[1] === "logout" && method === "POST") {
-		services.accounts.logout(session.token_hash);
-		return json({ ok: true }, 200, {
-			"set-cookie": sessionCookie("", origin, 0),
+export function accountHandlers(accounts: Accounts, origin: string) {
+	function signedIn(
+		result: { user: unknown; csrf: string; token: string },
+		status: number,
+	) {
+		return json({ user: result.user, csrf: result.csrf }, status, {
+			"set-cookie": sessionCookie(result.token, origin),
 		});
 	}
-	fail(404, "Not found");
+	return {
+		async register(req: RouteRequest) {
+			return signedIn(await accounts.register(await body(req)), 201);
+		},
+		async login(req: RouteRequest) {
+			return signedIn(await accounts.login(await body(req)), 200);
+		},
+		me(_req: RouteRequest, session: Session) {
+			return json({
+				user: { id: session.user_id, name: session.name, email: session.email },
+				csrf: session.csrf,
+			});
+		},
+		logout(_req: RouteRequest, session: Session) {
+			accounts.logout(session.token_hash);
+			return json({ ok: true }, 200, {
+				"set-cookie": sessionCookie("", origin, 0),
+			});
+		},
+	};
 }

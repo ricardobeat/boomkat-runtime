@@ -1,5 +1,6 @@
 import { createServices } from "./services.ts";
-import { createHttpHandler } from "./http/router.ts";
+import { createRoutes } from "./http/router.ts";
+import { json, errorResponse } from "../lib/http.ts";
 import { createAssets } from "./http/assets.ts";
 import type { Platform } from "./platform.ts";
 
@@ -16,11 +17,22 @@ export async function startTaskboard(platform: Platform) {
 		db.exec(await platform.readText(root + "/schema.sql"));
 		const services = await createServices(db, platform);
 		const assets = await createAssets(platform, root);
+		const routes = createRoutes(services, platform, origin);
+		for (const [path, response] of Object.entries(assets)) {
+			routes[path] = {
+				GET: response,
+				HEAD: new Response(null, {
+					status: response.status,
+					headers: response.headers,
+				}),
+			};
+		}
 		return platform.serve({
 			hostname: "127.0.0.1",
 			port,
-			static: assets,
-			fetch: createHttpHandler(services, platform, origin),
+			routes,
+			fetch: () => json({ error: "Not found" }, 404),
+			error: errorResponse,
 			onListen() {
 				console.log(
 					`Taskboard: ${origin}\nDatabase: ${dataDir}/taskboard.sqlite`,

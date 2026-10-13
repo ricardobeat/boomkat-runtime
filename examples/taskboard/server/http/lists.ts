@@ -1,27 +1,21 @@
-import { body, json, fail } from "../../lib/http.ts";
+import { body, json } from "../../lib/http.ts";
 import { id } from "../../lib/validation.ts";
-import type { RouteContext } from "./context.ts";
+import type { RouteRequest } from "http";
+import type { Services } from "../services.ts";
+import type { Session } from "../domain/accounts.ts";
 
-export function listRoutes(ctx: RouteContext): Response | Promise<Response> {
-	const { parts, method, services, userId } = ctx;
-	if (parts.length === 2 && method === "POST") return create(ctx);
-	if (parts.length === 3) {
-		const listId = id(parts[2]);
-		if (method === "DELETE") {
-			services.lists.remove(listId, userId);
+export function listHandlers(lists: Services["lists"]) {
+	return {
+		async create(req: RouteRequest, session: Session) {
+			return json({ id: lists.create(session.user_id, await body(req)) }, 201);
+		},
+		async update(req: RouteRequest, session: Session) {
+			lists.update(id(req.params.listId), session.user_id, await body(req));
 			return json({ ok: true });
-		}
-		if (method === "PATCH") return update(ctx, listId);
-	}
-	fail(404, "Not found");
-}
-async function create(ctx: RouteContext) {
-	return json(
-		{ id: ctx.services.lists.create(ctx.userId, await body(ctx.req)) },
-		201,
-	);
-}
-async function update(ctx: RouteContext, listId: number) {
-	ctx.services.lists.update(listId, ctx.userId, await body(ctx.req));
-	return json({ ok: true });
+		},
+		remove(req: RouteRequest, session: Session) {
+			lists.remove(id(req.params.listId), session.user_id);
+			return json({ ok: true });
+		},
+	};
 }

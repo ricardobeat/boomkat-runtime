@@ -1,4 +1,5 @@
 import type { Database } from "sqlite";
+import type { Routes } from "http";
 
 export interface Crypto {
 	hashPassword(password: string): Promise<string>;
@@ -23,8 +24,9 @@ export interface Platform extends Crypto {
 	serve(options: {
 		hostname: string;
 		port: number;
-		static: Record<string, Response>;
+		routes: Routes;
 		fetch(request: Request): Response | Promise<Response>;
+		error(error: unknown): Response | Promise<Response>;
 		onListen(): void;
 	}): unknown;
 }

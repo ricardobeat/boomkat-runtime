@@ -109,27 +109,17 @@ export function transpile(
 export function serve(options: {
 	hostname: string;
 	port: number;
-	static: Record<string, Response>;
-	fetch: (req: Request) => Promise<Response>;
+	routes: import("http").Routes;
+	fetch: (req: Request) => Response | Promise<Response>;
+	error: (error: unknown) => Response | Promise<Response>;
 	onListen: () => void;
 }) {
-	const routes = Object.fromEntries(
-		Object.entries(options.static).map(([path, response]) => [
-			path,
-			{
-				GET: response,
-				HEAD: new Response(null, {
-					status: response.status,
-					headers: response.headers,
-				}),
-			},
-		]),
-	);
 	const server = Bun.serve({
 		hostname: options.hostname,
 		port: options.port,
-		routes,
+		routes: options.routes,
 		fetch: options.fetch,
+		error: options.error,
 		development: false,
 		idleTimeout: 10,
 		maxRequestBodySize: 16 * 1024 * 1024,

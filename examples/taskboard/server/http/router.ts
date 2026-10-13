@@ -1,66 +1,79 @@
-import { checkOrigin, errorResponse, fail, json } from "../../lib/http.ts";
+import { checkOrigin, fail } from "../../lib/http.ts";
 import { authenticateRequest } from "./auth.ts";
-import { accountRoutes, signIn } from "./accounts.ts";
-import { teamRoutes } from "./teams.ts";
-import { boardRoutes } from "./boards.ts";
-import { listRoutes } from "./lists.ts";
-import { cardRoutes } from "./cards.ts";
-import { imageRoutes } from "./images.ts";
+import { accountHandlers } from "./accounts.ts";
+import { teamHandlers } from "./teams.ts";
+import { boardHandlers } from "./boards.ts";
+import { listHandlers } from "./lists.ts";
+import { cardHandlers } from "./cards.ts";
+import { imageHandlers } from "./images.ts";
+import type { RouteHandler, RouteRequest, Routes } from "http";
 import type { Services } from "../services.ts";
 import type { Crypto } from "../platform.ts";
+import type { Session } from "../domain/accounts.ts";
 
-export function createHttpHandler(
+type AuthenticatedHandler = (
+	req: RouteRequest,
+	session: Session,
+) => Response | Promise<Response>;
+export function createRoutes(
 	services: Services,
 	crypto: Crypto,
 	origin: string,
-) {
-	function route(req: Request): Response | Promise<Response> {
-		const url = new URL(req.url);
-		if (!url.pathname.startsWith("/api/")) fail(404, "Not found");
-		const parts = url.pathname.split("/").filter(Boolean),
-			method = req.method;
-		checkOrigin(req, origin);
-		if (
-			parts.length === 2 &&
-			method === "POST" &&
-			(parts[1] === "register" || parts[1] === "login")
-		)
-			return signIn(req, parts[1], services.accounts, origin);
-		const session = authenticateRequest(req, services.accounts, crypto);
-		const ctx = {
-			req,
-			parts,
-			method,
-			services,
-			session,
-			userId: session.user_id,
+): Routes {
+	// Wrappers run synchronously unless the controller itself returns a promise.
+	function authenticated(handler: AuthenticatedHandler): RouteHandler {
+		return (req) => {
+			checkOrigin(req, origin);
+			return handler(req, authenticateRequest(req, services.accounts, crypto));
 		};
-		switch (parts[1]) {
-			case "me":
-			case "logout":
-				return accountRoutes(ctx, origin);
-			case "workspace":
-				if (parts.length === 2 && method === "GET")
-					return json(services.teams.workspace(ctx.userId));
-				break;
-			case "teams":
-				return teamRoutes(ctx);
-			case "boards":
-				return boardRoutes(ctx);
-			case "lists":
-				return listRoutes(ctx);
-			case "cards":
-				return cardRoutes(ctx);
-			case "images":
-				return imageRoutes(ctx);
-		}
-		fail(404, "Not found");
 	}
-	return async function fetch(req: Request) {
-		try {
-			return await route(req);
-		} catch (error) {
-			return errorResponse(error);
-		}
+	function publicWrite(handler: RouteHandler): RouteHandler {
+		return (req, server) => {
+			checkOrigin(req, origin);
+			return handler(req, server);
+		};
+	}
+	const accounts = accountHandlers(services.accounts, origin);
+	const teams = teamHandlers(services.teams);
+	const boards = boardHandlers(services.boards);
+	const lists = listHandlers(services.lists);
+	const cards = cardHandlers(services.cards);
+	const images = imageHandlers(services.images);
+	return {
+		"/api/register": { POST: publicWrite(accounts.register) },
+		"/api/login": { POST: publicWrite(accounts.login) },
+		"/api/me": { GET: authenticated(accounts.me) },
+		"/api/logout": { POST: authenticated(accounts.logout) },
+		"/api/workspace": { GET: authenticated(teams.workspace) },
+		"/api/teams": { POST: authenticated(teams.create) },
+		"/api/teams/:teamId/members": {
+			GET: authenticated(teams.members),
+			POST: authenticated(teams.addMember),
+		},
+		"/api/teams/:teamId/members/:memberId": {
+			DELETE: authenticated(teams.removeMember),
+		},
+		"/api/boards": { POST: authenticated(boards.create) },
+		"/api/boards/:boardId": {
+			GET: authenticated(boards.get),
+			DELETE: authenticated(boards.remove),
+		},
+		"/api/lists": { POST: authenticated(lists.create) },
+		"/api/lists/:listId": {
+			PATCH: authenticated(lists.update),
+			DELETE: authenticated(lists.remove),
+		},
+		"/api/cards": { POST: authenticated(cards.create) },
+		"/api/cards/:cardId": {
+			PATCH: authenticated(cards.update),
+			DELETE: authenticated(cards.remove),
+		},
+		"/api/cards/:cardId/images": { POST: authenticated(images.upload) },
+		"/api/images/:imageId": {
+			GET: authenticated(images.get),
+			HEAD: authenticated(images.head),
+			DELETE: authenticated(images.remove),
+		},
+		"/api/*": authenticated(() => fail(404, "Not found")),
 	};
 }
