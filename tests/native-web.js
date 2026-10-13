@@ -311,4 +311,87 @@ observe("Headers parse custom split",()=>Headers._fromBlob({split(){return ["x",
 observe("Headers parse metadata",()=>[Headers._fromBlob.name,Headers._fromBlob.length]);
 for (let i = 0; i < (args[0] === "stress" ? 300 : 30000); i++) new URL("http://example.com/churn?" + i);
 observe("retained after churn", () => [new URL("http://example.com/a").pathname, new Response("x")._body]);
+
+observe("Headers record ASCII",()=>{
+    const h=new Headers({"X-Test":" \t first \r\n", "x-test":"second", "x-empty":""});
+    return [h._blob(),h.get("x-test"),h.get("x-empty"),h._map.size];
+});
+observe("Headers record null prototype",()=>{
+    const o=Object.create(null);o[2]="two";o[1]="one";o["X-Name"]="yes";
+    Object.defineProperty(o,"hidden",{value:"ignored"});o[Symbol("secret")]="ignored";
+    return new Headers(o)._blob();
+});
+observe("Headers record non-ASCII",()=>new Headers({"X-Name":"\u00a0 café 😀 \u00a0"})._blob());
+observe("Headers record getters and conversion",()=>{
+    const calls=[];const o={a:"one",b:{toString(){calls.push("convert");return " two ";}}};
+    Object.defineProperty(o,"c",{enumerable:true,get(){calls.push("get");return "three";}});
+    return [new Headers(o)._blob(),calls];
+});
+observe("Headers record Object.keys patch",()=>{
+    const saved=Object.keys;let calls=0;
+    try {Object.keys=()=>{calls++;return ["b","a"];};return [new Headers({a:"one",b:"two"})._blob(),calls];}
+    finally{Object.keys=saved;}
+});
+observe("Headers record Object replacement",()=>{
+    const saved=Object;
+    try {globalThis.Object={keys:saved.keys};return new Headers({x:"y"})._blob();}
+    finally{globalThis.Object=saved;}
+});
+observe("Headers record Symbol replacement",()=>{
+    const saved=Symbol;let calls=0;const o={x:"y"};
+    Object.defineProperty(o,"probe",{get(){calls++;return undefined;}});
+    try {globalThis.Symbol={iterator:"probe"};return [new Headers(o)._blob(),calls];}
+    finally{globalThis.Symbol=saved;}
+});
+observe("Headers record iterator getter",()=>{
+    let calls=0;const o={x:"y"};
+    Object.defineProperty(o,Symbol.iterator,{get(){calls++;return undefined;}});
+    return [new Headers(o)._blob(),calls];
+});
+observe("Headers record custom iterator",()=>{
+    const o={x:"ignored",*[Symbol.iterator](){yield ["X-One","one"];yield ["x-two","two"];}};
+    return new Headers(o)._blob();
+});
+observe("Headers record array iterator patch",()=>{
+    const key=Symbol.iterator,saved=Array.prototype[key];
+    try {Array.prototype[key]=function*(){yield "b";};return new Headers({a:"one",b:"two"})._blob();}
+    finally{Array.prototype[key]=saved;}
+});
+observe("Headers record array next getter",()=>{
+    const proto=Object.getPrototypeOf([][Symbol.iterator]());const saved=Object.getOwnPropertyDescriptor(proto,"next");let calls=0;
+    try {Object.defineProperty(proto,"next",{configurable:true,get(){calls++;return saved.value;}});return [new Headers({x:"y"})._blob(),calls];}
+    finally{Object.defineProperty(proto,"next",saved);}
+});
+observe("Headers record instance getter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Headers,Symbol.hasInstance);let calls=0;
+    try {Object.defineProperty(Headers,Symbol.hasInstance,{configurable:true,get(){calls++;return Function.prototype[Symbol.hasInstance];}});return [new Headers({x:"y"})._blob(),calls];}
+    finally{if(saved)Object.defineProperty(Headers,Symbol.hasInstance,saved);else delete Headers[Symbol.hasInstance];}
+});
+for (const method of ["toLowerCase","trim"]) {
+    observe("Headers record string getter "+method,()=>{
+        const saved=Object.getOwnPropertyDescriptor(String.prototype,method);let calls=0;
+        try {Object.defineProperty(String.prototype,method,{configurable:true,get(){calls++;return saved.value;}});return [new Headers({X:" y ",Y:" z "})._blob(),calls];}
+        finally{Object.defineProperty(String.prototype,method,saved);}
+    });
+}
+observe("Headers record String replacement",()=>{
+    const saved=String;let calls=0;
+    try {globalThis.String=value=>{calls++;return saved(value);};return [new Headers({x:"y"})._blob(),calls];}
+    finally{globalThis.String=saved;}
+});
+observe("Headers record Map.set getter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Map.prototype,"set");let calls=0;
+    try {Object.defineProperty(Map.prototype,"set",{configurable:true,get(){calls++;return saved.value;}});return [new Headers({x:"y",a:"b"})._blob(),calls];}
+    finally{Object.defineProperty(Map.prototype,"set",saved);}
+});
+observe("Headers record cookie append getter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Headers.prototype,"append");let calls=0;
+    try {Object.defineProperty(Headers.prototype,"append",{configurable:true,get(){calls++;return saved.value;}});const h=new Headers({x:"y","Set-Cookie":"a=1"});return [h._blob(),h.getSetCookie(),calls];}
+    finally{Object.defineProperty(Headers.prototype,"append",saved);}
+});
+observe("Headers record receiver setter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Headers.prototype,"_map");let calls=0;
+    try {Object.defineProperty(Headers.prototype,"_map",{configurable:true,set(value){calls++;Object.defineProperty(this,"_map",{value,writable:true,configurable:true,enumerable:true});}});return [new Headers({x:"y"})._blob(),calls];}
+    finally{if(saved)Object.defineProperty(Headers.prototype,"_map",saved);else delete Headers.prototype._map;}
+});
 console.log(JSON.stringify(rows));

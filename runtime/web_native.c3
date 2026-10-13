@@ -648,8 +648,219 @@ fn void js_native_headers_from_blob(JsCtx ctx, void* user) {
     ctx.ret(result);
 }
 
+// Record construction uses no guest callbacks when all entries are ASCII
+// strings and the conversion, enumeration and Map methods remain intrinsic.
+struct NativeHeadersRecord
+{
+	TVal[7] dependencies;
+	HString* object_key;
+	HString* keys_key;
+	HString* symbol_key;
+	HString* iterator_key;
+	JsValue[11] roots;
+}
+NativeHeadersRecord g_native_headers_record;
+
+fn bool web_data_or_missing(HObject* obj, HString* key, Heap* h, TVal* value)
+{
+	for (uint depth = 0; obj && depth < 32; depth++, obj = obj.prototype)
+	{
+		if (obj.flags.exotic_proxyobj) return false;
+		int slot = obj.find_prop_idx(key, h);
+		if (slot < 0) continue;
+		if (obj.get_prop_flags((uint)slot, h).is_accessor) return false;
+		*value = obj.prop_values()[slot].get();
+		return true;
+	}
+	value.set_undefined();
+	return obj == null;
+}
+
+fn void native_headers_record(BuiltinContext* raw, void* user)
+{
+	@pool()
+	{
+		JsCtx ctx = { .ctx = raw };
+		ctx.ret_bool(false);
+		NativeHeadersRecord* cls   = user;
+		NativeHeadersBlob* headers = &g_native_headers_blob;
+		NativeHeadersParse* parse  = &g_native_headers_parse;
+		TVal receiver              = ctx.arg(0).tv;
+		TVal input                 = ctx.arg(1).tv;
+		if (!receiver.is_object() || !input.is_object()) return;
+		HObject* obj    = receiver.get_heapptr();
+		HObject* record = input.get_heapptr();
+		Heap* h         = raw.heap;
+		if (obj.prototype != headers.prototype || obj.flags.exotic_proxyobj || record.get_class() != OBJECT
+			|| record.flags.exotic_proxyobj
+			|| record.array_used
+			|| (record.prototype && record.prototype != h.object_proto)) return;
+		TVal object_ctor, string_ctor, symbol_ctor, symbol_iterator, map_value, iterator;
+		if (!web_own_data(
+			raw.global_env.bindings,
+			cls.object_key,
+			h,
+			&object_ctor
+		) || object_ctor.get_raw_bits() != cls.dependencies[1].get_raw_bits() || !web_method_is(
+			object_ctor.get_heapptr(),
+			cls.keys_key,
+			cls.dependencies[2],
+			h
+		) || !web_own_data(
+			raw.global_env.bindings,
+			parse.keys[1],
+			h,
+			&string_ctor
+		) || string_ctor.get_raw_bits() != parse.dependencies[2].get_raw_bits() || !web_method_is(
+			h.string_proto,
+			parse.keys[3],
+			parse.dependencies[4],
+			h
+		) || !web_method_is(
+			h.string_proto,
+			parse.keys[4],
+			parse.dependencies[5],
+			h
+		) || !web_method_is(
+			h.array_proto,
+			builtins::ensure_iterator_symbol(h),
+			cls.dependencies[3],
+			h
+		) || !web_method_is(
+			h.array_iterator_proto,
+			headers.next_key,
+			cls.dependencies[4],
+			h
+		) || !web_own_data(
+			raw.global_env.bindings,
+			cls.symbol_key,
+			h,
+			&symbol_ctor
+		) || symbol_ctor.get_raw_bits() != cls.dependencies[5].get_raw_bits() || !web_own_data(
+			symbol_ctor.get_heapptr(),
+			cls.iterator_key,
+			h,
+			&symbol_iterator
+		) || symbol_iterator.get_raw_bits() != cls.dependencies[6].get_raw_bits() || !web_own_data(
+			obj,
+			headers.map_key,
+			h,
+			&map_value
+		) || !map_value.is_object()) return;
+		HObject* map = map_value.get_heapptr();
+		if (map.get_class() != MAP || map.array_used || !web_method_is(
+			map,
+			parse.keys[7],
+			parse.dependencies[8],
+			h
+		)) return;
+		bool instance;
+		if (!web_instanceof(
+			h,
+			input,
+			cls.dependencies[0],
+			&instance
+		) || instance || !web_data_or_missing(
+			record,
+			builtins::ensure_iterator_symbol(h),
+			h,
+			&iterator
+		) || (!iterator.is_undefined() && !iterator.is_null())) return;
+		HString*[] keys = mem::temp_array(HString*, record.prop_count);
+		uint count      = builtins::collect_own_enum_string_keys(h, record, keys.ptr);
+		// Validate before touching the receiver, so fallback preserves getters
+		// and coercions in the original constructor's order.
+		for (uint i = 0; i < count; i++)
+		{
+			TVal value;
+			if (!keys[i].is_ascii() || ((String)keys[i].get_data()).compare_to_ignore_case(
+				"set-cookie"
+			) == 0 || !web_own_data(
+				record,
+				keys[i],
+				h,
+				&value
+			) || !value
+				.is_string() || ((HString*)value.get_heapptr())
+					.is_symbol() || !((HString*)value.get_heapptr()).is_ascii()) return;
+		}
+		for (uint i = 0; i < count; i++)
+		{
+			char[] name = keys[i].get_data();
+			bool lower  = true;
+			foreach (c : name) if (c >= 'A' && c <= 'Z')
+			{
+				lower = false;
+				break;
+			}
+			JsArg key;
+			if (lower)
+			{
+				key.tv.set_string_borrowed(keys[i]);
+			}
+			else
+			{
+				char[] normalized = mem::temp_array(char, name.len);
+				foreach (n, c : name) normalized[n] = c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+				key = ctx.string((String)normalized);
+			}
+			TVal value;
+			(void)web_own_data(record, keys[i], h, &value);
+			char[] bytes = ((HString*)value.get_heapptr()).get_data();
+			usz start    = 0;
+			usz end      = bytes.len;
+			while (start < end && web_header_ascii_space(bytes[start])) start++;
+			while (end > start && web_header_ascii_space(bytes[end - 1])) end--;
+			if (start || end != bytes.len) value = ctx.string((String)bytes[start:end - start]).tv;
+			int found = builtins::map_find_key(map, key.tv, h);
+			if (found >= 0)
+			{
+				h.store_slot_ref(map, &map.array_part()[(uint)found + 1], &value);
+			}
+			else
+			{
+				uint at = map.array_used;
+				if (!map.set_array_idx(at, key.tv, h) || !map.set_array_idx(at + 1, value, h))
+				{
+					return ctx.throw_error(ERROR, "Headers allocation failed");
+				}
+			}
+		}
+		ctx.ret_bool(true);
+	};
+}
+
+fn void js_native_headers_record(JsCtx ctx, void* user)
+{
+	NativeHeadersRecord* cls = &g_native_headers_record;
+	if (!cls.roots[0].is_empty()) return ctx.throw_error(TYPE, "Headers record initializer already installed");
+	for (uint i = 0; i < 7; i++)
+	{
+		cls.dependencies[i] = ctx.arg(i).tv;
+		cls.roots[i] = ctx.persist(ctx.arg(i))!!;
+	}
+	JsArg object_key = ctx.string("Object");
+	JsArg keys_key   = ctx.string("keys");
+	cls.object_key = object_key.tv.get_heapptr();
+	cls.keys_key = keys_key.tv.get_heapptr();
+	cls.roots[7] = ctx.persist(object_key)!!;
+	cls.roots[8] = ctx.persist(keys_key)!!;
+	JsArg symbol_key   = ctx.string("Symbol");
+	JsArg iterator_key = ctx.string("iterator");
+	cls.symbol_key = symbol_key.tv.get_heapptr();
+	cls.iterator_key = iterator_key.tv.get_heapptr();
+	cls.roots[9] = ctx.persist(symbol_key)!!;
+	cls.roots[10] = ctx.persist(iterator_key)!!;
+	HObject*? made = web_host_function(ctx.ctx.heap, "_initRecord", &native_headers_record, cls, 2, false);
+	if (catch made) return ctx.throw_error(ERROR, "Headers record initializer allocation failed");
+	JsArg result;
+	result.tv.set_object(made);
+	ctx.ret(result);
+}
+
 const Native[] WEB_NATIVES = {
     { "nativeClass", &js_native_class, 6 },
     { "nativeHeadersBlob", &js_native_headers_blob, 4 },
     { "nativeHeadersFromBlob", &js_native_headers_from_blob, 9 },
+    { "nativeHeadersRecord", &js_native_headers_record, 7 },
 };

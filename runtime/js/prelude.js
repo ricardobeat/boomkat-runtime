@@ -872,11 +872,13 @@ def("URLSearchParams", URLSearchParams);
 
 // ---- Headers ----
 
+let initHeaderRecord;
 class Headers {
     constructor(init) {
         this._map = new Map();
         this._cookies = null;
         if (init === INTERNAL || init === undefined || init === null) return;
+        if (initHeaderRecord(this, init)) return;
         if (init instanceof Headers) {
             for (const e of init._map) this._map.set(e[0], e[1]);
             if (init._cookies) this._cookies = init._cookies.slice();
@@ -964,6 +966,9 @@ Object.defineProperty(Headers, "_fromBlob", {
         Headers.prototype.append, Map.prototype.get, Map.prototype.set),
     writable: true, configurable: true,
 });
+initHeaderRecord = bk.nativeHeadersRecord(Headers, Object, Object.keys,
+    Array.prototype[Symbol.iterator], Object.getPrototypeOf([][Symbol.iterator]()).next,
+    Symbol, Symbol.iterator);
 hidden(Headers, { INTERNAL });
 def("Headers", Headers);
 
