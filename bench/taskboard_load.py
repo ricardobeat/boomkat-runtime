@@ -212,6 +212,7 @@ def main():
     bkr_binary=BIN
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime',choices=['bkr','bun'],default='bkr')
+    parser.add_argument('--http-workers',type=int,default=1,help='Runtime-owned server workers (BKR only)')
     parser.add_argument('--seconds',type=int,default=8)
     parser.add_argument('--warmup',type=int,default=1)
     parser.add_argument('--connections',default='1,32,128')
@@ -224,6 +225,8 @@ def main():
     if opts.profile_dir: opts.profile_dir.mkdir(parents=True,exist_ok=True)
     if opts.runtime=='bun' and opts.byte_json:
         parser.error('--byte-json is a BKR-only diagnostic')
+    if not 1 <= opts.http_workers <= 64 or (opts.runtime=='bun' and opts.http_workers!=1):
+        parser.error('--http-workers must be 1..64 and requires BKR for multiple workers')
     if opts.runtime=='bun':
         BIN=Path(os.environ.get('BUN_BIN') or shutil.which('bun')).resolve()
     connections=[int(c) for c in opts.connections.split(',')]
@@ -258,7 +261,7 @@ def main():
             stop()
             log=open(directory/'server.log','w+')
             command=([str(BIN),str(app/'server.bun.ts'),str(port),str(directory)] if runtime=='bun' else
-                [str(bkr_binary),'--no-prompt',f'--allow-net=127.0.0.1:{port}',
+                [str(bkr_binary),'--no-prompt',f'--http-workers={opts.http_workers}',f'--allow-net=127.0.0.1:{port}',
                 f'--allow-read={app},{directory}',f'--allow-write={directory}',str(app/'server.ts'),str(port),str(directory)])
             env=os.environ.copy()
             if runtime=='bun': env['TASKBOARD_BENCH_ASSET']=str(directory/'common-app.js')
@@ -267,7 +270,12 @@ def main():
                 if proc.poll() is not None:
                     log.seek(0);raise RuntimeError(log.read())
                 try:
-                    with urllib.request.urlopen(origin,timeout=.2):return
+                    with urllib.request.urlopen(origin,timeout=.2):
+                        if runtime=='bkr' and opts.http_workers>1:
+                            log.seek(0)
+                            if f'HTTP workers ready: {opts.http_workers}' not in log.read():
+                                time.sleep(.05);continue
+                        return
                 except (OSError,urllib.error.URLError):time.sleep(.05)
             raise RuntimeError('Server startup timed out')
         try:
@@ -329,6 +337,8 @@ def main():
             report={'date_utc':datetime.now(timezone.utc).isoformat(),'binary':str(BIN),
                     'profiled':bool(opts.profile_dir),
                     'runtime':opts.runtime,'runtime_version':run_checked([str(BIN),'--version']).strip() if opts.runtime=='bun' else None,
+                    'http_workers':opts.http_workers,
+                    'http_distribution':'runtime round-robin accepted connections' if opts.http_workers>1 else 'single VM',
                     'asset_sha256':hashlib.sha256(asset).hexdigest(),
                     'binary_sha256':hashlib.sha256(BIN.read_bytes()).hexdigest(),
                     'runtime_commit':run_checked(['git','rev-parse','HEAD'],cwd=ROOT).strip(),
@@ -384,6 +394,9 @@ def main():
                     _,cpu1=process_stats(proc.pid)
                     elapsed=time.monotonic()-begin
                     row=parse_wrk(output)
+                    if row['errors']:
+                        log.flush();log.seek(0)
+                        row['server_errors']=log.read()[-8000:]
                     row.update(workload=kind,connections=c,peak_rss_mib=round(peak,2),
                                idle_rss_mib=round(baseline,2),cpu_percent=round(100*(cpu1-cpu0)/elapsed,1),
                                raw=output)
