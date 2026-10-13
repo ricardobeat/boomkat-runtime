@@ -255,6 +255,60 @@ observe("Headers blob throwing iterator", () => {
     h._map[Symbol.iterator]=()=>{throw error;};
     try{h._blob();}catch(caught){return caught===error;}
 });
+for (const blob of ["", "ignored", "X-One\n first \nX-One\nsecond\nX-Two\n\ttrim\r\n", "key\n", "\n", "a\nb\nc", "x\n\bno trim\0\n", "x\né😀\n", "Set-Cookie\na=1\nset-cookie\nb=2\n"]) {
+    observe("Headers parse " + JSON.stringify(blob), () => {
+        const h=Headers._fromBlob(blob);
+        return [h._blob(),h.get("x-one"),h.getSetCookie(),Object.keys(h),h instanceof Headers];
+    });
+}
+observe("Headers parse large map and mutations",()=>{
+    let blob="";for(let i=0;i<100;i++)blob+=`X-${i}\nv${i}\n`;
+    const h=Headers._fromBlob(blob);
+    h.set("x-5","updated");h.delete("x-7");h.append("x-99","last");h.set("x-new","new");
+    return [h._map.size,h.get("x-5"),h.get("x-7"),h.get("x-99"),h.get("x-new"),h._blob()];
+});
+observe("Headers parse Map constructor patch",()=>{
+    const saved=globalThis.Map;let calls=0;
+    try {globalThis.Map=class extends saved{constructor(){super();calls++;}};return [Headers._fromBlob("x\ny\n")._blob(),calls];}
+    finally{globalThis.Map=saved;}
+});
+observe("Headers parse String patch",()=>{
+    const saved=globalThis.String;let calls=0;
+    try {globalThis.String=function(value){calls++;return saved(value);};return [Headers._fromBlob("x\ny\n")._blob(),calls];}
+    finally{globalThis.String=saved;}
+});
+for(const method of ["split","toLowerCase","trim"]){
+    observe("Headers parse String method patch "+method,()=>{
+        const saved=String.prototype[method];let calls=0;
+        try {String.prototype[method]=function(...args){calls++;return saved.apply(this,args);};return [Headers._fromBlob("X\n y \n")._blob(),calls];}
+        finally{String.prototype[method]=saved;}
+    });
+}
+for(const method of ["get","set"]){
+    observe("Headers parse Map method patch "+method,()=>{
+        const saved=Map.prototype[method];let calls=0;
+        try {Map.prototype[method]=function(...args){calls++;return saved.apply(this,args);};return [Headers._fromBlob("x\ny\nx\nz\n")._blob(),calls];}
+        finally{Map.prototype[method]=saved;}
+    });
+}
+observe("Headers parse append patch",()=>{
+    const saved=Headers.prototype.append;let calls=0;
+    try {Headers.prototype.append=function(...args){calls++;return saved.apply(this,args);};return [Headers._fromBlob("x\ny\n")._blob(),calls];}
+    finally{Headers.prototype.append=saved;}
+});
+observe("Headers parse append getter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Headers.prototype,"append");let calls=0;
+    try {Object.defineProperty(Headers.prototype,"append",{configurable:true,get(){calls++;return saved.value;}});return [Headers._fromBlob("x\ny\n")._blob(),calls];}
+    finally{Object.defineProperty(Headers.prototype,"append",saved);}
+});
+observe("Headers parse field setter",()=>{
+    const saved=Object.getOwnPropertyDescriptor(Headers.prototype,"_map");let calls=0;
+    try {Object.defineProperty(Headers.prototype,"_map",{configurable:true,set(v){calls++;Object.defineProperty(this,"_map",{value:v,writable:true,configurable:true,enumerable:true});}});return [Headers._fromBlob("x\ny\n")._blob(),calls];}
+    finally{if(saved)Object.defineProperty(Headers.prototype,"_map",saved);else delete Headers.prototype._map;}
+});
+observe("Headers parse malformed argument",()=>Headers._fromBlob(42));
+observe("Headers parse custom split",()=>Headers._fromBlob({split(){return ["x","object"];}})._blob());
+observe("Headers parse metadata",()=>[Headers._fromBlob.name,Headers._fromBlob.length]);
 for (let i = 0; i < (args[0] === "stress" ? 300 : 30000); i++) new URL("http://example.com/churn?" + i);
 observe("retained after churn", () => [new URL("http://example.com/a").pathname, new Response("x")._body]);
 console.log(JSON.stringify(rows));

@@ -958,6 +958,12 @@ Object.defineProperty(Headers.prototype, "_blob", {
         Map.prototype[Symbol.iterator], Object.getPrototypeOf(new Map().entries()).next),
     writable: true, configurable: true,
 });
+Object.defineProperty(Headers, "_fromBlob", {
+    value: bk.nativeHeadersFromBlob(Headers._fromBlob, Map, String,
+        String.prototype.split, String.prototype.toLowerCase, String.prototype.trim,
+        Headers.prototype.append, Map.prototype.get, Map.prototype.set),
+    writable: true, configurable: true,
+});
 hidden(Headers, { INTERNAL });
 def("Headers", Headers);
 

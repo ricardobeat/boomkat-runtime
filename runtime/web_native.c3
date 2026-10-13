@@ -479,7 +479,177 @@ fn void js_native_headers_blob(JsCtx ctx, void* user) {
     ctx.ret(result);
 }
 
+struct NativeHeadersParse {
+    TVal[9] dependencies;
+    HString*[8] keys;
+    JsValue[17] roots;
+}
+NativeHeadersParse g_native_headers_parse;
+
+fn bool web_header_ascii_space(char c) => c == ' ' || (c >= 9 && c <= 13);
+
+fn void native_headers_from_blob(BuiltinContext* raw, void* user) {
+    @pool() {
+        JsCtx ctx                  = { .ctx = raw };
+        NativeHeadersParse* cls    = user;
+        NativeHeadersBlob* headers = &g_native_headers_blob;
+        TVal input                 = ctx.arg(0).tv;
+        TVal map_ctor, string_ctor;
+        bool fast                  = input.is_string() && ((HString*)input.get_heapptr()).is_ascii() && web_own_data(
+            raw.global_env.bindings,
+            cls.keys[0],
+            raw.heap,
+            &map_ctor
+        ) && map_ctor.get_raw_bits() == cls.dependencies[1].get_raw_bits() && web_own_data(
+            raw.global_env.bindings,
+            cls.keys[1],
+            raw.heap,
+            &string_ctor
+        ) && string_ctor.get_raw_bits() == cls.dependencies[2].get_raw_bits() && web_method_is(
+            raw.heap.string_proto,
+            cls.keys[2],
+            cls.dependencies[3],
+            raw.heap
+        ) && web_method_is(
+            raw.heap.string_proto,
+            cls.keys[3],
+            cls.dependencies[4],
+            raw.heap
+        ) && web_method_is(
+            raw.heap.string_proto,
+            cls.keys[4],
+            cls.dependencies[5],
+            raw.heap
+        ) && web_method_is(
+            headers.prototype,
+            cls.keys[5],
+            cls.dependencies[6],
+            raw.heap
+        ) && web_method_is(
+            raw.heap.map_proto,
+            cls.keys[6],
+            cls.dependencies[7],
+            raw.heap
+        ) && web_method_is(
+            raw.heap.map_proto,
+            cls.keys[7],
+            cls.dependencies[8],
+            raw.heap
+        ) && web_can_assign(
+            headers.prototype,
+            headers.map_key,
+            raw.heap
+        ) && web_can_assign(headers.prototype, headers.cookies_key, raw.heap);
+        char[] bytes               = fast ? ((HString*)input.get_heapptr()).get_data() : (char[]) { };
+        // Set-Cookie has a separate array and joining policy in the JS class.
+        // Preflight before creating any partially populated native object.
+        for (usz at = 0; fast && at < bytes.len;) {
+            usz key_end = at;
+            while (key_end < bytes.len && bytes[key_end] != '\n') key_end++;
+            if (key_end == bytes.len) break;
+            if (((String)bytes[at:key_end - at]).compare_to_ignore_case("set-cookie") == 0) {
+                fast = false;
+                break;
+            }
+            at = key_end + 1;
+            while (at < bytes.len && bytes[at] != '\n') at++;
+            at++;
+        }
+        if (!fast) {
+            JsArg[1] args = { ctx.arg(0) };
+            if (try result = ctx.call(ctx.value(cls.roots[0]), args[..], ctx.this_value())) ctx.ret(result);
+            return;
+        }
+        HObject*? made = raw.heap.alloc_object(OBJECT);
+        if (catch made) return ctx.throw_error(ERROR, "Headers allocation failed");
+        HObject* obj = made;
+        raw.heap.set_prototype(obj, headers.prototype);
+        HObject*? map_raw = raw.heap.alloc_object(MAP);
+        if (catch map_raw) return ctx.throw_error(ERROR, "Headers allocation failed");
+        HObject* map = map_raw;
+        raw.heap.set_prototype(map, raw.heap.map_proto);
+        TVal map_value;
+        map_value.set_object(map);
+        if (!obj.put_prop(
+            headers.map_key,
+            map_value,
+            hobject::PROP_FLAGS_WEC,
+            raw.heap
+        ) || !obj.put_prop(headers.cookies_key, ctx.null_value()
+            .tv, hobject::PROP_FLAGS_WEC, raw.heap)) return ctx.throw_error(ERROR, "Headers allocation failed");
+        for (usz at = 0; at < bytes.len;) {
+            usz key_end = at;
+            while (key_end < bytes.len && bytes[key_end] != '\n') key_end++;
+            if (key_end == bytes.len) break;
+            char[] name = mem::temp_array(char, (sz)(key_end - at));
+            for (usz i = 0; i < name.len; i++) {
+                char c = bytes[at + i];
+                name[i] = c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+            }
+            usz start = key_end + 1;
+            usz end   = start;
+            while (end < bytes.len && bytes[end] != '\n') end++;
+            at = end + 1;
+            while (start < end && web_header_ascii_space(bytes[start])) start++;
+            while (end > start && web_header_ascii_space(bytes[end - 1])) end--;
+            JsArg key   = ctx.string((String)name);
+            JsArg value = ctx.string((String)bytes[start:end - start]);
+            int found   = builtins::map_find_key(map, key.tv, raw.heap);
+            if (found >= 0) {
+                HString* old = map.array_part()[(uint)found + 1].get().get_heapptr();
+                builtins::StrBuf joined;
+                joined.init(raw.heap);
+                defer joined.free();
+                if (!joined.append_bytes(
+                    old.get_data()
+                ) || !joined.append_bytes(
+                    ", "
+                ) || !joined.append_bytes(
+                    bytes[start:end - start]
+                )) return ctx.throw_error(RANGE, "Invalid string length");
+                value = ctx.string((String)joined.bytes());
+                raw.heap.store_slot_ref(map, &map.array_part()[(uint)found + 1], &value.tv);
+            } else {
+                uint count = map.array_used;
+                if (!map.set_array_idx(
+                    count,
+                    key.tv,
+                    raw.heap
+                ) || !map.set_array_idx(
+                    count + 1,
+                    value.tv,
+                    raw.heap
+                )) return ctx.throw_error(ERROR, "Headers allocation failed");
+            }
+        }
+        JsArg result;
+        result.tv.set_object(obj);
+        ctx.ret(result);
+    };
+}
+
+fn void js_native_headers_from_blob(JsCtx ctx, void* user) {
+    NativeHeadersParse* cls = &g_native_headers_parse;
+    if (!cls.roots[0].is_empty()) return ctx.throw_error(TYPE, "Headers parser already installed");
+    for (uint i = 0; i < 9; i++) {
+        cls.dependencies[i] = ctx.arg(i).tv;
+        cls.roots[i] = ctx.persist(ctx.arg(i))!!;
+    }
+    String[8] names = { "Map", "String", "split", "toLowerCase", "trim", "append", "get", "set" };
+    for (uint i = 0; i < 8; i++) {
+        JsArg key = ctx.string(names[i]);
+        cls.keys[i] = key.tv.get_heapptr();
+        cls.roots[9 + i] = ctx.persist(key)!!;
+    }
+    HObject*? made = web_host_function(ctx.ctx.heap, "_fromBlob", &native_headers_from_blob, cls, 1, false);
+    if (catch made) return ctx.throw_error(ERROR, "Headers parser allocation failed");
+    JsArg result;
+    result.tv.set_object(made);
+    ctx.ret(result);
+}
+
 const Native[] WEB_NATIVES = {
     { "nativeClass", &js_native_class, 6 },
     { "nativeHeadersBlob", &js_native_headers_blob, 4 },
+    { "nativeHeadersFromBlob", &js_native_headers_from_blob, 9 },
 };

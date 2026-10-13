@@ -1,0 +1,160 @@
+{
+  "date_utc": "2026-10-13T05:29:35.842593+00:00",
+  "binary": "/Users/rtomasi/cousas/boomkat-runtime/out/bkr",
+  "profiled": false,
+  "runtime": "bkr",
+  "runtime_version": null,
+  "asset_sha256": "8e7c71ce35fd8444d04a13f803e2f68ed5cdf823ce376033f99f11ba2fe995b5",
+  "binary_sha256": "f778f3563d4790799af2f8c40cc7702e87cbb0e06f5761940f752e1702ede5f7",
+  "runtime_commit": "3e25a57c4c82c89c13bf6bb066136d898f0357fd",
+  "working_tree_dirty": true,
+  "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A5425a",
+  "wrk": "wrk 4.2.0 [kqueue] Copyright (C) 2012 Will Glozer",
+  "fixture": {
+    "accounts": 10,
+    "shared_teams": 2,
+    "boards": 4,
+    "cards_per_board": 200,
+    "images": 16,
+    "board_json_bytes": 79040,
+    "asset_bytes": 207,
+    "image_bytes": 131072,
+    "journal_mode": "wal",
+    "synchronous": 2
+  },
+  "seconds_per_run": 8,
+  "warmup_seconds": 1,
+  "client_threads": 2,
+  "response_body": "string",
+  "close_connections": false,
+  "results": [
+    {
+      "rps": 4357.62,
+      "p50_ms": 29.41,
+      "p90_ms": 30.16,
+      "p99_ms": 30.61,
+      "mean_ms": 29.3,
+      "max_ms": 31.23,
+      "requests": 35079,
+      "duration_s": 8.05,
+      "statuses": {
+        "200": 35079
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "board",
+      "connections": 128,
+      "peak_rss_mib": 48.48,
+      "idle_rss_mib": 48.48,
+      "cpu_percent": 99.0,
+      "raw": "Running 8s test @ http://127.0.0.1:54960\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    29.30ms    1.19ms  31.23ms   93.83%\n    Req/Sec     2.19k   178.71     2.56k    60.00%\n  Latency Distribution\n     50%   29.41ms\n     75%   29.87ms\n     90%   30.16ms\n     99%   30.61ms\n  35079 requests in 8.05s, 2.60GB read\nRequests/sec:   4357.62\nTransfer/sec:    330.36MB\nSTATUS 200 35079\n"
+    },
+    {
+      "rps": 20993.8,
+      "p50_ms": 6.08,
+      "p90_ms": 6.31,
+      "p99_ms": 6.52,
+      "mean_ms": 6.09,
+      "max_ms": 8.91,
+      "requests": 168133,
+      "duration_s": 8.01,
+      "statuses": {
+        "200": 168133
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "image",
+      "connections": 128,
+      "peak_rss_mib": 52.61,
+      "idle_rss_mib": 52.19,
+      "cpu_percent": 97.6,
+      "raw": "Running 8s test @ http://127.0.0.1:54960\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     6.09ms  198.12us   8.91ms   76.76%\n    Req/Sec    10.55k   177.70    10.96k    62.50%\n  Latency Distribution\n     50%    6.08ms\n     75%    6.18ms\n     90%    6.31ms\n     99%    6.52ms\n  168133 requests in 8.01s, 20.57GB read\nRequests/sec:  20993.80\nTransfer/sec:      2.57GB\nSTATUS 200 168133\n"
+    },
+    {
+      "rps": 16981.51,
+      "p50_ms": 7.17,
+      "p90_ms": 9.14,
+      "p99_ms": 9.78,
+      "mean_ms": 7.53,
+      "max_ms": 10.2,
+      "requests": 136223,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 136223
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "update",
+      "connections": 128,
+      "peak_rss_mib": 36.86,
+      "idle_rss_mib": 36.83,
+      "cpu_percent": 92.9,
+      "raw": "Running 8s test @ http://127.0.0.1:54960\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     7.53ms    1.00ms  10.20ms   62.28%\n    Req/Sec     8.54k   210.24     9.10k    61.88%\n  Latency Distribution\n     50%    7.17ms\n     75%    8.36ms\n     90%    9.14ms\n     99%    9.78ms\n  136223 requests in 8.02s, 31.05MB read\nRequests/sec:  16981.51\nTransfer/sec:      3.87MB\nSTATUS 200 136223\n"
+    },
+    {
+      "rps": 5635.97,
+      "p50_ms": 22.63,
+      "p90_ms": 23.19,
+      "p99_ms": 25.86,
+      "mean_ms": 22.67,
+      "max_ms": 26.93,
+      "requests": 45305,
+      "duration_s": 8.04,
+      "statuses": {
+        "200": 45305
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "mixed",
+      "connections": 128,
+      "peak_rss_mib": 49.45,
+      "idle_rss_mib": 49.17,
+      "cpu_percent": 98.0,
+      "raw": "Running 8s test @ http://127.0.0.1:54960\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    22.67ms    0.91ms  26.93ms   95.02%\n    Req/Sec     2.83k   184.21     3.20k    58.13%\n  Latency Distribution\n     50%   22.63ms\n     75%   22.92ms\n     90%   23.19ms\n     99%   25.86ms\n  45305 requests in 8.04s, 3.46GB read\nRequests/sec:   5635.97\nTransfer/sec:    440.40MB\nSTATUS 200 45305\n"
+    },
+    {
+      "rps": 4052.75,
+      "p50_ms": 32.88,
+      "p90_ms": 43.49,
+      "p99_ms": 45.58,
+      "mean_ms": 31.46,
+      "max_ms": 51.81,
+      "requests": 32635,
+      "duration_s": 8.05,
+      "statuses": {
+        "200": 16275,
+        "201": 16360
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "upload_delete",
+      "connections": 128,
+      "peak_rss_mib": 83.77,
+      "idle_rss_mib": 79.34,
+      "cpu_percent": 73.7,
+      "raw": "Running 8s test @ http://127.0.0.1:54960\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    31.46ms    8.28ms  51.81ms   66.34%\n    Req/Sec     2.04k   204.95     2.54k    64.38%\n  Latency Distribution\n     50%   32.88ms\n     75%   37.05ms\n     90%   43.49ms\n     99%   45.58ms\n  32635 requests in 8.05s, 7.52MB read\nRequests/sec:   4052.75\nTransfer/sec:      0.93MB\nSTATUS 200 16275\nSTATUS 201 16360\n"
+    }
+  ],
+  "login_burst": {
+    "requests": 32,
+    "concurrency": 8,
+    "statuses": {
+      "200": 2,
+      "429": 30
+    },
+    "reasons": {
+      "Sign-in workers are busy. Try again shortly": 28,
+      "Too many sign-in attempts. Try again in a minute": 2
+    }
+  },
+  "login_rate_limit": {
+    "requests": 45,
+    "statuses": {
+      "200": 30,
+      "429": 15
+    }
+  },
+  "integrity": "SQLite integrity, foreign keys, fixture card count and BLOB lengths passed",
+  "engine_source_commit": "032bbaf7",
+  "engine_source_dirty": false
+}
