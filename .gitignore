@@ -15,3 +15,6 @@ vendor/libuws_shim.a
 # .git and would commit as a gitlink -- a clone would get an empty directory.
 # scripts/setup_vendor.sh re-applies the one edit this project needs to it.
 vendor/libwebsockets.c3l
+
+# Sample app databases and SQLite sidecars.
+examples/taskboard/data/

@@ -126,7 +126,6 @@ fn int pool_thread(void* arg) {
             uws_loop_defer(g_loop, &task_done, t);
         }
     };
-    return 0;
 }
 
 fn void submit(Task* t) {

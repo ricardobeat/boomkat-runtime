@@ -35,6 +35,10 @@ void *uws_loop(void) { return uWS::Loop::get(); }
 
 void uws_loop_run(void) { uWS::Loop::get()->run(); }
 
+void uws_loop_on_pre(void (*cb)(void *), void *user) {
+    uWS::Loop::get()->addPreHandler(user, [cb, user](uWS::Loop *) { cb(user); });
+}
+
 // Thread-safe: runs cb(user) on `loop`'s thread at its next iteration.
 void uws_loop_defer(void *loop, void (*cb)(void *), void *user) {
     ((uWS::Loop *)loop)->defer([cb, user]() { cb(user); });

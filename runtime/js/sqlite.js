@@ -13,13 +13,17 @@ function databaseState(db) {
 function statementState(stmt) {
     const state = statements.get(stmt);
     if (!state || state.finalized) throw new TypeError("statement is finalized or invalid");
-    databaseState(state.db);
+    if (state.database.closed) throw new TypeError("database is closed or invalid");
     return state;
 }
 function bindings(names, args) {
     const first = args[0];
     const named = args.length === 1 && first !== null && typeof first === "object" &&
         !Array.isArray(first) && !(first instanceof ArrayBuffer) && !ArrayBuffer.isView(first);
+    if (!named && !(args.length === 1 && Array.isArray(first))) {
+        if (args.length !== names.length) throw new RangeError("incorrect SQLite parameter count");
+        return args;
+    }
     const out = [];
     if (named) {
         const used = new Set();
@@ -33,7 +37,7 @@ function bindings(names, args) {
         }
         for (const key of Object.keys(first)) if (!used.has(key)) throw new RangeError("unknown SQLite parameter: " + key);
     } else {
-        const values = args.length === 1 && Array.isArray(first) ? first : args;
+        const values = first;
         for (let i = 0; i < values.length; i++) out.push(values[i]);
         if (out.length !== names.length) throw new RangeError("incorrect SQLite parameter count");
     }
@@ -43,7 +47,7 @@ function bindings(names, args) {
 export class Statement {
     constructor(token, db, id) {
         if (token !== internal) throw new TypeError("use database.prepare() to create a statement");
-        try { statements.set(this, { db, id, names: bk.sqliteParams(id), finalized: false }); }
+        try { statements.set(this, { db, database: databaseState(db), id, names: bk.sqliteParams(id), finalized: false }); }
         catch (error) { bk.sqliteFinalize(id); throw error; }
     }
     all(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 0); }

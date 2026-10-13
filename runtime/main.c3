@@ -24,6 +24,8 @@ const Builtin[] BUILTINS = {
     { "file", $embed("js/file.js") },
     { "process", $embed("js/process.js") },
     { "permissions", $embed("js/permissions.js") },
+    { "typescript", $embed("js/typescript.js") },
+    { "crypto", $embed("js/crypto.js") },
 };
 
 List{String} g_args;
@@ -310,6 +312,8 @@ fn void? boot() {
     install_natives(PROC_NATIVES)!;
     install_natives(TIMER_NATIVES)!;
     install_natives(IMMEDIATE_NATIVES)!;
+    install_natives(TRANSPILE_NATIVES)!;
+    install_natives(CRYPTO_NATIVES)!;
     g_rt.exec(PRELUDE, "<prelude>")!;
     g_rt.exec(FETCH, "<fetch>")!;
     foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;

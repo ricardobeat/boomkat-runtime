@@ -17,7 +17,10 @@
     "/Users/rtomasi/cousas/boomkat/src/native_stack.c",
     "/Users/rtomasi/cousas/boomkat/src/sysmem.c"
   ],
-  "cflags": "-O2",
+  // Homebrew's linked OpenSSL archives require macOS 26. Keep C3, the C
+  // sources, and scripts/build_uws.sh on the same deployment target.
+  "macos-min-version": "26.0",
+  "cflags": "-O2 -mmacosx-version-min=26.0",
   "c-include-dirs": [
     "/Users/rtomasi/cousas/boomkat/vendor/dtoa",
     "/Users/rtomasi/cousas/boomkat/libregexp"
@@ -54,7 +57,7 @@
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "none",
-      "features": [ "CONSOLE", "OP_PROFILE" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     },
@@ -70,7 +73,7 @@
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "none",
-      "features": [ "CONSOLE", "OP_PROFILE", "THREADED_DISPATCH" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE", "THREADED_DISPATCH" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     },
@@ -86,7 +89,7 @@
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "none",
-      "features": [ "THREADED_DISPATCH", "CONSOLE" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     },
@@ -102,7 +105,7 @@
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "none",
-      "features": [ "THREADED_DISPATCH", "CONSOLE" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     },
@@ -119,7 +122,7 @@
       "single-module": true,
       "fp-math": "relaxed",
       "debug-info": "full",
-      "features": [ "THREADED_DISPATCH", "CONSOLE" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     },
@@ -136,7 +139,7 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       // Opcode counters run in switch dispatch; threading bypasses them.
-      "features": [ "CONSOLE", "OP_PROFILE" ],
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
       "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
     }

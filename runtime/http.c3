@@ -47,6 +47,7 @@ extern fn void uws_res_end(UwsRes* res, char* body, sz len);
 extern fn void uws_res_close(UwsRes* res);
 extern fn void uws_res_end_empty(UwsRes* res);
 extern fn void uws_res_cork(UwsRes* res, Callback cb, void* user);
+extern fn void uws_loop_on_pre(Callback cb, void* user);
 
 const sz MAX_REQUEST_BODY = 16 * 1024 * 1024;
 const int MAX_HEADERS     = 64;
@@ -99,6 +100,11 @@ List{Conn*} g_conns;
 List{uint} g_free_slots;
 List{Conn*} g_spare;
 ulong g_generation;
+List{ulong} g_http_queue;
+sz g_http_queue_at;
+bool g_http_queue_armed;
+ulong g_http_turn_ns;
+const ulong HTTP_TURN_NS = 2_000_000;
 
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
 JsValue[METHODS.len] g_methods;
@@ -141,6 +147,8 @@ fn void? init_http() {
     g_conns.init(mem, 256);
     g_free_slots.init(mem, 256);
     g_spare.init(mem, 256);
+    g_http_queue.init(mem, 256);
+    uws_loop_on_pre(&http_turn_reset, &g_http_queue);
     foreach (i, m : METHODS) g_methods[i] = g_rt.string(m)!;
     g_http_fulfilled = bk_get("httpFulfilled")!;
     g_http_rejected = bk_get("httpRejected")!;
@@ -837,6 +845,58 @@ fn void js_req_remote(JsCtx ctx, void* udata) {
 
 // ---- uWS callbacks ----
 
+fn void http_turn_reset(void* user) => g_http_turn_ns = 0;
+
+fn void http_queue_arm() {
+    if (g_http_queue_armed) return;
+    g_http_queue_armed = true;
+    uws_loop_defer(g_loop, &http_queue_drain, null);
+}
+
+fn void http_queue_drain(void* user) {
+    g_http_queue_armed = false;
+    g_http_turn_ns = now_ns();
+    while (g_http_queue_at < g_http_queue.len()) {
+        ulong id = g_http_queue[g_http_queue_at++];
+        Conn* c  = conn_find(id);
+        if (c && c.res && !c.aborted) {
+            @pool() {
+                bool body = c.body.is_initialized();
+                dispatch(c, c.method, body ? c.body.array_view() : (char[]) { }, body);
+            };
+        }
+        if (now_ns() - g_http_turn_ns >= HTTP_TURN_NS) break;
+    }
+    if (g_http_queue_at == g_http_queue.len()) {
+        g_http_queue.clear();
+        g_http_queue_at = 0;
+    } else {
+        // A saturated server may never empty the queue. Reclaim the consumed
+        // prefix so storage remains bounded by requests still waiting.
+        if (g_http_queue_at >= 256) {
+            sz left = g_http_queue.len() - g_http_queue_at;
+            mem::move(g_http_queue.entries, &g_http_queue[g_http_queue_at], left * ulong::size);
+            g_http_queue.size = left;
+            g_http_queue_at = 0;
+        }
+        http_queue_arm();
+    }
+}
+
+// Bound work between socket polls, including requests left behind by a
+// disconnected client. IDs let aborted queued requests be discarded safely.
+fn void http_dispatch_ready(Conn* c, String method, char[] body, bool has_body) {
+    ulong now = now_ns();
+    if (!g_http_turn_ns) g_http_turn_ns = now;
+    if (g_http_queue.len() || now - g_http_turn_ns >= HTTP_TURN_NS) {
+        c.capture(method);
+        g_http_queue.push(c.id);
+        http_queue_arm();
+        return;
+    }
+    dispatch(c, method, body, has_body);
+}
+
 fn void on_aborted(void* user) {
     Conn* c = user;
     c.aborted = true;
@@ -857,7 +917,7 @@ fn void on_data(void* user, char* chunk, sz len, CInt last) {
     c.body.push_all(chunk[:len]);
     if (!last) return;
     @pool() {
-        dispatch(c, c.method, c.body.array_view(), true);
+        http_dispatch_ready(c, c.method, c.body.array_view(), true);
     };
 }
 
@@ -888,7 +948,7 @@ fn void on_request(void* user, UwsReq* req, UwsRes* res) {
             return;
         }
         c.in_request = true;
-        dispatch(c, method, { }, false);
+        http_dispatch_ready(c, method, { }, false);
         c.in_request = false;
         if (!c.res) {
             conn_free(c);

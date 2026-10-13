@@ -15,6 +15,11 @@ c3c build bkr
 ./out/bkr --allow-net hello.js
 ```
 
+The current Homebrew OpenSSL archives require macOS 26+. `project.json`
+sets that deployment target for C3 and C sources; `scripts/build_uws.sh`
+uses the same target for the native shim. After changing the target, rebuild
+the shim with `bash scripts/build_uws.sh` before building the runtime.
+
 There is no Node compatibility layer and no npm: a bare specifier is either a
 built-in or an error, and remote imports are not supported.
 
@@ -29,6 +34,61 @@ built-in or an error, and remote imports are not supported.
 | `path` | `join`, `resolve`, `relative`, `dirname`, `basename`, `extname`, `parse`, `format`, `toFileUrl`, `fromFileUrl` |
 | `permissions` | `query`, `request`, `revoke` |
 | `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |
+| `crypto` | `randomBytes`, `sha256`, `hex`, `timingSafeEqual`, async `hashPassword` / `verifyPassword` |
+| `typescript` | `transpile(source, options)`; native TS type erasure and JSX lowering to JavaScript source |
+
+### Serving TypeScript and JSX
+
+The `typescript` module uses Boomkat's parser to erase types, lower JSX, validate
+syntax and print browser JavaScript. It neither executes the source nor resolves
+its imports. No external compiler or package manager is involved.
+
+```ts
+import { transpile } from "typescript";
+import { readText } from "file";
+
+const js = transpile(await readText("./app.tsx"), {
+    filename: "app.tsx",
+    jsxImportSource: "preact",
+});
+const response = new Response(js, {
+    headers: { "content-type": "text/javascript; charset=utf-8" },
+});
+```
+
+Options: `filename` (default `module.ts`, `.tsx`/`.jsx` enables JSX), `module`
+(default `true`), `jsx` (`automatic`, the default, or `classic`),
+`jsxImportSource` (default `preact`), `jsxFactory` (default `h`), and
+`jsxFragmentFactory` (default `Fragment`). JSX pragmas in the source are honored.
+Automatic JSX inserts imports from `<jsxImportSource>/jsx-runtime`; browsers
+need an import map or resolvable specifiers. Existing imports are preserved:
+this API does not bundle or rewrite import paths. It does not type-check,
+downlevel JavaScript, preserve comments/formatting, or generate source maps.
+Enums and other syntax requiring unsupported TS runtime transforms throw.
+
+The [Taskboard sample](examples/taskboard/README.md) serves a Preact TSX UI this
+way, with accounts, shared teams, boards and SQLite BLOB image attachments.
+It includes full, pinned Preact sources and browser modules; no npm or build step.
+
+### Native crypto
+
+`randomBytes(size)` returns a system-random Uint8Array (0–65536 bytes).
+`sha256(stringOrBytes)` returns 32 bytes; `hex(bytes)` formats them.
+`timingSafeEqual(a, b)` compares byte buffers with OpenSSL's constant-time
+comparison for equal-length inputs; unequal lengths return false immediately.
+
+`await hashPassword(password)` returns a salted Argon2id PHC string using C3's
+stdlib (`m=19456 KiB, t=2, p=1`, 16-byte salt, 32-byte hash).
+`await verifyPassword(password, encoded)` verifies that fixed profile and
+returns false for malformed hashes or other profiles. Passwords are bounded
+to 4096 UTF-8 bytes. Password hashing runs on worker threads with at most two
+jobs in flight; additional requests reject with `code: "BUSY"`. The native
+password copy and intermediate digest are wiped after use. This is a password
+hashing API, separate from the global Web Crypto random helpers.
+
+Validation: `python3 tests/run_transpile.py`, `python3 tests/run_crypto.py`, and
+`python3 tests/run_taskboard.py`. The crypto check compares Argon2id output
+against OpenSSL when its ARGON2ID KDF is available.
 
 ### Optional SQLite
 
@@ -55,8 +115,11 @@ try {
 `new Database(path, { readonly: true })` opens an existing file for reading.
 Writable databases create missing files. File access requires read permission and,
 for writable connections, write permission for the database directory, including
-SQLite's `-journal`, `-wal`, and `-shm` sidecars. Permissions are checked again on
-operations, so revoking a grant blocks later queries. `:memory:` needs no file grants.
+SQLite's `-journal`, `-wal`, and `-shm` sidecars. Permissions are checked once when
+opening the database, against the absolute, normalized pathname rather than a
+symlink's target. An open connection retains its access capability; later grant
+changes affect new connections. OS sandbox restrictions still apply. `:memory:`
+needs no file grants.
 
 `prepare(sql)` and its alias `query(sql)` each create one reusable statement.
 `all(...values)` returns rows, `get(...values)` returns the first row or `undefined`,

@@ -22,6 +22,10 @@ struct Grant {
     bool all;
     List{String} allow;
     List{String} deny;
+    // SQLite grants use the original pathname; other modules retain their
+    // existing target-based checks.
+    List{String} location_allow;
+    List{String} location_deny;
 }
 
 struct Permissions {
@@ -38,6 +42,8 @@ fn void init_perms() {
     foreach (&g : g_perms.grants) {
         g.allow.init(mem);
         g.deny.init(mem);
+        g.location_allow.init(mem);
+        g.location_deny.init(mem);
     }
 }
 
@@ -136,12 +142,14 @@ fn bool ask(Perm p, String item, int port) {
         switch (line.trim()) {
             case "y":
                 grant(p).allow.push(p == NET && port >= 0 ? what.copy(mem) : item.copy(mem));
+                if (p == READ || p == WRITE) grant(p).location_allow.push(item.copy(mem));
                 return true;
             case "A":
                 grant(p).all = true;
                 return true;
             case "n":
                 grant(p).deny.push(what.copy(mem));
+                if (p == READ || p == WRITE) grant(p).location_deny.push(item.copy(mem));
                 return false;
         }
     }
@@ -186,6 +194,16 @@ fn bool check_path(Perm p, String path) => check(p, path);
 
 fn bool check_env(String name) => check(ENV, name);
 
+// `path` is absolute and lexically normalized. This deliberately checks
+// a symlink's location rather than resolving its target.
+fn bool check_path_location(Perm p, String path) {
+    Grant* g = grant(p);
+    foreach (entry : g.location_deny) if (path_match(entry, path)) return false;
+    if (g.all) return true;
+    foreach (entry : g.location_allow) if (path_match(entry, path)) return true;
+    return g_perms.prompt && !g_perms.locked && ask(p, path, -1);
+}
+
 // ---- revoking ----
 
 fn void revoke(Perm p, String item) {
@@ -193,9 +211,11 @@ fn void revoke(Perm p, String item) {
     if (!item.len) {
         g.all = false;
         g.allow.clear();
+        g.location_allow.clear();
         return;
     }
     g.deny.push(item.copy(mem));
+    if (p == READ || p == WRITE) g.location_deny.push(item.copy(mem));
 }
 
 // ---- paths ----
@@ -237,7 +257,11 @@ fn String absolute(String path, String base = "") {
 // The real path: symlinks resolved for the part that exists, the rest
 // appended lexically. In tmem.
 fn String canonical(String path, String base = "") {
-    String abs   = absolute(path, base);
+    return canonical_absolute(absolute(path, base));
+}
+
+// Internal callers may reuse an already-normalized absolute path.
+fn String canonical_absolute(String abs) {
     String quick = canonical_cached(abs);
     if (quick.len) return quick;
     return canonical_slow(abs);
@@ -265,7 +289,7 @@ fn String canonical_cached(String abs) {
     ulong now   = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
     foreach (&e : g_dirs) {
         if (!e.dir.len || e.dir != dir || now - e.stamp > DIR_TTL_NS) continue;
-        String full = string::tformat("%s/%s", e.real, leaf);
+        String full = e.real == dir ? abs : string::tformat("%s/%s", e.real, leaf);
         libc::Stat st;
         if (libc::lstat(full.zstr_tcopy(), &st) != 0) return libc::errno() == Errno.ENOENT ? full : "";
         return (st.st_mode & libc::S_IFMT) == 0o120000 ? "" : full;
@@ -359,7 +383,12 @@ fn Perm? perm_named(String name) {
 
 fn void add_entry(Perm p, List{String}* list, String item, String base) {
     String e = item;
-    if (p == READ || p == WRITE) e = canonical(item, base);
+    if (p == READ || p == WRITE) {
+        Grant* g                = grant(p);
+        List{String}* locations = list == &g.deny ? &g.location_deny : &g.location_allow;
+        locations.push(absolute(item, base).copy(mem));
+        e = canonical(item, base);
+    }
     list.push(e.copy(mem));
 }
 

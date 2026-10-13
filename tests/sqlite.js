@@ -18,6 +18,25 @@ assert(all[1].data.length === 0 && all[1].data !== null, "empty blob became null
 assert(all[2].name === "nul\0text" && all[2].data === null, "text NUL or null wrong");
 assert(all[1].n === -9223372036854775808n && all[2].n === 9223372036854775807n, "int64 precision lost");
 assert(rows.all()[0].data.join() === "0,1,255", "blob result did not survive statement reuse");
+assert(db.query("SELECT 1 AS same, 2 AS same").get().same === 2, "duplicate column aliases");
+const evolving=db.query("SELECT * FROM t");evolving.all();
+db.exec("ALTER TABLE t ADD COLUMN added TEXT DEFAULT 'new'");
+assert(evolving.all()[0].added === 'new', "metadata after automatic schema reprepare");
+const longText='ASCII result data '.repeat(30);
+assert(db.query('SELECT ? AS value').get(longText).value === longText, 'long text equality');
+assert(db.query('SELECT ? AS value').get(longText+'\0').value === longText+'\0', 'long text NUL');
+assert(db.query('SELECT ? AS value').get('é😀'.repeat(50)).value === 'é😀'.repeat(50), 'long Unicode text');
+for (const n of [-140737488355329,-140737488355328,140737488355327,140737488355328,9007199254740991]) {
+    const value=db.query('SELECT ? AS value').get(n).value;
+    assert(value===n && JSON.stringify(value)===JSON.stringify(n), 'integer result boundary');
+}
+const alias='long column name '.repeat(30);
+assert(db.query('SELECT 1 AS "'+alias+'"').get()[alias]===1,'long column alias');
+const indexed=db.query('SELECT 2 AS "2", 1 AS "1", name FROM t').all();
+assert(Object.keys(indexed[1]).join(',')==='1,2,name','shaped row numeric keys');
+const retained=db.query('SELECT id,name FROM t ORDER BY id').all();delete retained[0].name;retained[0].extra=true;
+Object.defineProperty(retained[1],'name',{get(){return 'changed'}});
+assert(retained[2].name==='nul\0text'&&Object.keys(retained[2]).join(',')==='id,name','shaped row mutations isolated');
 const named = db.query("SELECT id FROM t WHERE name = :name OR id = $id");
 assert(named.get({ name: "second", id: 99 }).id === 2, "bare named binding wrong");
 assert(named.get({ ":name": "missing", "$id": 1 }).id === 1, "prefixed named binding wrong");

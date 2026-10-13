@@ -1,0 +1,115 @@
+{
+  "date_utc": "2026-10-13T01:56:17.161467+00:00",
+  "binary": "/private/tmp/bkr-before-vfs-permissions",
+  "profiled": false,
+  "runtime": "bkr",
+  "runtime_version": null,
+  "asset_sha256": "49ffe17dcd437290f18bf319668c0c0eb674e5ea92f43c6363e5778c81ed755c",
+  "binary_sha256": "467cdd1a4f0039f3c24728363a2a2ecbfe785dc5d2152f07d90370ecb809d9ed",
+  "runtime_commit": "3f30788765b85cf17bffcd84ed34dbc5bb2cca3c",
+  "working_tree_dirty": true,
+  "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A5425a",
+  "wrk": "wrk 4.2.0 [kqueue] Copyright (C) 2012 Will Glozer",
+  "fixture": {
+    "accounts": 10,
+    "shared_teams": 2,
+    "boards": 4,
+    "cards_per_board": 200,
+    "images": 16,
+    "board_json_bytes": 79040,
+    "asset_bytes": 26575,
+    "image_bytes": 131072,
+    "journal_mode": "wal",
+    "synchronous": 2
+  },
+  "seconds_per_run": 8,
+  "warmup_seconds": 1,
+  "client_threads": 2,
+  "response_body": "string",
+  "close_connections": false,
+  "results": [
+    {
+      "rps": 3326.13,
+      "p50_ms": 37.35,
+      "p90_ms": 42.82,
+      "p99_ms": 46.65,
+      "mean_ms": 38.28,
+      "max_ms": 50.46,
+      "requests": 26766,
+      "duration_s": 8.05,
+      "statuses": {
+        "200": 26766
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "board",
+      "connections": 128,
+      "peak_rss_mib": 47.73,
+      "idle_rss_mib": 47.73,
+      "cpu_percent": 97.7,
+      "raw": "Running 8s test @ http://127.0.0.1:52850\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    38.28ms    2.99ms  50.46ms   82.49%\n    Req/Sec     1.67k   194.10     1.94k    60.00%\n  Latency Distribution\n     50%   37.35ms\n     75%   39.20ms\n     90%   42.82ms\n     99%   46.65ms\n  26766 requests in 8.05s, 1.98GB read\nRequests/sec:   3326.13\nTransfer/sec:    252.16MB\nSTATUS 200 26766\n"
+    },
+    {
+      "rps": 12122.38,
+      "p50_ms": 10.25,
+      "p90_ms": 11.57,
+      "p99_ms": 14.82,
+      "mean_ms": 10.5,
+      "max_ms": 19.99,
+      "requests": 97455,
+      "duration_s": 8.04,
+      "statuses": {
+        "200": 97455
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "image",
+      "connections": 128,
+      "peak_rss_mib": 80.14,
+      "idle_rss_mib": 79.14,
+      "cpu_percent": 96.7,
+      "raw": "Running 8s test @ http://127.0.0.1:52850\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    10.50ms    1.12ms  19.99ms   87.94%\n    Req/Sec     6.12k   259.67     6.50k    56.25%\n  Latency Distribution\n     50%   10.25ms\n     75%   10.93ms\n     90%   11.57ms\n     99%   14.82ms\n  97455 requests in 8.04s, 11.92GB read\nRequests/sec:  12122.38\nTransfer/sec:      1.48GB\nSTATUS 200 97455\n"
+    },
+    {
+      "rps": 10230.04,
+      "p50_ms": 11.99,
+      "p90_ms": 14.41,
+      "p99_ms": 17.8,
+      "mean_ms": 12.47,
+      "max_ms": 21.27,
+      "requests": 82138,
+      "duration_s": 8.03,
+      "statuses": {
+        "200": 82138
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "update",
+      "connections": 128,
+      "peak_rss_mib": 36.25,
+      "idle_rss_mib": 36.25,
+      "cpu_percent": 93.9,
+      "raw": "Running 8s test @ http://127.0.0.1:52850\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    12.47ms    1.56ms  21.27ms   76.82%\n    Req/Sec     5.15k   245.48     5.73k    70.62%\n  Latency Distribution\n     50%   11.99ms\n     75%   13.34ms\n     90%   14.41ms\n     99%   17.80ms\n  82138 requests in 8.03s, 18.72MB read\nRequests/sec:  10230.04\nTransfer/sec:      2.33MB\nSTATUS 200 82138\n"
+    }
+  ],
+  "login_burst": {
+    "requests": 32,
+    "concurrency": 8,
+    "statuses": {
+      "200": 2,
+      "429": 30
+    },
+    "reasons": {
+      "Sign-in workers are busy. Try again shortly": 28,
+      "Too many sign-in attempts. Try again in a minute": 2
+    }
+  },
+  "login_rate_limit": {
+    "requests": 45,
+    "statuses": {
+      "200": 30,
+      "429": 15
+    }
+  },
+  "integrity": "SQLite integrity, foreign keys, fixture card count and BLOB lengths passed"
+}

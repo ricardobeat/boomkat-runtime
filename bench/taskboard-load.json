@@ -1,0 +1,437 @@
+{
+  "date_utc": "2026-10-12T23:36:00.390182+00:00",
+  "binary": "/Users/rtomasi/cousas/boomkat-runtime/out/bkr",
+  "binary_sha256": "abdf9d105cfdf8b2d58917a2228cda859d0b09b89d2c7009c528e20350097599",
+  "runtime_commit": "3f30788765b85cf17bffcd84ed34dbc5bb2cca3c",
+  "working_tree_dirty": true,
+  "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A5425a",
+  "wrk": "wrk 4.2.0 [kqueue] Copyright (C) 2012 Will Glozer",
+  "fixture": {
+    "accounts": 10,
+    "shared_teams": 2,
+    "boards": 4,
+    "cards_per_board": 200,
+    "images": 16,
+    "board_json_bytes": 79040,
+    "asset_bytes": 26575,
+    "image_bytes": 131072,
+    "journal_mode": "wal",
+    "synchronous": 2
+  },
+  "seconds_per_run": 8,
+  "warmup_seconds": 1,
+  "client_threads": 2,
+  "results": [
+    {
+      "rps": 42426.62,
+      "p50_ms": 0.02,
+      "p90_ms": 0.022,
+      "p99_ms": 0.028,
+      "mean_ms": 0.02038,
+      "max_ms": 0.242,
+      "requests": 343672,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 343672
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "asset",
+      "connections": 1,
+      "peak_rss_mib": 32.72,
+      "idle_rss_mib": 32.72,
+      "cpu_percent": 33.7,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    20.38us    3.92us 242.00us   96.20%\n    Req/Sec    42.65k   420.75    44.55k    86.42%\n  Latency Distribution\n     50%   20.00us\n     75%   21.00us\n     90%   22.00us\n     99%   28.00us\n  343672 requests in 8.10s, 8.66GB read\nRequests/sec:  42426.62\nTransfer/sec:      1.07GB\nSTATUS 200 343672\n"
+    },
+    {
+      "rps": 177418.91,
+      "p50_ms": 0.134,
+      "p90_ms": 0.256,
+      "p99_ms": 0.34400000000000003,
+      "mean_ms": 0.15661000000000003,
+      "max_ms": 0.96,
+      "requests": 1420634,
+      "duration_s": 8.01,
+      "statuses": {
+        "200": 1420634
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "asset",
+      "connections": 32,
+      "peak_rss_mib": 32.81,
+      "idle_rss_mib": 32.81,
+      "cpu_percent": 96.7,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   156.61us   64.80us   0.96ms   72.10%\n    Req/Sec    89.24k     2.81k   94.39k    82.50%\n  Latency Distribution\n     50%  134.00us\n     75%  196.00us\n     90%  256.00us\n     99%  344.00us\n  1420634 requests in 8.01s, 35.81GB read\nRequests/sec: 177418.91\nTransfer/sec:      4.47GB\nSTATUS 200 1420634\n"
+    },
+    {
+      "rps": 164252.51,
+      "p50_ms": 0.619,
+      "p90_ms": 1.13,
+      "p99_ms": 1.65,
+      "mean_ms": 0.6940700000000001,
+      "max_ms": 7.45,
+      "requests": 1317347,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 1317347
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "asset",
+      "connections": 128,
+      "peak_rss_mib": 32.83,
+      "idle_rss_mib": 32.83,
+      "cpu_percent": 96.3,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   694.07us  296.46us   7.45ms   80.39%\n    Req/Sec    82.76k    11.17k   92.93k    88.75%\n  Latency Distribution\n     50%  619.00us\n     75%  715.00us\n     90%    1.13ms\n     99%    1.65ms\n  1317347 requests in 8.02s, 33.20GB read\nRequests/sec: 164252.51\nTransfer/sec:      4.14GB\nSTATUS 200 1317347\n"
+    },
+    {
+      "rps": 1873.41,
+      "p50_ms": 0.493,
+      "p90_ms": 0.594,
+      "p99_ms": 2.02,
+      "mean_ms": 0.58475,
+      "max_ms": 23.11,
+      "requests": 15179,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 15179
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "board",
+      "connections": 1,
+      "peak_rss_mib": 45.0,
+      "idle_rss_mib": 41.5,
+      "cpu_percent": 83.8,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   584.75us  779.38us  23.11ms   98.23%\n    Req/Sec     1.88k   235.36     2.07k    86.42%\n  Latency Distribution\n     50%  493.00us\n     75%  528.00us\n     90%  594.00us\n     99%    2.02ms\n  15179 requests in 8.10s, 1.12GB read\nRequests/sec:   1873.41\nTransfer/sec:    142.03MB\nSTATUS 200 15179\n"
+    },
+    {
+      "rps": 2337.11,
+      "p50_ms": 13.29,
+      "p90_ms": 13.62,
+      "p99_ms": 26.67,
+      "mean_ms": 13.66,
+      "max_ms": 27.76,
+      "requests": 18749,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 18749
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "board",
+      "connections": 32,
+      "peak_rss_mib": 44.12,
+      "idle_rss_mib": 41.62,
+      "cpu_percent": 99.2,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    13.66ms    2.38ms  27.76ms   96.59%\n    Req/Sec     1.18k    57.78     1.28k    66.25%\n  Latency Distribution\n     50%   13.29ms\n     75%   13.45ms\n     90%   13.62ms\n     99%   26.67ms\n  18749 requests in 8.02s, 1.39GB read\nRequests/sec:   2337.11\nTransfer/sec:    177.18MB\nSTATUS 200 18749\n"
+    },
+    {
+      "rps": 2245.14,
+      "p50_ms": 56.19,
+      "p90_ms": 56.84,
+      "p99_ms": 60.19,
+      "mean_ms": 56.64,
+      "max_ms": 116.6,
+      "requests": 18014,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 18014
+      },
+      "socket_errors": {
+        "connect": 0,
+        "read": 135,
+        "write": 7,
+        "timeout": 0
+      },
+      "errors": 142,
+      "workload": "board",
+      "connections": 128,
+      "peak_rss_mib": 44.28,
+      "idle_rss_mib": 41.53,
+      "cpu_percent": 99.8,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    56.64ms    5.17ms 116.60ms   98.67%\n    Req/Sec     1.13k    28.91     1.16k    96.88%\n  Latency Distribution\n     50%   56.19ms\n     75%   56.50ms\n     90%   56.84ms\n     99%   60.19ms\n  18014 requests in 8.02s, 1.33GB read\n  Socket errors: connect 0, read 135, write 7, timeout 0\nRequests/sec:   2245.14\nTransfer/sec:    170.21MB\nSTATUS 200 18014\n"
+    },
+    {
+      "rps": 7353.35,
+      "p50_ms": 0.12,
+      "p90_ms": 0.162,
+      "p99_ms": 0.333,
+      "mean_ms": 0.13130000000000003,
+      "max_ms": 1.03,
+      "requests": 59562,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 59562
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "image",
+      "connections": 1,
+      "peak_rss_mib": 69.95,
+      "idle_rss_mib": 61.83,
+      "cpu_percent": 76.3,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   131.30us   43.56us   1.03ms   92.36%\n    Req/Sec     7.39k   340.02     7.82k    77.78%\n  Latency Distribution\n     50%  120.00us\n     75%  127.00us\n     90%  162.00us\n     99%  333.00us\n  59562 requests in 8.10s, 7.29GB read\nRequests/sec:   7353.35\nTransfer/sec:      0.90GB\nSTATUS 200 59562\n"
+    },
+    {
+      "rps": 9414.06,
+      "p50_ms": 3.1,
+      "p90_ms": 4.24,
+      "p99_ms": 6.94,
+      "mean_ms": 3.39,
+      "max_ms": 8.57,
+      "requests": 75382,
+      "duration_s": 8.01,
+      "statuses": {
+        "200": 75382
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "image",
+      "connections": 32,
+      "peak_rss_mib": 71.81,
+      "idle_rss_mib": 61.58,
+      "cpu_percent": 98.0,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     3.39ms  737.95us   8.57ms   87.67%\n    Req/Sec     4.73k   175.64     5.11k    55.62%\n  Latency Distribution\n     50%    3.10ms\n     75%    3.42ms\n     90%    4.24ms\n     99%    6.94ms\n  75382 requests in 8.01s, 9.22GB read\nRequests/sec:   9414.06\nTransfer/sec:      1.15GB\nSTATUS 200 75382\n"
+    },
+    {
+      "rps": 9104.2,
+      "p50_ms": 13.96,
+      "p90_ms": 15.08,
+      "p99_ms": 16.96,
+      "mean_ms": 14.0,
+      "max_ms": 37.09,
+      "requests": 73161,
+      "duration_s": 8.04,
+      "statuses": {
+        "200": 73161
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "image",
+      "connections": 128,
+      "peak_rss_mib": 79.61,
+      "idle_rss_mib": 63.75,
+      "cpu_percent": 97.8,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    14.00ms    1.17ms  37.09ms   81.68%\n    Req/Sec     4.58k   245.30     5.07k    69.38%\n  Latency Distribution\n     50%   13.96ms\n     75%   14.33ms\n     90%   15.08ms\n     99%   16.96ms\n  73161 requests in 8.04s, 8.95GB read\nRequests/sec:   9104.20\nTransfer/sec:      1.11GB\nSTATUS 200 73161\n"
+    },
+    {
+      "rps": 6641.35,
+      "p50_ms": 0.127,
+      "p90_ms": 0.213,
+      "p99_ms": 1.47,
+      "mean_ms": 0.17543,
+      "max_ms": 4.6,
+      "requests": 53796,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 53796
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "update",
+      "connections": 1,
+      "peak_rss_mib": 43.36,
+      "idle_rss_mib": 36.42,
+      "cpu_percent": 85.7,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   175.43us  214.70us   4.60ms   96.08%\n    Req/Sec     6.67k   480.23     7.34k    74.07%\n  Latency Distribution\n     50%  127.00us\n     75%  141.00us\n     90%  213.00us\n     99%    1.47ms\n  53796 requests in 8.10s, 12.26MB read\nRequests/sec:   6641.35\nTransfer/sec:      1.51MB\nSTATUS 200 53796\n"
+    },
+    {
+      "rps": 7967.65,
+      "p50_ms": 3.54,
+      "p90_ms": 5.38,
+      "p99_ms": 7.99,
+      "mean_ms": 4.0,
+      "max_ms": 17.52,
+      "requests": 64562,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 64562
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "update",
+      "connections": 32,
+      "peak_rss_mib": 44.41,
+      "idle_rss_mib": 36.02,
+      "cpu_percent": 96.5,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     4.00ms    1.05ms  17.52ms   88.38%\n    Req/Sec     4.03k   382.12     7.97k    94.41%\n  Latency Distribution\n     50%    3.54ms\n     75%    4.27ms\n     90%    5.38ms\n     99%    7.99ms\n  64562 requests in 8.10s, 14.72MB read\nRequests/sec:   7967.65\nTransfer/sec:      1.82MB\nSTATUS 200 64562\n"
+    },
+    {
+      "rps": 7532.51,
+      "p50_ms": 15.67,
+      "p90_ms": 19.31,
+      "p99_ms": 32.75,
+      "mean_ms": 16.97,
+      "max_ms": 76.21,
+      "requests": 60518,
+      "duration_s": 8.03,
+      "statuses": {
+        "200": 60518
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "update",
+      "connections": 128,
+      "peak_rss_mib": 44.41,
+      "idle_rss_mib": 36.52,
+      "cpu_percent": 94.9,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    16.97ms    3.43ms  76.21ms   92.31%\n    Req/Sec     3.79k   510.86     4.50k    80.62%\n  Latency Distribution\n     50%   15.67ms\n     75%   17.51ms\n     90%   19.31ms\n     99%   32.75ms\n  60518 requests in 8.03s, 13.79MB read\nRequests/sec:   7532.51\nTransfer/sec:      1.72MB\nSTATUS 200 60518\n"
+    },
+    {
+      "rps": 2390.01,
+      "p50_ms": 0.47800000000000004,
+      "p90_ms": 0.535,
+      "p99_ms": 0.714,
+      "mean_ms": 0.41452,
+      "max_ms": 4.13,
+      "requests": 19358,
+      "duration_s": 8.1,
+      "statuses": {
+        "200": 19358
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "mixed",
+      "connections": 1,
+      "peak_rss_mib": 46.64,
+      "idle_rss_mib": 43.67,
+      "cpu_percent": 81.7,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   414.52us  162.62us   4.13ms   69.53%\n    Req/Sec     2.40k    61.41     2.54k    82.72%\n  Latency Distribution\n     50%  478.00us\n     75%  499.00us\n     90%  535.00us\n     99%  714.00us\n  19358 requests in 8.10s, 1.48GB read\nRequests/sec:   2390.01\nTransfer/sec:    186.76MB\nSTATUS 200 19358\n"
+    },
+    {
+      "rps": 2885.18,
+      "p50_ms": 10.63,
+      "p90_ms": 11.76,
+      "p99_ms": 21.45,
+      "mean_ms": 11.07,
+      "max_ms": 36.93,
+      "requests": 23128,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 23128
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "mixed",
+      "connections": 32,
+      "peak_rss_mib": 48.92,
+      "idle_rss_mib": 46.05,
+      "cpu_percent": 98.4,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    11.07ms    2.18ms  36.93ms   94.45%\n    Req/Sec     1.45k    91.30     1.61k    71.88%\n  Latency Distribution\n     50%   10.63ms\n     75%   11.16ms\n     90%   11.76ms\n     99%   21.45ms\n  23128 requests in 8.02s, 1.76GB read\nRequests/sec:   2885.18\nTransfer/sec:    225.45MB\nSTATUS 200 23128\n"
+    },
+    {
+      "rps": 2723.39,
+      "p50_ms": 44.53,
+      "p90_ms": 52.03,
+      "p99_ms": 81.66,
+      "mean_ms": 46.78,
+      "max_ms": 144.28,
+      "requests": 21837,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 21837
+      },
+      "socket_errors": {
+        "connect": 0,
+        "read": 17,
+        "write": 17,
+        "timeout": 0
+      },
+      "errors": 34,
+      "workload": "mixed",
+      "connections": 128,
+      "peak_rss_mib": 47.27,
+      "idle_rss_mib": 43.69,
+      "cpu_percent": 98.5,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    46.78ms    6.73ms 144.28ms   92.46%\n    Req/Sec     1.37k   131.65     1.52k    81.88%\n  Latency Distribution\n     50%   44.53ms\n     75%   47.99ms\n     90%   52.03ms\n     99%   81.66ms\n  21837 requests in 8.02s, 1.67GB read\n  Socket errors: connect 0, read 17, write 17, timeout 0\nRequests/sec:   2723.39\nTransfer/sec:    212.82MB\nSTATUS 200 21837\n"
+    },
+    {
+      "rps": 3158.43,
+      "p50_ms": 0.296,
+      "p90_ms": 1.15,
+      "p99_ms": 2.78,
+      "mean_ms": 0.45146,
+      "max_ms": 3.47,
+      "requests": 25282,
+      "duration_s": 8.0,
+      "statuses": {
+        "200": 12641,
+        "201": 12641
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "upload_delete",
+      "connections": 1,
+      "peak_rss_mib": 49.62,
+      "idle_rss_mib": 45.84,
+      "cpu_percent": 64.4,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  1 threads and 1 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   451.46us  580.95us   3.47ms   89.33%\n    Req/Sec     3.17k   100.48     3.36k    75.00%\n  Latency Distribution\n     50%  296.00us\n     75%  334.00us\n     90%    1.15ms\n     99%    2.78ms\n  25282 requests in 8.00s, 5.79MB read\nRequests/sec:   3158.43\nTransfer/sec:    740.26KB\nSTATUS 200 12641\nSTATUS 201 12641\n"
+    },
+    {
+      "rps": 3217.3,
+      "p50_ms": 11.24,
+      "p90_ms": 13.66,
+      "p99_ms": 19.04,
+      "mean_ms": 9.94,
+      "max_ms": 28.18,
+      "requests": 25808,
+      "duration_s": 8.02,
+      "statuses": {
+        "200": 12896,
+        "201": 12912
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "upload_delete",
+      "connections": 32,
+      "peak_rss_mib": 55.22,
+      "idle_rss_mib": 50.97,
+      "cpu_percent": 78.6,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 32 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     9.94ms    3.85ms  28.18ms   64.10%\n    Req/Sec     1.62k    67.15     1.80k    57.50%\n  Latency Distribution\n     50%   11.24ms\n     75%   12.62ms\n     90%   13.66ms\n     99%   19.04ms\n  25808 requests in 8.02s, 5.95MB read\nRequests/sec:   3217.30\nTransfer/sec:    758.99KB\nSTATUS 200 12896\nSTATUS 201 12912\n"
+    },
+    {
+      "rps": 2195.89,
+      "p50_ms": 50.6,
+      "p90_ms": 461.9,
+      "p99_ms": 884.29,
+      "mean_ms": 127.4,
+      "max_ms": 985.58,
+      "requests": 17658,
+      "duration_s": 8.04,
+      "statuses": {
+        "200": 8809,
+        "201": 8849
+      },
+      "socket_errors": {},
+      "errors": 0,
+      "workload": "upload_delete",
+      "connections": 128,
+      "peak_rss_mib": 63.03,
+      "idle_rss_mib": 60.41,
+      "cpu_percent": 62.1,
+      "raw": "Running 8s test @ http://127.0.0.1:54199\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   127.40ms  205.93ms 985.58ms   87.41%\n    Req/Sec     1.36k   249.56     1.74k    90.62%\n  Latency Distribution\n     50%   50.60ms\n     75%   64.13ms\n     90%  461.90ms\n     99%  884.29ms\n  17658 requests in 8.04s, 4.07MB read\nRequests/sec:   2195.89\nTransfer/sec:    517.75KB\nSTATUS 200 8809\nSTATUS 201 8849\n"
+    }
+  ],
+  "login_burst": {
+    "requests": 32,
+    "concurrency": 8,
+    "statuses": {
+      "200": 2,
+      "429": 30
+    },
+    "reasons": {
+      "Sign-in workers are busy. Try again shortly": 28,
+      "Too many sign-in attempts. Try again in a minute": 2
+    }
+  },
+  "login_rate_limit": {
+    "requests": 45,
+    "statuses": {
+      "200": 30,
+      "429": 15
+    }
+  },
+  "integrity": "SQLite integrity, foreign keys, fixture card count and BLOB lengths passed"
+}

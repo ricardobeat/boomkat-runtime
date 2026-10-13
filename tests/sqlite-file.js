@@ -21,9 +21,10 @@ if (mode === "deny") {
     if (mode === "revoke") {
         const stmt = db.query("SELECT v FROM t");
         await revoke("read");
+        assert(stmt.all()[0].v === "persisted", "open handle lost its access capability");
         let error;
-        try { stmt.all(); } catch (e) { error = e; }
-        assert(error && error.code === "PERMISSION_DENIED", "revoked permission ignored");
+        try { new Database(path); } catch (e) { error = e; }
+        assert(error && error.code === "PERMISSION_DENIED", "new database ignored revoked grant");
     }
     db.close();
 }

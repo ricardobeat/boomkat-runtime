@@ -21,6 +21,8 @@ const Needs[] NEEDS = {
     { "process", "env run" },
     { "permissions", "" },
     { "path", "" },
+    { "typescript", "" },
+    { "crypto", "" },
 };
 
 fn void scan(String file, List{String}* seen, List{String}* found) {

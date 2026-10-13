@@ -5,6 +5,7 @@ import boomkat;
 import boomkat::heap;
 import boomkat::hobject;
 import boomkat::hbigint;
+import boomkat::hstring;
 import boomkat::types;
 import libc;
 import std::collections::map;
@@ -44,6 +45,7 @@ alias SqlLibversion = fn ZString();
 alias SqlLibversionNumber = fn CInt();
 alias SqlSetAuthorizer = fn CInt(void*, SqlAuthorizer, void*);
 alias SqlProgressHandler = fn void(void*, CInt, SqlProgress, void*);
+alias SqlStmtStatus = fn CInt(void*, CInt, CInt);
 
 struct SqlApi {
     SqlOpenV2 open_v2;
@@ -78,6 +80,7 @@ struct SqlApi {
     SqlLibversionNumber libversion_number;
     SqlSetAuthorizer set_authorizer;
     SqlProgressHandler progress_handler;
+    SqlStmtStatus stmt_status;
 }
 
 SqlApi g_sql;
@@ -91,8 +94,6 @@ struct SqlDatabase {
     ulong id;
     ulong deadline;
     SqlStatement* statements;
-    String path;
-    bool readonly;
 }
 struct SqlStatement {
     void* handle;
@@ -100,6 +101,12 @@ struct SqlStatement {
     SqlDatabase* db;
     SqlStatement* next;
     SqlStatement* prev;
+    JsValue layout;
+    HString*[] keys;
+    uint[] slots;
+    uint shape;
+    CInt reprepares;
+    bool indexed_keys;
 }
 
 fn bool load_sqlite(void* library) {
@@ -168,7 +175,9 @@ fn bool load_sqlite(void* library) {
     if (!api.set_authorizer) return false;
     api.progress_handler = (SqlProgressHandler)libc::dlsym(library, "sqlite3_progress_handler");
     if (!api.progress_handler) return false;
-    // NOFOLLOW is supported from 3.31 onward.
+    api.stmt_status = (SqlStmtStatus)libc::dlsym(library, "sqlite3_stmt_status");
+    if (!api.stmt_status) return false;
+    // The binding requires SQLite 3.31 or newer.
     if (api.libversion_number() < 3031000) return false;
     g_sql = api;
     return true;
@@ -222,14 +231,12 @@ fn ulong sql_id(JsArg value) {
 fn SqlDatabase* sql_database(JsCtx ctx) {
     SqlDatabase* db = g_sql_databases.get(sql_id(ctx.arg(0))) ?? null;
     if (!db) ctx.throw_error(TYPE, "database is closed or invalid");
-    if (db && !sql_access(ctx, db)) return null;
     return db;
 }
 
 fn SqlStatement* sql_statement(JsCtx ctx) {
     SqlStatement* stmt = g_sql_statements.get(sql_id(ctx.arg(0))) ?? null;
     if (!stmt) ctx.throw_error(TYPE, "statement is finalized or its database is closed");
-    if (stmt && !sql_access(ctx, stmt.db)) return null;
     return stmt;
 }
 
@@ -242,14 +249,79 @@ fn void sql_finalize(SqlStatement* stmt) {
     }
     if (stmt.next) stmt.next.prev = stmt.prev;
     g_sql.finalize(stmt.handle);
+    sql_layout_clear(stmt);
     free(stmt);
+}
+
+fn void sql_layout_clear(SqlStatement* stmt) {
+    if (!stmt.layout.is_empty()) g_rt.release(stmt.layout);
+    if (stmt.keys.len) free(stmt.keys.ptr);
+    if (stmt.slots.len) free(stmt.slots.ptr);
+    stmt.layout = { };
+    stmt.keys = { };
+    stmt.slots = { };
+    stmt.shape = heap::SHAPE_NONE;
+}
+
+fn bool sql_layout(JsCtx ctx, SqlStatement* stmt) {
+    // step() can recompile a prepared statement after schema changes.
+    CInt reprepares = g_sql.stmt_status(stmt.handle, 5, 0); // SQLITE_STMTSTATUS_REPREPARE
+    if (!stmt.layout.is_empty() && stmt.reprepares == reprepares) return true;
+    Heap* h         = ctx.ctx.heap;
+    CInt columns    = g_sql.column_count(stmt.handle);
+    HString*[] keys = mem::new_array(HString*, columns);
+    uint[] slots    = mem::new_array(uint, columns);
+    bool saved;
+    defer if (!saved) {
+        free(keys.ptr);
+        free(slots.ptr);
+    }
+    HObject* layout = sql_object(ctx) ?? null;
+    if (!layout) {
+        ctx.throw_error(ERROR, "SQLite allocation failed");
+        return false;
+    }
+    TVal undefined;
+    undefined.set_undefined();
+    for (CInt i = 0; i < columns; i++) {
+        HString* key = h.str_intern((char[])g_sql.column_name(stmt.handle, i).str_view());
+        if (!key) {
+            ctx.throw_error(ERROR, "SQLite allocation failed");
+            return false;
+        }
+        keys[i] = h.ensure_interned(key);
+        if (!layout.put_prop(keys[i], undefined, hobject::PROP_FLAGS_WEC, h)) {
+            ctx.throw_error(ERROR, "SQLite allocation failed");
+            return false;
+        }
+        slots[i] = (uint)layout.find_prop_idx(keys[i], h);
+    }
+    JsArg value;
+    value.tv.set_object(layout);
+    JsValue root = ctx.persist(value) ?? { };
+    if (root.is_empty()) {
+        ctx.throw_error(ERROR, "SQLite allocation failed");
+        return false;
+    }
+    sql_layout_clear(stmt);
+    stmt.layout = root;
+    stmt.keys = keys;
+    stmt.slots = slots;
+    stmt.reprepares = reprepares;
+    stmt.indexed_keys = layout.flags.has_indexed_named_prop;
+    Shape* shape = layout.get_shape(h);
+    if (shape && !shape.dict && shape.parent != hobject::PRIVATE_SHAPE_PARENT) {
+        shape.shared = true;
+        stmt.shape = layout.shape_id;
+    }
+    saved = true;
+    return true;
 }
 
 fn void sql_close(SqlDatabase* db) {
     while (db.statements) sql_finalize(db.statements);
     g_sql_databases.remove(db.id);
     g_sql.close(db.handle);
-    if (db.path.len) free(db.path.ptr);
     free(db);
 }
 
@@ -306,16 +378,19 @@ fn String? sql_string(JsCtx ctx, uint index) {
     return text;
 }
 
-fn bool sql_access(JsCtx ctx, SqlDatabase* db) {
-    if (!db.path.len) return true;
+fn bool sql_access(JsCtx ctx, String database, bool readonly) {
+    if (database == ":memory:") return true;
     String[] suffixes = { "", "-journal", "-wal", "-shm" };
     foreach (suffix : suffixes) {
-        String target = canonical(string::tformat("%s%s", db.path, suffix));
-        if (!check_path(READ, target)) {
+        String path   = string::tformat("%s%s", database, suffix);
+        // Grants apply to the normalized pathname, including existing links.
+        // Validate once at open; the handle retains that access capability.
+        String target = path;
+        if (!check_path_location(READ, target)) {
             sql_throw(ctx, "PERMISSION_DENIED", denied_path(READ, target));
             return false;
         }
-        if (!db.readonly && !check_path(WRITE, target)) {
+        if (!readonly && !check_path_location(WRITE, target)) {
             sql_throw(ctx, "PERMISSION_DENIED", denied_path(WRITE, target));
             return false;
         }
@@ -330,17 +405,18 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
         if (!raw.len || raw.starts_with(
             "file:"
         )) return ctx.throw_error(TYPE, "use a file path or :memory:, not a SQLite URI");
-        bool readonly          = ctx.arg(1).as_bool() ?? false;
-        String path            = raw == ":memory:" ? raw : canonical(raw);
-        SqlDatabase permission = { .path = path == ":memory:" ? "" : path, .readonly = readonly };
-        if (!sql_access(ctx, &permission)) return;
+        bool readonly = ctx.arg(1).as_bool() ?? false;
+        String path   = raw == ":memory:" ? raw : absolute(raw);
+        if (!sql_access(ctx, path, readonly)) return;
         SqlDatabase* db = mem::new(SqlDatabase);
         bool opened;
         defer if (!opened) {
             if (db.handle) g_sql.close(db.handle);
             free(db);
         }
-        CInt flags = (readonly ? 1 : 2 | 4) | 0x1000000; // READONLY / READWRITE|CREATE, NOFOLLOW
+        // All handle access stays on the loop thread: per-connection mutexes
+        // add no protection here. File locks and journal durability remain on.
+        CInt flags = (readonly ? 1 : 2 | 4) | 0x8000; // NOMUTEX
         if (g_sql.open_v2(path.zstr_tcopy(), &db.handle, flags, null) != 0) {
             if (db.handle) {
                 sql_error(ctx, db);
@@ -358,8 +434,6 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
             null
         ) != 0 || g_sql.set_authorizer(db.handle, &sql_authorize, db) != 0) return sql_error(ctx, db);
         db.id = g_sql_next_id++;
-        db.readonly = readonly;
-        if (path != ":memory:") db.path = path.copy(mem);
         g_sql.progress_handler(db.handle, 10000, &sql_progress, db);
         g_sql_databases.set(db.id, db);
         opened = true;
@@ -437,7 +511,11 @@ fn bool sql_put(JsCtx ctx, HObject* obj, String name, TVal value) {
 }
 
 fn JsArg? sql_integer(JsCtx ctx, long value) {
-    if (value >= -9007199254740991 && value <= 9007199254740991) return ctx.number((double)value);
+    if (value >= -9007199254740991 && value <= 9007199254740991) {
+        JsArg result;
+        result.tv.set_fastint_or_number(value);
+        return result;
+    }
     HBigInt* bigint = hbigint::hbigint_alloc(ctx.ctx.heap, (int128)value)!;
     JsArg result;
     result.tv.set_bigint(bigint);
@@ -528,6 +606,16 @@ fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
             char* text = g_sql.column_text(stmt.handle, column);
             CInt len = g_sql.column_bytes(stmt.handle, column);
             if (!text && len) return boomkat::OUT_OF_MEMORY~;
+            // Result data is not an identifier. Long ASCII values can avoid
+            // hashing and comparing their entire contents in the intern table.
+            // Copy before SQLite advances; retain the normal UTF-8 path otherwise.
+            if (len >= 64 && hstring::check_is_ascii(text[:len])) {
+                HString* string = hstring::hstring_alloc(ctx.ctx.heap, text[:len], hstring::HASH_DEFERRED)!;
+                ctx.ctx.heap.large_string_register(string);
+                JsArg value;
+                value.tv.set_string_borrowed(string);
+                return value;
+            }
             return ctx.string((String)text[:len]);
         case 4:
             char* data = g_sql.column_blob(stmt.handle, column);
@@ -561,23 +649,37 @@ fn void js_sqlite_query(JsCtx ctx, void* user) {
             TVal value = bindings.get_array_idx(i) ?? (TVal) { };
             if (!sql_bind(ctx, stmt, i, value)) return;
         }
-        int mode         = ctx.arg(2).as_int(); // 0 all, 1 get, 2 run
-        HObject*? output = sql_object(ctx, ARRAY);
-        if (catch output) return ctx.throw_error(ERROR, "SQLite allocation failed");
+        int mode = ctx.arg(2).as_int(); // 0 all, 1 get, 2 run
+        HObject* output;
+        if (mode != 1 && mode != 2) {
+            output = sql_object(ctx, ARRAY) ?? null;
+            if (!output) return ctx.throw_error(ERROR, "SQLite allocation failed");
+        }
         uint row_index;
+        bool have_layout;
         sql_deadline(stmt.db);
         while (true) {
             CInt rc = g_sql.step(stmt.handle);
             if (rc == 101) break;
             if (rc != 100) return sql_error(ctx, stmt.db);
             if (mode == 2) continue;
-            HObject*? row = sql_object(ctx);
+            if (!have_layout) {
+                if (!sql_layout(ctx, stmt)) return;
+                have_layout = true;
+            }
+            HObject*? row = stmt.shape == heap::SHAPE_NONE ? sql_object(ctx)
+                : ctx.ctx.heap.alloc_shaped_object(stmt.shape);
             if (catch row) return ctx.throw_error(ERROR, "SQLite allocation failed");
-            CInt columns = g_sql.column_count(stmt.handle);
-            for (CInt i = 0; i < columns; i++) {
+            if (stmt.shape != heap::SHAPE_NONE) {
+                ctx.ctx.heap.set_prototype(row, null);
+                row.flags.has_indexed_named_prop = stmt.indexed_keys;
+            }
+            for (CInt i = 0; i < stmt.keys.len; i++) {
                 JsArg? value = sql_column(ctx, stmt, i);
                 if (catch value) return ctx.throw_error(ERROR, "SQLite allocation failed");
-                if (!sql_put(ctx, row, g_sql.column_name(stmt.handle, i).str_view(), value.tv)) {
+                if (stmt.shape != heap::SHAPE_NONE) {
+                    ctx.ctx.heap.store_slot_ref(row, &row.prop_values()[stmt.slots[i]], &value.tv);
+                } else if (!row.put_prop(stmt.keys[i], value.tv, hobject::PROP_FLAGS_WEC, ctx.ctx.heap)) {
                     return ctx.throw_error(ERROR, "SQLite allocation failed");
                 }
             }
