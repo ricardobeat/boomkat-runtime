@@ -134,7 +134,9 @@ with a hash for the import map.
 This is a sample: there is no email delivery, account recovery, MFA, image
 resizing, realtime websocket sync, or automated schema migration framework.
 TS transpilation validates syntax but does not type-check or generate source
-maps. Native SQLite operations are synchronous.
+maps. Native SQLite operations are synchronous. The app permits up to 256 MiB of
+read-only database mappings to reduce pager copying; WAL/FULL durability stays
+enabled. SQLite falls back to ordinary reads when mapping is unavailable.
 
 ## Checks
 

@@ -15,6 +15,8 @@ export async function startTaskboard(platform: Platform) {
 	const db = new platform.Database(dataDir + "/taskboard.sqlite");
 	try {
 		db.exec(await platform.readText(root + "/schema.sql"));
+		// Let SQLite read database pages directly; WAL writes keep FULL durability.
+		db.exec("PRAGMA mmap_size=268435456");
 		const services = await createServices(db, platform);
 		const assets = await createAssets(platform, root);
 		const routes = createRoutes(services, platform, origin);
