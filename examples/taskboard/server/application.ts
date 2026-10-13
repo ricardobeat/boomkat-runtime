@@ -14,6 +14,8 @@ export async function startTaskboard(platform: Platform) {
 	await platform.mkdir(dataDir, { recursive: true });
 	const db = new platform.Database(dataDir + "/taskboard.sqlite");
 	try {
+		// Independent server workers share one WAL writer; wait for short commits.
+		db.exec("PRAGMA busy_timeout=5000");
 		db.exec(await platform.readText(root + "/schema.sql"));
 		// Let SQLite read database pages directly; WAL writes keep FULL durability.
 		db.exec("PRAGMA mmap_size=268435456");
