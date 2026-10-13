@@ -1,0 +1,2 @@
+postMessage("running");
+while (true) {}

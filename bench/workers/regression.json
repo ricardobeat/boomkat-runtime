@@ -1,0 +1,410 @@
+{
+  "engine_microbenchmarks": {
+    "runs": [
+      {
+        "binary": "baseline",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 329,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2207,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 131,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 331,
+            "value": 1124999250000
+          }
+        ]
+      },
+      {
+        "binary": "candidate",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 326,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2218,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 134,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 333,
+            "value": 1124999250000
+          }
+        ]
+      },
+      {
+        "binary": "candidate",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 330,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2230,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 135,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 343,
+            "value": 1124999250000
+          }
+        ]
+      },
+      {
+        "binary": "baseline",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 323,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2211,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 131,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 329,
+            "value": 1124999250000
+          }
+        ]
+      },
+      {
+        "binary": "baseline",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 330,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2229,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 134,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 345,
+            "value": 1124999250000
+          }
+        ]
+      },
+      {
+        "binary": "candidate",
+        "values": [
+          {
+            "name": "native-select",
+            "ms": 325,
+            "value": 1124999250000
+          },
+          {
+            "name": "records-json",
+            "ms": 2223,
+            "value": 606833340
+          },
+          {
+            "name": "string-calls",
+            "ms": 132,
+            "value": 39777780
+          },
+          {
+            "name": "collections-gc",
+            "ms": 344,
+            "value": 1124999250000
+          }
+        ]
+      }
+    ],
+    "median": {
+      "native-select": {
+        "baseline_ms": 329,
+        "candidate_ms": 326,
+        "speedup_percent": 0.9
+      },
+      "records-json": {
+        "baseline_ms": 2211,
+        "candidate_ms": 2223,
+        "speedup_percent": -0.5
+      },
+      "string-calls": {
+        "baseline_ms": 131,
+        "candidate_ms": 134,
+        "speedup_percent": -2.2
+      },
+      "collections-gc": {
+        "baseline_ms": 331,
+        "candidate_ms": 343,
+        "speedup_percent": -3.5
+      }
+    }
+  },
+  "taskboard_control": {
+    "date_utc": "2026-10-13T18:21:26.649576+00:00",
+    "binary": "/private/tmp/bkr-workers-control/out/bkr",
+    "profiled": false,
+    "runtime": "bkr",
+    "runtime_version": null,
+    "asset_sha256": "8e7c71ce35fd8444d04a13f803e2f68ed5cdf823ce376033f99f11ba2fe995b5",
+    "binary_sha256": "be6a6f3dc7cf34394615377d1a7beee83551134e8db45e0d687753b5681b141d",
+    "runtime_commit": "919535151bbdd411c3b1a7df247fd09fc958319e",
+    "working_tree_dirty": true,
+    "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A5425a",
+    "wrk": "wrk 4.2.0 [kqueue] Copyright (C) 2012 Will Glozer",
+    "fixture": {
+      "accounts": 10,
+      "shared_teams": 2,
+      "boards": 4,
+      "cards_per_board": 200,
+      "images": 16,
+      "board_json_bytes": 79040,
+      "asset_bytes": 207,
+      "image_bytes": 131072,
+      "journal_mode": "wal",
+      "synchronous": 2
+    },
+    "seconds_per_run": 6,
+    "warmup_seconds": 1,
+    "client_threads": 2,
+    "response_body": "string",
+    "close_connections": false,
+    "results": [
+      {
+        "rps": 4292.89,
+        "p50_ms": 29.82,
+        "p90_ms": 30.29,
+        "p99_ms": 31.4,
+        "mean_ms": 29.73,
+        "max_ms": 33.51,
+        "requests": 25857,
+        "duration_s": 6.02,
+        "statuses": {
+          "200": 25857
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "board",
+        "connections": 128,
+        "peak_rss_mib": 49.36,
+        "idle_rss_mib": 49.28,
+        "cpu_percent": 99.1,
+        "raw": "Running 6s test @ http://127.0.0.1:65021\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    29.73ms    1.29ms  33.51ms   96.50%\n    Req/Sec     2.16k   160.49     2.47k    52.50%\n  Latency Distribution\n     50%   29.82ms\n     75%   30.04ms\n     90%   30.29ms\n     99%   31.40ms\n  25857 requests in 6.02s, 1.91GB read\nRequests/sec:   4292.89\nTransfer/sec:    325.46MB\nSTATUS 200 25857\n"
+      },
+      {
+        "rps": 22248.77,
+        "p50_ms": 5.73,
+        "p90_ms": 5.95,
+        "p99_ms": 6.18,
+        "mean_ms": 5.74,
+        "max_ms": 8.72,
+        "requests": 133624,
+        "duration_s": 6.01,
+        "statuses": {
+          "200": 133624
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "image",
+        "connections": 128,
+        "peak_rss_mib": 55.52,
+        "idle_rss_mib": 55.52,
+        "cpu_percent": 99.1,
+        "raw": "Running 6s test @ http://127.0.0.1:65021\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     5.74ms  218.54us   8.72ms   83.53%\n    Req/Sec    11.18k   200.90    11.65k    72.50%\n  Latency Distribution\n     50%    5.73ms\n     75%    5.83ms\n     90%    5.95ms\n     99%    6.18ms\n  133624 requests in 6.01s, 16.34GB read\nRequests/sec:  22248.77\nTransfer/sec:      2.72GB\nSTATUS 200 133624\n"
+      },
+      {
+        "rps": 17433.23,
+        "p50_ms": 6.93,
+        "p90_ms": 8.93,
+        "p99_ms": 9.63,
+        "mean_ms": 7.34,
+        "max_ms": 19.9,
+        "requests": 104808,
+        "duration_s": 6.01,
+        "statuses": {
+          "200": 104808
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "update",
+        "connections": 128,
+        "peak_rss_mib": 37.16,
+        "idle_rss_mib": 37.16,
+        "cpu_percent": 93.3,
+        "raw": "Running 6s test @ http://127.0.0.1:65021\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     7.34ms    1.13ms  19.90ms   69.20%\n    Req/Sec     8.77k   264.87     9.11k    84.17%\n  Latency Distribution\n     50%    6.93ms\n     75%    8.16ms\n     90%    8.93ms\n     99%    9.63ms\n  104808 requests in 6.01s, 23.89MB read\nRequests/sec:  17433.23\nTransfer/sec:      3.97MB\nSTATUS 200 104808\n"
+      }
+    ],
+    "login_burst": {
+      "requests": 32,
+      "concurrency": 8,
+      "statuses": {
+        "200": 2,
+        "429": 30
+      },
+      "reasons": {
+        "Sign-in workers are busy. Try again shortly": 28,
+        "Too many sign-in attempts. Try again in a minute": 2
+      }
+    },
+    "login_rate_limit": {
+      "requests": 45,
+      "statuses": {
+        "200": 30,
+        "429": 15
+      }
+    },
+    "integrity": "SQLite integrity, foreign keys, fixture card count and BLOB lengths passed"
+  },
+  "taskboard_candidate": {
+    "date_utc": "2026-10-13T18:21:58.835756+00:00",
+    "binary": "/Users/rtomasi/cousas/boomkat-runtime/out/bkr",
+    "profiled": false,
+    "runtime": "bkr",
+    "runtime_version": null,
+    "asset_sha256": "8e7c71ce35fd8444d04a13f803e2f68ed5cdf823ce376033f99f11ba2fe995b5",
+    "binary_sha256": "ec507f5b7f1e8715776cb7aa8dc16f8800cea90125b1753fa66bd77436c3fb16",
+    "runtime_commit": "919535151bbdd411c3b1a7df247fd09fc958319e",
+    "working_tree_dirty": true,
+    "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A5425a",
+    "wrk": "wrk 4.2.0 [kqueue] Copyright (C) 2012 Will Glozer",
+    "fixture": {
+      "accounts": 10,
+      "shared_teams": 2,
+      "boards": 4,
+      "cards_per_board": 200,
+      "images": 16,
+      "board_json_bytes": 79040,
+      "asset_bytes": 207,
+      "image_bytes": 131072,
+      "journal_mode": "wal",
+      "synchronous": 2
+    },
+    "seconds_per_run": 6,
+    "warmup_seconds": 1,
+    "client_threads": 2,
+    "response_body": "string",
+    "close_connections": false,
+    "results": [
+      {
+        "rps": 4254.27,
+        "p50_ms": 30.0,
+        "p90_ms": 30.42,
+        "p99_ms": 31.03,
+        "mean_ms": 29.94,
+        "max_ms": 33.14,
+        "requests": 25620,
+        "duration_s": 6.02,
+        "statuses": {
+          "200": 25620
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "board",
+        "connections": 128,
+        "peak_rss_mib": 49.81,
+        "idle_rss_mib": 49.56,
+        "cpu_percent": 99.4,
+        "raw": "Running 6s test @ http://127.0.0.1:49560\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency    29.94ms    1.23ms  33.14ms   99.01%\n    Req/Sec     2.14k   140.55     2.37k    53.33%\n  Latency Distribution\n     50%   30.00ms\n     75%   30.20ms\n     90%   30.42ms\n     99%   31.03ms\n  25620 requests in 6.02s, 1.90GB read\nRequests/sec:   4254.27\nTransfer/sec:    322.53MB\nSTATUS 200 25620\n"
+      },
+      {
+        "rps": 22073.06,
+        "p50_ms": 5.78,
+        "p90_ms": 6.01,
+        "p99_ms": 6.22,
+        "mean_ms": 5.79,
+        "max_ms": 8.07,
+        "requests": 134735,
+        "duration_s": 6.1,
+        "statuses": {
+          "200": 134735
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "image",
+        "connections": 128,
+        "peak_rss_mib": 56.47,
+        "idle_rss_mib": 56.33,
+        "cpu_percent": 96.8,
+        "raw": "Running 6s test @ http://127.0.0.1:49560\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     5.79ms  202.01us   8.07ms   77.96%\n    Req/Sec    11.10k   155.04    11.70k    68.03%\n  Latency Distribution\n     50%    5.78ms\n     75%    5.89ms\n     90%    6.01ms\n     99%    6.22ms\n  134735 requests in 6.10s, 16.48GB read\nRequests/sec:  22073.06\nTransfer/sec:      2.70GB\nSTATUS 200 134735\n"
+      },
+      {
+        "rps": 17426.65,
+        "p50_ms": 6.98,
+        "p90_ms": 8.96,
+        "p99_ms": 9.58,
+        "mean_ms": 7.34,
+        "max_ms": 12.19,
+        "requests": 106450,
+        "duration_s": 6.11,
+        "statuses": {
+          "200": 106450
+        },
+        "socket_errors": {},
+        "errors": 0,
+        "workload": "update",
+        "connections": 128,
+        "peak_rss_mib": 37.39,
+        "idle_rss_mib": 37.38,
+        "cpu_percent": 94.4,
+        "raw": "Running 6s test @ http://127.0.0.1:49560\n  2 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     7.34ms    1.01ms  12.19ms   62.50%\n    Req/Sec     8.76k   199.62     9.05k    64.75%\n  Latency Distribution\n     50%    6.98ms\n     75%    8.14ms\n     90%    8.96ms\n     99%    9.58ms\n  106450 requests in 6.11s, 24.26MB read\nRequests/sec:  17426.65\nTransfer/sec:      3.97MB\nSTATUS 200 106450\n"
+      }
+    ],
+    "login_burst": {
+      "requests": 32,
+      "concurrency": 8,
+      "statuses": {
+        "200": 2,
+        "429": 30
+      },
+      "reasons": {
+        "Sign-in workers are busy. Try again shortly": 28,
+        "Too many sign-in attempts. Try again in a minute": 2
+      }
+    },
+    "login_rate_limit": {
+      "requests": 45,
+      "statuses": {
+        "200": 30,
+        "429": 15
+      }
+    },
+    "integrity": "SQLite integrity, foreign keys, fixture card count and BLOB lengths passed"
+  },
+  "control_engine_commit": "5c91f807",
+  "control_runtime_commit": "9195351"
+}

@@ -249,7 +249,7 @@ fn void fs_done(Task* t) {
     switch (f.kind) {
         case READ_FILE: resolve_bytes(f.op, f.data);
         case READ_TEXT:
-            g_rt.@scope() {
+            g_runtime.rt.@scope() {
                 JsValue? value = owned_text_value(f.data);
                 if (catch value) {
                     reject(f.op, "ENOMEM", "cannot allocate file text");
@@ -266,7 +266,7 @@ fn void fs_done(Task* t) {
         case WRITE_FILE:
         case MKDIR:
         case REMOVE:
-        case RENAME: resolve(f.op, g_rt.null_value() ?? { });
+        case RENAME: resolve(f.op, g_runtime.rt.null_value() ?? { });
     }
 }
 

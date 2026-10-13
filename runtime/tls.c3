@@ -2,6 +2,8 @@
 // hostname checks for clients, so both are added here per connection.
 module bkr;
 
+import std::thread;
+
 extern fn CInt ssl_ctx_set_default_verify_paths(void* ctx) @cname("SSL_CTX_set_default_verify_paths");
 extern fn void ssl_ctx_set_verify(void* ctx, CInt mode, void* cb) @cname("SSL_CTX_set_verify");
 extern fn long ssl_ctrl(void* ssl, CInt cmd, long larg, void* parg) @cname("SSL_ctrl");
@@ -24,6 +26,8 @@ const CInt SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
 const CInt CRYPTO_EX_INDEX_SSL          = 0;
 
 CInt g_res_index = -1;
+OnceFlag g_tls_index_once;
+fn void tls_index_init() => g_res_index = crypto_get_ex_new_index(CRYPTO_EX_INDEX_SSL, 0, null, null, null, null);
 
 fn CInt verify_cb(CInt ok, void* store) {
     if (ok) return ok;
@@ -37,7 +41,7 @@ fn void tls_client_init(UsContext* ctx) {
     void* sctx = us_socket_context_get_native_handle(1, ctx);
     ssl_ctx_set_default_verify_paths(sctx);
     ssl_ctx_set_verify(sctx, SSL_VERIFY_PEER, &verify_cb);
-    if (g_res_index < 0) g_res_index = crypto_get_ex_new_index(CRYPTO_EX_INDEX_SSL, 0, null, null, null, null);
+    g_tls_index_once.call(&tls_index_init);
 }
 
 fn void tls_client_setup(Res* r) {

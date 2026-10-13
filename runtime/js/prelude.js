@@ -209,10 +209,21 @@ def("AbortController", AbortController);
 
 // ---- the global scope as an event target ----
 
-const globalEvents = new EventTarget();
-def("addEventListener", globalEvents.addEventListener.bind(globalEvents));
-def("removeEventListener", globalEvents.removeEventListener.bind(globalEvents));
-def("dispatchEvent", globalEvents.dispatchEvent.bind(globalEvents));
+const globalEvents = bk.workerIsWorker() ? globalThis : new EventTarget();
+if (globalEvents === globalThis) hidden(globalThis, { _listeners: new Map() });
+def("addEventListener", EventTarget.prototype.addEventListener.bind(globalEvents));
+def("removeEventListener", EventTarget.prototype.removeEventListener.bind(globalEvents));
+const dispatchGlobalEvent = EventTarget.prototype.dispatchEvent.bind(globalEvents);
+def("dispatchEvent", dispatchGlobalEvent);
+for (const type of ["message", "messageerror", "error", "unhandledrejection"]) {
+    const name = "on" + type;
+    if (globalEvents === globalThis) def(name, null);
+    else Object.defineProperty(globalThis, name, {
+        configurable: true,
+        get() { return globalEvents[name] || null; },
+        set(handler) { globalEvents[name] = handler; },
+    });
+}
 
 class PromiseRejectionEvent extends Event {
     constructor(type, init) {
@@ -225,7 +236,7 @@ def("PromiseRejectionEvent", PromiseRejectionEvent);
 
 bk.unhandled = function (reason, promise) {
     const ev = new PromiseRejectionEvent("unhandledrejection", { reason, promise, cancelable: true });
-    globalEvents.dispatchEvent(ev);
+    dispatchGlobalEvent(ev);
     return ev.defaultPrevented;
 };
 
@@ -1465,6 +1476,7 @@ bk.Handle = class Handle {
     #writable = null;
     constructor(rid) {
         this.#rid = rid;
+        bk.workerOpaque(this);
     }
     get readable() {
         return this.#readable ??= new ReadableStream({

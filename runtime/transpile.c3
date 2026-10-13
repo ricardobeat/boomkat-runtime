@@ -572,7 +572,7 @@ fn void js_transpile(JsCtx ctx, void* udata) {
                     .as_bool() ?? true) ? JsxRuntime.AUTOMATIC : JsxRuntime.CLASSIC, .factory = ctx.arg(3)
                         .as_string() ?? "h", .fragment = ctx.arg(4)
                             .as_string() ?? "Fragment", .import_source = ctx.arg(5).as_string() ?? "preact", }, };
-        AstIndex* index = ast::index_begin(source, g_rt.rt.heap, opts);
+        AstIndex* index = ast::index_begin(source, g_runtime.rt.rt.heap, opts);
         defer ast::index_end(index);
         if (!index.built || !index.use) {
             ctx.throw_error(SYNTAX, (String)index.parser.err_msg[:index.parser.err_len]);
@@ -589,7 +589,7 @@ fn void js_transpile(JsCtx ctx, void* udata) {
         // Validate the output as JavaScript too, including factories supplied
         // by JSX pragmas/options. Never return syntax the JS parser rejects.
         ParseOptions js_opts = { .is_module = opts.is_module };
-        AstIndex* emitted    = ast::index_begin(writer.out.str_view(), g_rt.rt.heap, js_opts);
+        AstIndex* emitted    = ast::index_begin(writer.out.str_view(), g_runtime.rt.rt.heap, js_opts);
         defer ast::index_end(emitted);
         if (!emitted.built || !emitted.use) {
             ctx.throw_error(

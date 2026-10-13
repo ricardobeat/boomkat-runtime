@@ -69,7 +69,6 @@ extern fn CInt us_poll_events(void* p);
 const CInt POLL_READABLE = 1;
 const CInt POLL_WRITABLE = 2;
 
-UsContext*[2] g_client_ctx;
 
 // ---- socket callbacks, shared by client and accepted sockets ----
 
@@ -178,13 +177,13 @@ fn UsSocket* on_sock_connect_error(CInt ssl, UsSocket* s, CInt code) {
 fn void Res.pause(&self) {
     if (self.paused || !self.sock) return;
     self.paused = true;
-    us_poll_change(self.sock, g_loop, us_poll_events(self.sock) & ~POLL_READABLE);
+    us_poll_change(self.sock, g_runtime.loop, us_poll_events(self.sock) & ~POLL_READABLE);
 }
 
 fn void Res.resume(&self) {
     if (!self.paused || !self.sock) return;
     self.paused = false;
-    us_poll_change(self.sock, g_loop, us_poll_events(self.sock) | POLL_READABLE);
+    us_poll_change(self.sock, g_runtime.loop, us_poll_events(self.sock) | POLL_READABLE);
 }
 
 // ---- writing ----
@@ -300,9 +299,9 @@ fn void dns_done(Task* t) {
             return;
         }
         if (!d.connect) {
-            g_rt.@scope() {
-                JsValue list = g_rt.array() ?? { };
-                foreach (i, a : d.addrs) (void)g_rt.set_index(list, (uint)i, g_rt.string(a) ?? { });
+            g_runtime.rt.@scope() {
+                JsValue list = g_runtime.rt.array() ?? { };
+                foreach (i, a : d.addrs) (void)g_runtime.rt.set_index(list, (uint)i, g_runtime.rt.string(a) ?? { });
                 resolve(d.op, list);
             };
             return;
@@ -328,22 +327,22 @@ fn void dns_done(Task* t) {
 }
 
 fn void start_connect(uint op, String host, String ip, int port, CInt ssl) {
-    if (!g_client_ctx[ssl]) {
+    if (!g_runtime.client_ctx[ssl]) {
         UsContextOptions opts;
-        UsContext* ctx = us_create_socket_context(ssl, g_loop, 0, opts);
+        UsContext* ctx = us_create_socket_context(ssl, g_runtime.loop, 0, opts);
         if (ssl) tls_client_init(ctx);
         if (ssl) {
             @callbacks(1, ctx);
         } else {
             @callbacks(0, ctx);
         }
-        g_client_ctx[ssl] = ctx;
+        g_runtime.client_ctx[ssl] = ctx;
     }
     Res* r = res_new(SOCKET);
     r.ssl = ssl;
     r.host = host.copy(mem);
     r.connect_op = op;
-    UsSocket* s = us_socket_context_connect(ssl, g_client_ctx[ssl], ip.zstr_tcopy(), port, null, 0, (CInt)8);
+    UsSocket* s = us_socket_context_connect(ssl, g_runtime.client_ctx[ssl], ip.zstr_tcopy(), port, null, 0, (CInt)8);
     if (!s) {
         r.closed = r.gone = true;
         res_release(r);
@@ -416,7 +415,7 @@ fn void js_listen(JsCtx ctx, void* udata) {
             return;
         }
         UsContextOptions opts;
-        UsContext* uc = us_create_socket_context(0, g_loop, (CInt)8, opts);
+        UsContext* uc = us_create_socket_context(0, g_runtime.loop, (CInt)8, opts);
         @callbacks(0, uc);
         Res* l = res_new(LISTENER);
         l.ctx = uc;

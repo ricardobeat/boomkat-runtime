@@ -109,23 +109,9 @@ struct Conn {
     List{char} body;
 }
 
-List{Server*} g_servers;
-List{Conn*} g_conns;
-List{uint} g_free_slots;
-List{Conn*} g_spare;
-ulong g_generation;
-List{ulong} g_http_queue;
-sz g_http_queue_at;
-bool g_http_queue_armed;
-ulong g_http_turn_ns;
 const ulong HTTP_TURN_NS = 2_000_000;
 
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
-JsValue[METHODS.len] g_methods;
-JsValue g_dispatch;
-JsValue g_handled;
-JsValue g_failed;
-JsValue g_pump;
 
 // What the native request path needs to build a Request and read a
 // Response without running the prelude's JS.
@@ -152,65 +138,58 @@ struct FastTypes {
     JsValue[14] keep;
 }
 
-FastTypes g_fast;
-JsValue g_drain;
-JsValue g_aborted;
-JsValue g_http_fulfilled;
-JsValue g_http_rejected;
-JsValue g_http_then;
-JsValue g_http_error;
 
 fn void? init_http() {
-    g_servers.init(mem);
-    g_conns.init(mem, 256);
-    g_free_slots.init(mem, 256);
-    g_spare.init(mem, 256);
-    g_http_queue.init(mem, 256);
-    uws_loop_on_pre(&http_turn_reset, &g_http_queue);
-    foreach (i, m : METHODS) g_methods[i] = g_rt.string(m)!;
-    g_http_fulfilled = bk_get("httpFulfilled")!;
-    g_http_rejected = bk_get("httpRejected")!;
-    g_http_error = bk_get("error")!;
-    g_http_then = g_rt.root(g_rt.rt.heap.promise_proto.get_prop(g_rt.rt.heap.str(THEN), g_rt.rt.heap)!)!;
+    g_runtime.servers.init(mem);
+    g_runtime.conns.init(mem, 256);
+    g_runtime.free_slots.init(mem, 256);
+    g_runtime.spare.init(mem, 256);
+    g_runtime.http_queue.init(mem, 256);
+    uws_loop_on_pre(&http_turn_reset, &g_runtime.http_queue);
+    foreach (i, m : METHODS) g_runtime.methods[i] = g_runtime.rt.string(m)!;
+    g_runtime.http_fulfilled = bk_get("httpFulfilled")!;
+    g_runtime.http_rejected = bk_get("httpRejected")!;
+    g_runtime.http_error = bk_get("error")!;
+    g_runtime.http_then = g_runtime.rt.root(g_runtime.rt.rt.heap.promise_proto.get_prop(g_runtime.rt.rt.heap.str(THEN), g_runtime.rt.rt.heap)!)!;
 }
 
 // ---- conn table ----
 
 fn Conn* conn_new(Server* s, UwsRes* res) {
-    Conn* c = g_spare.len() ? g_spare.pop()!! : mem::new(Conn);
+    Conn* c = g_runtime.spare.len() ? g_runtime.spare.pop()!! : mem::new(Conn);
     c.server = s;
     c.res = res;
     uint slot;
-    if (g_free_slots.len()) {
-        slot = g_free_slots.pop()!!;
-        g_conns[slot] = c;
+    if (g_runtime.free_slots.len()) {
+        slot = g_runtime.free_slots.pop()!!;
+        g_runtime.conns[slot] = c;
     } else {
-        slot = (uint)g_conns.len();
-        g_conns.push(c);
+        slot = (uint)g_runtime.conns.len();
+        g_runtime.conns.push(c);
     }
-    g_generation = (g_generation + 1) & ((1ul << (53 - SLOT_BITS)) - 1);
-    c.id = (g_generation << SLOT_BITS) | slot;
+    g_runtime.generation = (g_runtime.generation + 1) & ((1ul << (53 - SLOT_BITS)) - 1);
+    c.id = (g_runtime.generation << SLOT_BITS) | slot;
     return c;
 }
 
 fn Conn* conn_find(ulong id) {
     uint slot = (uint)(id & SLOT_MASK);
-    if (slot >= g_conns.len()) return null;
-    Conn* c = g_conns[slot];
+    if (slot >= g_runtime.conns.len()) return null;
+    Conn* c = g_runtime.conns[slot];
     return c && c.id == id ? c : null;
 }
 
 fn void conn_free(Conn* c) {
-    g_conns[(sz)(c.id & SLOT_MASK)] = null;
-    g_free_slots.push((uint)(c.id & SLOT_MASK));
-    if (!c.params.is_empty()) g_rt.release(c.params);
+    g_runtime.conns[(sz)(c.id & SLOT_MASK)] = null;
+    g_runtime.free_slots.push((uint)(c.id & SLOT_MASK));
+    if (!c.params.is_empty()) g_runtime.rt.release(c.params);
     if (c.method.len) free(c.method.ptr);
     if (c.url.len) free(c.url.ptr);
     if (c.blob.len) free(c.blob.ptr);
     if (c.body.is_initialized()) c.body.free();
     *c = { };
-    if (g_spare.len() < 1024) {
-        g_spare.push(c);
+    if (g_runtime.spare.len() < 1024) {
+        g_runtime.spare.push(c);
     } else {
         free(c);
     }
@@ -284,44 +263,44 @@ fn void Conn.capture(&self, String method) {
 // ---- dispatch ----
 
 fn HString* fast_key(usz i, String name) {
-    JsValue v = g_rt.string(name)!!;
-    g_fast.keep[i] = v;
+    JsValue v = g_runtime.rt.string(name)!!;
+    g_runtime.fast.keep[i] = v;
     TVal tv;
-    g_rt.load(v, &tv);
+    g_runtime.rt.load(v, &tv);
     return (HString*)tv.get_heapptr();
 }
 
 // fastTypes(Request.prototype, Response.prototype, ctText, ctJson)
 fn void js_fast_types(JsCtx ctx, void* udata) {
     if (!ctx.arg(0).tv.is_object() || !ctx.arg(1).tv.is_object()) return;
-    g_fast.request_proto = (HObject*)ctx.arg(0).tv.get_heapptr();
-    g_fast.response_proto = (HObject*)ctx.arg(1).tv.get_heapptr();
-    g_fast.ct_text = ctx.arg(2).tv;
-    g_fast.ct_json = ctx.arg(3).tv;
-    g_fast.file_proto = ctx.arg(4).tv.get_heapptr();
+    g_runtime.fast.request_proto = (HObject*)ctx.arg(0).tv.get_heapptr();
+    g_runtime.fast.response_proto = (HObject*)ctx.arg(1).tv.get_heapptr();
+    g_runtime.fast.ct_text = ctx.arg(2).tv;
+    g_runtime.fast.ct_json = ctx.arg(3).tv;
+    g_runtime.fast.file_proto = ctx.arg(4).tv.get_heapptr();
     for (uint i = 0; i < 5; i++) (void)ctx.persist(ctx.arg(i));
-    g_fast.k_method = fast_key(0, "method");
-    g_fast.k_id = fast_key(1, "_id");
-    g_fast.k_body = fast_key(2, "_body");
-    g_fast.k_headers = fast_key(3, "_headers");
-    g_fast.k_used = fast_key(4, "_used");
-    g_fast.k_status = fast_key(5, "status");
-    g_fast.k_ct = fast_key(6, "_ct");
-    g_fast.k_url = fast_key(7, "_url");
-    g_fast.k_header_blob = fast_key(8, "_headerBlob");
-    g_fast.k_file_path = fast_key(9, "_path");
-    g_fast.k_params = fast_key(10, "params");
-    g_fast.k_blob = fast_key(11, "_blob");
-    g_fast.blob_method = g_fast.response_proto.get_prop_proto(g_fast.k_blob, ctx.ctx.heap) ?? (TVal) { };
-    g_fast.keep[12] = ctx.persist((JsArg) { .tv = g_fast.blob_method })!!;
-    g_fast.response_ctor = ctx.get_prop(ctx.arg(1), "constructor")!!.tv;
-    g_fast.keep[13] = ctx.persist((JsArg) { .tv = g_fast.response_ctor })!!;
+    g_runtime.fast.k_method = fast_key(0, "method");
+    g_runtime.fast.k_id = fast_key(1, "_id");
+    g_runtime.fast.k_body = fast_key(2, "_body");
+    g_runtime.fast.k_headers = fast_key(3, "_headers");
+    g_runtime.fast.k_used = fast_key(4, "_used");
+    g_runtime.fast.k_status = fast_key(5, "status");
+    g_runtime.fast.k_ct = fast_key(6, "_ct");
+    g_runtime.fast.k_url = fast_key(7, "_url");
+    g_runtime.fast.k_header_blob = fast_key(8, "_headerBlob");
+    g_runtime.fast.k_file_path = fast_key(9, "_path");
+    g_runtime.fast.k_params = fast_key(10, "params");
+    g_runtime.fast.k_blob = fast_key(11, "_blob");
+    g_runtime.fast.blob_method = g_runtime.fast.response_proto.get_prop_proto(g_runtime.fast.k_blob, ctx.ctx.heap) ?? (TVal) { };
+    g_runtime.fast.keep[12] = ctx.persist((JsArg) { .tv = g_runtime.fast.blob_method })!!;
+    g_runtime.fast.response_ctor = ctx.get_prop(ctx.arg(1), "constructor")!!.tv;
+    g_runtime.fast.keep[13] = ctx.persist((JsArg) { .tv = g_runtime.fast.response_ctor })!!;
 }
 
 // fetchFor(index, fetch, server): call this server's handler straight from C3.
 fn void js_fetch_for(JsCtx ctx, void* udata) {
     uint index = ctx.arg(0).id();
-    foreach (s : g_servers) {
+    foreach (s : g_runtime.servers) {
         if (s.index != index) continue;
         s.fetch = ctx.persist(ctx.arg(1)) ?? { };
         s.server_value = ctx.persist(ctx.arg(2)) ?? { };
@@ -329,39 +308,39 @@ fn void js_fetch_for(JsCtx ctx, void* udata) {
 }
 
 fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
-    Heap* h      = g_rt.rt.heap;
+    Heap* h      = g_runtime.rt.rt.heap;
     HObject* req = h.alloc_object(OBJECT)!;
-    h.set_prototype(req, g_fast.request_proto);
+    h.set_prototype(req, g_runtime.fast.request_proto);
     TVal m;
-    g_rt.load(method, &m);
+    g_runtime.rt.load(method, &m);
     TVal id;
     id.set_number((double)c.id);
-    req.put_prop(g_fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
-    req.put_prop(g_fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
+    req.put_prop(g_runtime.fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
+    req.put_prop(g_runtime.fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
     // Metadata belongs to the Request even when the response has ended.
-    JsValue url  = g_rt.string(c.url_now())!;
-    JsValue blob = g_rt.string(c.blob_now())!;
+    JsValue url  = g_runtime.rt.string(c.url_now())!;
+    JsValue blob = g_runtime.rt.string(c.blob_now())!;
     TVal metadata;
-    g_rt.load(url, &metadata);
-    req.put_prop(g_fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
-    g_rt.load(blob, &metadata);
-    req.put_prop(g_fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
+    g_runtime.rt.load(url, &metadata);
+    req.put_prop(g_runtime.fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
+    g_runtime.rt.load(blob, &metadata);
+    req.put_prop(g_runtime.fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
     if (!c.params.is_empty()) {
-        g_rt.load(c.params, &metadata);
-        req.put_prop(g_fast.k_params, metadata, hobject::PROP_FLAGS_WEC, h);
+        g_runtime.rt.load(c.params, &metadata);
+        req.put_prop(g_runtime.fast.k_params, metadata, hobject::PROP_FLAGS_WEC, h);
     }
     if (has_body) {
         TVal b;
         b.set_object(new_u8(copy_bytes(body))!);
-        req.put_prop(g_fast.k_body, b, hobject::PROP_FLAGS_WEC, h);
+        req.put_prop(g_runtime.fast.k_body, b, hobject::PROP_FLAGS_WEC, h);
     }
     TVal rv;
     rv.set_object(req);
-    return g_rt.root(rv);
+    return g_runtime.rt.root(rv);
 }
 
 fn TVal fast_get(HObject* o, HString* key) {
-    TVal v = o.get_prop_proto(key, g_rt.rt.heap) ?? (TVal) { };
+    TVal v = o.get_prop_proto(key, g_runtime.rt.rt.heap) ?? (TVal) { };
     return v;
 }
 
@@ -369,25 +348,25 @@ fn TVal fast_get(HObject* o, HString* key) {
 // serialization need no guest callbacks; other responses use the prelude.
 fn bool respond_fast(Conn* c, JsValue result) {
     TVal rv;
-    if (!g_rt.load(result, &rv) || !rv.is_object()) return false;
+    if (!g_runtime.rt.load(result, &rv) || !rv.is_object()) return false;
     HObject* o = (HObject*)rv.get_heapptr();
-    if (o.prototype != g_fast.response_proto) return false;
-    if (!web_method_is(o, g_fast.k_blob, g_fast.blob_method, g_rt.rt.heap)) return false;
-    TVal headers = fast_get(o, g_fast.k_headers);
+    if (o.prototype != g_runtime.fast.response_proto) return false;
+    if (!web_method_is(o, g_runtime.fast.k_blob, g_runtime.fast.blob_method, g_runtime.rt.rt.heap)) return false;
+    TVal headers = fast_get(o, g_runtime.fast.k_headers);
     builtins::StrBuf header_blob;
-    header_blob.init(g_rt.rt.heap);
+    header_blob.init(g_runtime.rt.rt.heap);
     defer header_blob.free();
-    TVal used = fast_get(o, g_fast.k_used);
+    TVal used = fast_get(o, g_runtime.fast.k_used);
     if (!used.is_boolean() || used.get_boolean()) return false;
-    TVal status = fast_get(o, g_fast.k_status);
+    TVal status = fast_get(o, g_runtime.fast.k_status);
     if (!status.is_fastint() || status.get_fastint() != 200) return false;
-    TVal ct = fast_get(o, g_fast.k_ct);
+    TVal ct = fast_get(o, g_runtime.fast.k_ct);
     String blob;
     if (!headers.is_null()) {
         bool match;
-        if (!web_instanceof(g_rt.rt.heap, rv, g_fast.response_ctor, &match) || !match) return false;
+        if (!web_instanceof(g_runtime.rt.rt.heap, rv, g_runtime.fast.response_ctor, &match) || !match) return false;
         if (!headers.is_object() || !web_headers_blob(
-            g_rt.rt.heap,
+            g_runtime.rt.rt.heap,
             headers.get_heapptr(),
             &header_blob,
             true
@@ -395,32 +374,32 @@ fn bool respond_fast(Conn* c, JsValue result) {
         blob = (String)header_blob.bytes();
     } else if (ct.is_null()) {
         blob = "";
-    } else if (ct.is_string() && ct.get_heapptr() == g_fast.ct_text.get_heapptr()) {
+    } else if (ct.is_string() && ct.get_heapptr() == g_runtime.fast.ct_text.get_heapptr()) {
         blob = BLOB_TEXT;
-    } else if (ct.is_string() && ct.get_heapptr() == g_fast.ct_json.get_heapptr()) {
+    } else if (ct.is_string() && ct.get_heapptr() == g_runtime.fast.ct_json.get_heapptr()) {
         blob = BLOB_JSON;
     } else {
         return false;
     }
-    TVal b     = fast_get(o, g_fast.k_body);
+    TVal b     = fast_get(o, g_runtime.fast.k_body);
     JsArg body = { .tv = b };
-    bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_fast.file_proto;
+    bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_runtime.fast.file_proto;
     bool stream;
     if (b.is_object() && !body.is_bytes() && !file) {
-        if (!web_instanceof(g_rt.rt.heap, b, g_native_response.stream_ctor, &stream)) return false;
+        if (!web_instanceof(g_runtime.rt.rt.heap, b, g_runtime.native_response.stream_ctor, &stream)) return false;
     }
     if (!b.is_null() && !b.is_string() && !body.is_bytes() && !file && !stream) return false;
     TVal t;
     t.set_boolean(true);
-    o.put_prop(g_fast.k_used, t, hobject::PROP_FLAGS_WEC, g_rt.rt.heap);
+    o.put_prop(g_runtime.fast.k_used, t, hobject::PROP_FLAGS_WEC, g_runtime.rt.rt.heap);
     if (stream) {
-        JsValue[2] args = { g_rt.number((double)c.id) ?? { }, result };
-        (void)call_js(g_pump, args[..]);
+        JsValue[2] args = { g_runtime.rt.number((double)c.id) ?? { }, result };
+        (void)call_js(g_runtime.pump, args[..]);
         return true;
     }
     @pool() {
         if (file) {
-            JsArg path = { .tv = fast_get((HObject*)b.get_heapptr(), g_fast.k_file_path) };
+            JsArg path = { .tv = fast_get((HObject*)b.get_heapptr(), g_runtime.fast.k_file_path) };
             native_file_start(c, (String)path.bytes(), 200, "", blob);
         } else {
             finish(c, 200, "", blob, b.is_null() ? (char[]) { } : body.bytes());
@@ -433,7 +412,7 @@ const String BLOB_TEXT = "content-type\ntext/plain;charset=UTF-8\n";
 const String BLOB_JSON = "content-type\napplication/json\n";
 
 fn void dispatch(Conn* c, String method, char[] body, bool has_body) {
-    if (!c.server.fetch.is_empty() && g_fast.request_proto) {
+    if (!c.server.fetch.is_empty() && g_runtime.fast.request_proto) {
         dispatch_fast(c, method, body, has_body);
         return;
     }
@@ -441,34 +420,34 @@ fn void dispatch(Conn* c, String method, char[] body, bool has_body) {
     bool cached;
     foreach (i, name : METHODS) {
         if (name == method) {
-            m = g_methods[i];
+            m = g_runtime.methods[i];
             cached = true;
             break;
         }
     }
-    g_rt.@scope() {
-        if (!cached) m = g_rt.string(method) ?? { };
+    g_runtime.rt.@scope() {
+        if (!cached) m = g_runtime.rt.string(method) ?? { };
         JsValue[4] args = {
             c.server.index_value,
-            g_rt.number((double)c.id) ?? { },
+            g_runtime.rt.number((double)c.id) ?? { },
             m,
             has_body ? bytes_value(copy_bytes(body)) ?? { } : (JsValue) { },
         };
-        if (catch call_js(g_dispatch, args[..])) {
+        if (catch call_js(g_runtime.dispatch, args[..])) {
             if (conn_find(c.id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
         }
     };
 }
 
 fn JsValue method_value(String method) {
-    foreach (i, name : METHODS) if (name == method) return g_methods[i];
-    return g_rt.string(method) ?? { };
+    foreach (i, name : METHODS) if (name == method) return g_runtime.methods[i];
+    return g_runtime.rt.string(method) ?? { };
 }
 
 fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
     Server* s = c.server;
     ulong id  = c.id;
-    g_rt.@scope() {
+    g_runtime.rt.@scope() {
         JsValue? req = new_request(c, method_value(method), body, has_body);
         if (catch req) return;
         JsValue thrown;
@@ -479,21 +458,21 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
                 if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
                 return;
             }
-            JsValue[3] fa = { s.index_value, g_rt.number((double)id) ?? { }, thrown };
-            if (catch call_js(g_failed, fa[..])) {
+            JsValue[3] fa = { s.index_value, g_runtime.rt.number((double)id) ?? { }, thrown };
+            if (catch call_js(g_runtime.failed, fa[..])) {
                 if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
             }
             return;
         }
-        defer if (g_depth == 0 && g_rejections.len()) flush_rejections();
+        defer if (g_runtime.depth == 0 && g_runtime.rejections.len()) flush_rejections();
         if (conn_find(id) != c || !c.res) return;
         if (respond_fast(c, r)) return;
         if (subscribe_response(r, id)) {
-            if (catch g_rt.drain_microtasks()) report_uncaught();
+            if (catch g_runtime.rt.drain_microtasks()) report_uncaught();
             return;
         }
-        JsValue[3] ha = { s.index_value, g_rt.number((double)id) ?? { }, r };
-        if (catch call_js(g_handled, ha[..])) {
+        JsValue[3] ha = { s.index_value, g_runtime.rt.number((double)id) ?? { }, r };
+        if (catch call_js(g_runtime.handled, ha[..])) {
             if (conn_find(id) == c && c.res && !c.streaming) finish_plain(c, 500, "Internal Server Error");
         }
     };
@@ -502,9 +481,9 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
 // Terminal reactions hold an id, never a borrowed Conn pointer. They are
 // ordinary GC-managed host functions and allocate no downstream promise.
 fn JsValue? response_callback(JsValue template_fn, ulong id) {
-    Heap* h = g_rt.rt.heap;
+    Heap* h = g_runtime.rt.rt.heap;
     TVal template_value;
-    g_rt.load(template_fn, &template_value);
+    g_runtime.rt.load(template_fn, &template_value);
     HObject* template_obj = template_value.get_heapptr();
     HObject* fn_obj       = h.alloc_object(FUNCTION)!;
     h.set_prototype(fn_obj, h.function_proto);
@@ -513,28 +492,28 @@ fn JsValue? response_callback(JsValue template_fn, ulong id) {
     fn_obj.extra_ptr().func.comp_func = null;
     TVal value;
     value.set_number((double)id);
-    fn_obj.put_prop(g_fast.k_id, value, hobject::PROP_FLAGS_WEC, h);
+    fn_obj.put_prop(g_runtime.fast.k_id, value, hobject::PROP_FLAGS_WEC, h);
     value.set_object(fn_obj);
-    return g_rt.root(value);
+    return g_runtime.rt.root(value);
 }
 
 fn bool subscribe_response(JsValue result, ulong id) {
-    Heap* h = g_rt.rt.heap;
+    Heap* h = g_runtime.rt.rt.heap;
     TVal value;
-    if (!g_rt.load(result, &value) || !value.is_object()) return false;
+    if (!g_runtime.rt.load(result, &value) || !value.is_object()) return false;
     HObject* promise = value.get_heapptr();
     if (promise.get_class() != PROMISE || promise.prototype != h.promise_proto) return false;
     TVal expected;
-    g_rt.load(g_http_then, &expected);
+    g_runtime.rt.load(g_runtime.http_then, &expected);
     TVal actual = promise.get_prop_proto(h.str(THEN), h) ?? (TVal) { };
     if (!builtins::same_value(actual, expected) || !builtins::promise_default_species(h, promise)) return false;
-    JsValue? fulfilled = response_callback(g_http_fulfilled, id);
+    JsValue? fulfilled = response_callback(g_runtime.http_fulfilled, id);
     if (catch fulfilled) return false;
-    JsValue? rejected = response_callback(g_http_rejected, id);
+    JsValue? rejected = response_callback(g_runtime.http_rejected, id);
     if (catch rejected) return false;
     TVal f, r, downstream;
-    g_rt.load(fulfilled, &f);
-    g_rt.load(rejected, &r);
+    g_runtime.rt.load(fulfilled, &f);
+    g_runtime.rt.load(rejected, &r);
     downstream.set_undefined();
     uint state = builtins::promise_get_state(promise, builtins::PROMISE_PENDING);
     if (state == builtins::PROMISE_PENDING) {
@@ -559,7 +538,7 @@ fn bool subscribe_response(JsValue result, ulong id) {
 fn Conn* response_callback_conn(JsCtx ctx) {
     BuiltinContext* native = ctx.ctx;
     if (!native.callee_obj) return null;
-    TVal id   = native.callee_obj.get_prop(g_fast.k_id, g_rt.rt.heap) ?? (TVal) { };
+    TVal id   = native.callee_obj.get_prop(g_runtime.fast.k_id, g_runtime.rt.rt.heap) ?? (TVal) { };
     JsArg arg = { .tv = id };
     return conn_find(arg.conn_id());
 }
@@ -567,30 +546,30 @@ fn Conn* response_callback_conn(JsCtx ctx) {
 fn void js_http_fulfilled(JsCtx ctx, void* user) {
     Conn* c = response_callback_conn(ctx);
     if (!c || !c.res || c.aborted) return;
-    g_rt.@scope() {
-        JsValue value = g_rt.root(ctx.arg(0).tv) ?? { };
+    g_runtime.rt.@scope() {
+        JsValue value = g_runtime.rt.root(ctx.arg(0).tv) ?? { };
         if (respond_fast(c, value)) return;
-        JsValue[3] args = { c.server.index_value, g_rt.number((double)c.id) ?? { }, value };
-        (void)call_js(g_handled, args[..]);
+        JsValue[3] args = { c.server.index_value, g_runtime.rt.number((double)c.id) ?? { }, value };
+        (void)call_js(g_runtime.handled, args[..]);
     };
 }
 
 fn void js_http_rejected(JsCtx ctx, void* user) {
     Conn* c = response_callback_conn(ctx);
     if (!c || !c.res || c.aborted) return;
-    g_rt.@scope() {
-        JsValue[3] args = { c.server.index_value, g_rt.number((double)c.id) ?? { }, g_rt.root(ctx.arg(0).tv) ?? { } };
-        (void)call_js(g_failed, args[..]);
+    g_runtime.rt.@scope() {
+        JsValue[3] args = { c.server.index_value, g_runtime.rt.number((double)c.id) ?? { }, g_runtime.rt.root(ctx.arg(0).tv) ?? { } };
+        (void)call_js(g_runtime.failed, args[..]);
     };
 }
 
 fn void response_error(Conn* c, String code, String message) {
     if (c.aborted || !c.res) return;
-    g_rt.@scope() {
-        JsValue[2] parts = { g_rt.string(code) ?? { }, g_rt.string(message) ?? { } };
-        JsValue error    = g_rt.call(g_http_error, parts[..]) ?? { };
-        JsValue[3] args  = { c.server.index_value, g_rt.number((double)c.id) ?? { }, error };
-        (void)call_js(g_failed, args[..]);
+    g_runtime.rt.@scope() {
+        JsValue[2] parts = { g_runtime.rt.string(code) ?? { }, g_runtime.rt.string(message) ?? { } };
+        JsValue error    = g_runtime.rt.call(g_runtime.http_error, parts[..]) ?? { };
+        JsValue[3] args  = { c.server.index_value, g_runtime.rt.number((double)c.id) ?? { }, error };
+        (void)call_js(g_runtime.failed, args[..]);
     };
 }
 
@@ -600,8 +579,8 @@ fn void js_native_response(JsCtx ctx, void* user) {
         ctx.ret_bool(true);
         return;
     }
-    g_rt.@scope() {
-        ctx.ret_bool(respond_fast(c, g_rt.root(ctx.arg(1).tv) ?? { }));
+    g_runtime.rt.@scope() {
+        ctx.ret_bool(respond_fast(c, g_runtime.rt.root(ctx.arg(1).tv) ?? { }));
     };
 }
 
@@ -691,8 +670,8 @@ fn void js_respond(JsCtx ctx, void* udata) {
     if (!c) return;
     @pool() {
         JsArg body = ctx.arg(4);
-        if (body.tv.is_object() && ((HObject*)body.tv.get_heapptr()).prototype == g_fast.file_proto) {
-            JsArg path = { .tv = fast_get(body.tv.get_heapptr(), g_fast.k_file_path) };
+        if (body.tv.is_object() && ((HObject*)body.tv.get_heapptr()).prototype == g_runtime.fast.file_proto) {
+            JsArg path = { .tv = fast_get(body.tv.get_heapptr(), g_runtime.fast.k_file_path) };
             native_file_start(c, (String)path.bytes(), ctx.arg(1)
                 .as_int(200), (String)ctx.arg(2).bytes(), (String)ctx.arg(3).bytes());
         } else {
@@ -853,13 +832,13 @@ fn void js_stream_end(JsCtx ctx, void* udata) {
 
 fn CInt on_writable(void* user, ulong offset) {
     Conn* c = user;
-    call_conn(g_drain, c.id);
+    call_conn(g_runtime.drain, c.id);
     return 1;
 }
 
 fn void call_conn(JsValue f, ulong id) {
-    g_rt.@scope() {
-        JsValue[1] args = { g_rt.number((double)id) ?? { } };
+    g_runtime.rt.@scope() {
+        JsValue[1] args = { g_runtime.rt.number((double)id) ?? { } };
         (void)call_js(f, args[..]);
     };
 }
@@ -888,19 +867,19 @@ fn void js_req_remote(JsCtx ctx, void* udata) {
 
 // ---- uWS callbacks ----
 
-fn void http_turn_reset(void* user) => g_http_turn_ns = 0;
+fn void http_turn_reset(void* user) => g_runtime.http_turn_ns = 0;
 
 fn void http_queue_arm() {
-    if (g_http_queue_armed) return;
-    g_http_queue_armed = true;
-    uws_loop_defer(g_loop, &http_queue_drain, null);
+    if (g_runtime.http_queue_armed) return;
+    g_runtime.http_queue_armed = true;
+    uws_loop_defer(g_runtime.loop, &http_queue_drain, null);
 }
 
 fn void http_queue_drain(void* user) {
-    g_http_queue_armed = false;
-    g_http_turn_ns = now_ns();
-    while (g_http_queue_at < g_http_queue.len()) {
-        ulong id = g_http_queue[g_http_queue_at++];
+    g_runtime.http_queue_armed = false;
+    g_runtime.http_turn_ns = now_ns();
+    while (g_runtime.http_queue_at < g_runtime.http_queue.len()) {
+        ulong id = g_runtime.http_queue[g_runtime.http_queue_at++];
         Conn* c  = conn_find(id);
         if (c && c.res && !c.aborted) {
             @pool() {
@@ -908,19 +887,19 @@ fn void http_queue_drain(void* user) {
                 dispatch(c, c.method, body ? c.body.array_view() : (char[]) { }, body);
             };
         }
-        if (now_ns() - g_http_turn_ns >= HTTP_TURN_NS) break;
+        if (now_ns() - g_runtime.http_turn_ns >= HTTP_TURN_NS) break;
     }
-    if (g_http_queue_at == g_http_queue.len()) {
-        g_http_queue.clear();
-        g_http_queue_at = 0;
+    if (g_runtime.http_queue_at == g_runtime.http_queue.len()) {
+        g_runtime.http_queue.clear();
+        g_runtime.http_queue_at = 0;
     } else {
         // A saturated server may never empty the queue. Reclaim the consumed
         // prefix so storage remains bounded by requests still waiting.
-        if (g_http_queue_at >= 256) {
-            sz left = g_http_queue.len() - g_http_queue_at;
-            mem::move(g_http_queue.entries, &g_http_queue[g_http_queue_at], left * ulong::size);
-            g_http_queue.size = left;
-            g_http_queue_at = 0;
+        if (g_runtime.http_queue_at >= 256) {
+            sz left = g_runtime.http_queue.len() - g_runtime.http_queue_at;
+            mem::move(g_runtime.http_queue.entries, &g_runtime.http_queue[g_runtime.http_queue_at], left * ulong::size);
+            g_runtime.http_queue.size = left;
+            g_runtime.http_queue_at = 0;
         }
         http_queue_arm();
     }
@@ -930,10 +909,10 @@ fn void http_queue_drain(void* user) {
 // disconnected client. IDs let aborted queued requests be discarded safely.
 fn void http_dispatch_ready(Conn* c, String method, char[] body, bool has_body) {
     ulong now = now_ns();
-    if (!g_http_turn_ns) g_http_turn_ns = now;
-    if (g_http_queue.len() || now - g_http_turn_ns >= HTTP_TURN_NS) {
+    if (!g_runtime.http_turn_ns) g_runtime.http_turn_ns = now;
+    if (g_runtime.http_queue.len() || now - g_runtime.http_turn_ns >= HTTP_TURN_NS) {
         c.capture(method);
-        g_http_queue.push(c.id);
+        g_runtime.http_queue.push(c.id);
         http_queue_arm();
         return;
     }
@@ -945,7 +924,7 @@ fn void on_aborted(void* user) {
     c.aborted = true;
     ulong id = c.id;
     if (c.file_body) native_file_abort(c.file_body);
-    if (c.streaming) call_conn(g_aborted, id);
+    if (c.streaming) call_conn(g_runtime.aborted, id);
     // JS cancellation can finish the connection reentrantly.
     if (conn_find(id) == c) done(c);
 }
@@ -991,19 +970,19 @@ fn String route_decode(String raw) {
 }
 
 fn JsValue? route_params(Route* route, UwsReq* req) {
-    Heap* heap      = g_rt.rt.heap;
+    Heap* heap      = g_runtime.rt.rt.heap;
     HObject* params = heap.alloc_object(OBJECT)!;
     heap.set_prototype(params, null);
     TVal value;
     value.set_object(params);
-    JsValue result = g_rt.root(value)!;
+    JsValue result = g_runtime.rt.root(value)!;
     foreach (i, key : route.keys) {
         char* data;
         sz length    = uws_req_parameter(req, (ushort)i, &data);
-        JsValue text = g_rt.string(route_decode((String)data[:length]))!;
+        JsValue text = g_runtime.rt.string(route_decode((String)data[:length]))!;
         TVal k;
-        g_rt.load(key, &k);
-        g_rt.load(text, &value);
+        g_runtime.rt.load(key, &k);
+        g_runtime.rt.load(text, &value);
         if (!params.put_prop(k.get_heapptr(), value, hobject::PROP_FLAGS_WEC, heap)) return boomkat::OUT_OF_MEMORY~;
     }
     return result;
@@ -1047,9 +1026,9 @@ fn void request_arrive(Server* s, Route* route, UwsReq* req, UwsRes* res) {
         c.in_request = true;
         if (route) {
             bool ready;
-            g_rt.@scope() {
+            g_runtime.rt.@scope() {
                 if (try params = route_params(route, req)) {
-                    if (try owned = g_rt.persist(params)) {
+                    if (try owned = g_runtime.rt.persist(params)) {
                         c.params = owned;
                         ready = true;
                     }
@@ -1108,7 +1087,7 @@ fn bool serve_static(Server* s, String method, String path, UwsRes* res) {
 // staticRoute(index, path, status, statusText, headerBlob, body)
 fn void js_static_route(JsCtx ctx, void* udata) {
     uint index = ctx.arg(0).id();
-    foreach (s : g_servers) {
+    foreach (s : g_runtime.servers) {
         if (s.index != index) continue;
         String path = ((String)ctx.arg(1).bytes()).copy(mem);
         s.statics.set(
@@ -1137,7 +1116,7 @@ fn void js_http_route(JsCtx ctx, void* udata) {
             if (!key.is_string()) return ctx.throw_error(TYPE, "route parameter names must be strings");
         }
 
-        foreach (server : g_servers) {
+        foreach (server : g_runtime.servers) {
             if (server.index != index) continue;
             Route* route = mem::new(Route);
             route.server = server;
@@ -1160,7 +1139,7 @@ fn void js_http_route(JsCtx ctx, void* udata) {
 fn void js_http_static_route(JsCtx ctx, void* udata) {
     @pool() {
         uint index = ctx.arg(0).id();
-        foreach (server : g_servers) {
+        foreach (server : g_runtime.servers) {
             if (server.index != index) continue;
             Route* route = mem::new(Route);
             route.server = server;
@@ -1203,7 +1182,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
             uws_app_stop(s.app, 1);
             return;
         }
-        g_servers.push(s);
+        g_runtime.servers.push(s);
         ctx.ret_number(bound);
     };
 }
@@ -1211,7 +1190,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
 // stop(index, force)
 fn void js_stop(JsCtx ctx, void* udata) {
     uint index = ctx.arg(0).id();
-    foreach (s : g_servers) {
+    foreach (s : g_runtime.servers) {
         if (s.index != index || s.stopped) continue;
         s.stopped = true;
         uws_app_stop(s.app, ctx.arg(1).as_bool() ?? false ? 1 : 0);

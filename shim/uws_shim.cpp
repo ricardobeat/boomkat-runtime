@@ -87,6 +87,8 @@ void uws_app_stop(uws_app *app, int force) {
     if (force) a->app.close();
 }
 
+void uws_app_free(uws_app *app) { delete (App *)app; }
+
 size_t uws_req_method(uws_req *req, const char **out) {
     std::string_view v = ((Req *)req)->getCaseSensitiveMethod();
     *out = v.data();

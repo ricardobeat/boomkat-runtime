@@ -14,16 +14,12 @@ struct PendingImmediate {
     bool canceled;
 }
 
-PendingImmediate* g_immediate_head;
-PendingImmediate* g_immediate_tail;
-HashMap{ulong, PendingImmediate*} g_immediate_ids;
-ulong g_next_immediate = 1;
 
-fn void init_immediates() => g_immediate_ids.init(mem);
+fn void init_immediates() => g_runtime.immediate_ids.init(mem);
 
 fn void immediate_free(PendingImmediate* t) {
-    g_rt.release(t.callback);
-    foreach (a : t.args) g_rt.release(a);
+    g_runtime.rt.release(t.callback);
+    foreach (a : t.args) g_runtime.rt.release(a);
     if (t.args.len) free(t.args.ptr);
     free(t);
 }
@@ -35,7 +31,7 @@ fn void js_set_immediate(JsCtx ctx, void* user) {
         return;
     }
     PendingImmediate* t = mem::new(PendingImmediate);
-    t.id = g_next_immediate++;
+    t.id = g_runtime.next_immediate++;
     t.callback = ctx.persist(callback) ?? { };
     if (t.callback.is_empty()) {
         immediate_free(t);
@@ -51,13 +47,13 @@ fn void js_set_immediate(JsCtx ctx, void* user) {
             }
         }
     }
-    if (g_immediate_tail) {
-        g_immediate_tail.next = t;
+    if (g_runtime.immediate_tail) {
+        g_runtime.immediate_tail.next = t;
     } else {
-        g_immediate_head = t;
+        g_runtime.immediate_head = t;
     }
-    g_immediate_tail = t;
-    g_immediate_ids.set(t.id, t);
+    g_runtime.immediate_tail = t;
+    g_runtime.immediate_ids.set(t.id, t);
     js_immediate_arm(ctx, null);
     ctx.ret_number((double)t.id);
 }
@@ -66,28 +62,28 @@ fn void js_clear_immediate(JsCtx ctx, void* user) {
     if (!ctx.arg(0).is_number()) return;
     double id = ctx.arg(0).as_number() ?? -1;
     if (!(id >= 1) || id > 9007199254740991.0 || (double)(ulong)id != id) return;
-    if (try t = g_immediate_ids.get((ulong)id)) {
+    if (try t = g_runtime.immediate_ids.get((ulong)id)) {
         t.canceled = true;
-        g_immediate_ids.remove(t.id);
+        g_runtime.immediate_ids.remove(t.id);
     }
 }
 
 // Called inside one JS entry, preserving the batch's microtask checkpoint.
 // Detaching the queue sends callbacks added by this batch to the next turn.
 fn void js_run_immediates(JsCtx ctx, void* user) {
-    PendingImmediate* batch = g_immediate_head;
-    g_immediate_head = null;
-    g_immediate_tail = null;
+    PendingImmediate* batch = g_runtime.immediate_head;
+    g_runtime.immediate_head = null;
+    g_runtime.immediate_tail = null;
     defer while (batch) {
         PendingImmediate* t = batch;
         batch = t.next;
-        g_immediate_ids.remove(t.id);
+        g_runtime.immediate_ids.remove(t.id);
         immediate_free(t);
     }
     while (batch) {
         PendingImmediate* t = batch;
         batch = t.next;
-        g_immediate_ids.remove(t.id);
+        g_runtime.immediate_ids.remove(t.id);
         defer immediate_free(t);
         if (t.canceled) continue;
         @pool() {

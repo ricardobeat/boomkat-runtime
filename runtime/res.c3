@@ -46,16 +46,13 @@ struct Res {
     int pid; // PIPE: the child it belongs to
 }
 
-List{Res*} g_res;
-List{uint} g_res_free;
-uint g_res_gen;
 
 const usz READ_CHUNK = 64 * 1024;
 const usz INBOX_HIGH = 256 * 1024;
 
 fn void init_res() {
-    g_res.init(mem, 64);
-    g_res_free.init(mem, 64);
+    g_runtime.res.init(mem, 64);
+    g_runtime.res_free.init(mem, 64);
     for (CInt fd = 0; fd < 3; fd++) res_new(STDIO).fd = fd;
 }
 
@@ -67,15 +64,15 @@ fn Res* res_new(ResKind kind) {
     r.outbox.init(mem);
     r.backlog.init(mem);
     uint slot;
-    if (g_res_free.len()) {
-        slot = g_res_free.pop()!!;
-        g_res[slot] = r;
+    if (g_runtime.res_free.len()) {
+        slot = g_runtime.res_free.pop()!!;
+        g_runtime.res[slot] = r;
     } else {
-        slot = (uint)g_res.len();
-        g_res.push(r);
+        slot = (uint)g_runtime.res.len();
+        g_runtime.res.push(r);
     }
-    g_res_gen = (g_res_gen + 1) & 0xFFF;
-    r.rid = g_res_gen << SLOT_BITS | slot;
+    g_runtime.res_gen = (g_runtime.res_gen + 1) & 0xFFF;
+    r.rid = g_runtime.res_gen << SLOT_BITS | slot;
     // stdio keeps rids 0, 1 and 2.
     if (slot < 3) r.rid = slot;
     return r;
@@ -83,8 +80,8 @@ fn Res* res_new(ResKind kind) {
 
 fn Res* res_find(uint rid) {
     uint slot = rid & SLOT_MASK;
-    if (slot >= g_res.len()) return null;
-    Res* r = g_res[slot];
+    if (slot >= g_runtime.res.len()) return null;
+    Res* r = g_runtime.res[slot];
     return r && r.rid == rid ? r : null;
 }
 
@@ -92,8 +89,8 @@ fn Res* res_find(uint rid) {
 fn void res_release(Res* r) {
     if (!r.closed || !r.gone || r.busy) return;
     uint slot = r.rid & SLOT_MASK;
-    g_res[slot] = null;
-    g_res_free.push(slot);
+    g_runtime.res[slot] = null;
+    g_runtime.res_free.push(slot);
     r.inbox.free();
     r.outbox.free();
     r.backlog.free();
@@ -133,7 +130,7 @@ fn void Res.deliver(&self) {
     }
     if (self.eof || self.gone) {
         self.read_op = 0;
-        resolve(op, g_rt.null_value() ?? { });
+        resolve(op, g_runtime.rt.null_value() ?? { });
     }
 }
 
@@ -172,7 +169,7 @@ fn void fd_read_done(Task* t) {
         reject_errno(f.op, f.err, "read");
     } else if (f.n == 0) {
         free(f.buf.ptr);
-        resolve(f.op, g_rt.null_value() ?? { });
+        resolve(f.op, g_runtime.rt.null_value() ?? { });
     } else {
         resolve_bytes(f.op, f.buf[:f.n]);
     }
@@ -268,8 +265,7 @@ fn void js_write(JsCtx ctx, void* udata) {
     }
 }
 
-fn void js_close(JsCtx ctx, void* udata) {
-    Res* r = res_find(ctx.arg(0).id());
+fn void close_resource(Res* r) {
     if (!r || r.closed) return;
     r.closed = true;
     switch (r.kind) {
@@ -285,7 +281,7 @@ fn void js_close(JsCtx ctx, void* udata) {
                 Res* c = res_find(rid);
                 if (c) us_socket_close(c.ssl, c.sock, 0, null);
             }
-            if (r.accept_op) resolve(r.accept_op, g_rt.null_value() ?? { });
+            if (r.accept_op) resolve(r.accept_op, g_runtime.rt.null_value() ?? { });
             r.accept_op = 0;
         case STDIO:
             r.gone = true;
@@ -297,6 +293,8 @@ fn void js_close(JsCtx ctx, void* udata) {
     }
     res_release(r);
 }
+
+fn void js_close(JsCtx ctx, void* udata) => close_resource(res_find(ctx.arg(0).id()));
 
 const Native[] RES_NATIVES = {
     { "read", &js_read, 2 },

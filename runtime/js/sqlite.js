@@ -1,4 +1,5 @@
 const bk = __bk;
+const markOpaque = bk.workerOpaque;
 const databases = new WeakMap();
 const statements = new WeakMap();
 const internal = Symbol("SQLite statement");
@@ -78,6 +79,7 @@ Object.defineProperties(Statement.prototype, {
 export class Database {
     constructor(path = ":memory:", { readonly = false } = {}) {
         databases.set(this, { id: bk.sqliteOpen(String(path), Boolean(readonly)), closed: false });
+        markOpaque(this);
     }
     get inTransaction() { return bk.sqliteInTransaction(databaseState(this).id); }
     exec(sql) { bk.sqliteExec(databaseState(this).id, String(sql)); }

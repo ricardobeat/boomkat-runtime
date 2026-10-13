@@ -10,6 +10,7 @@ import std::time;
 import std::collections::map;
 
 faultdef TIMED_OUT;
+faultdef WORKER_STOPPED;
 
 // ---- unhandled rejections ----
 
@@ -18,109 +19,130 @@ struct Rejection {
     JsValue reason;
 }
 
-HashMap{ulong, Rejection} g_rejections;
-JsValue g_unhandled;
 
 fn void on_rejection(JsRuntime* rt, ulong id, JsValue promise, JsValue reason, bool handled, void* udata) {
     if (handled) {
-        Rejection? r = g_rejections.get(id);
+        Rejection? r = g_runtime.rejections.get(id);
         if (catch r) return;
         rt.release(r.promise);
         rt.release(r.reason);
-        g_rejections.remove(id);
+        g_runtime.rejections.remove(id);
         return;
     }
-    if (g_rejections.has_key(id)) return;
-    g_rejections.set(id, { rt.persist(promise) ?? { }, rt.persist(reason) ?? { } });
+    if (g_runtime.rejections.has_key(id)) return;
+    g_runtime.rejections.set(id, { rt.persist(promise) ?? { }, rt.persist(reason) ?? { } });
 }
 
 // Rejections still unhandled once the microtasks have drained reach the
 // global "unhandledrejection" event; unless a listener prevents its default,
 // the process ends, as in Deno.
 fn void flush_rejections() {
-    while (g_rejections.len()) {
-        ulong id    = g_rejections.keys(tmem)[0];
-        Rejection r = g_rejections.get(id)!!;
-        g_rejections.remove(id);
+    while (g_runtime.rejections.len()) {
+        ulong id    = g_runtime.rejections.keys(tmem)[0];
+        Rejection r = g_runtime.rejections.get(id)!!;
+        g_runtime.rejections.remove(id);
         defer {
-            g_rt.release(r.promise);
-            g_rt.release(r.reason);
+            g_runtime.rt.release(r.promise);
+            g_runtime.rt.release(r.reason);
         }
         JsValue[2] args    = { r.reason, r.promise };
-        JsValue? prevented = g_rt.call(g_unhandled, args[..]);
+        JsValue? prevented = g_runtime.rt.call(g_runtime.unhandled, args[..]);
         if (catch prevented) {
             report_uncaught();
             continue;
         }
-        defer g_rt.release(prevented);
-        if (g_rt.as_bool(prevented) ?? false) continue;
-        g_rt.@scope() {
+        defer g_runtime.rt.release(prevented);
+        if (g_runtime.rt.as_bool(prevented) ?? false) continue;
+        g_runtime.rt.@scope() {
             JsValue[1] a  = { r.reason };
-            JsValue? text = g_rt.call(g_describe, a[..]);
-            io::eprintfn("error: Uncaught (in promise) %s", g_rt.as_string(text ?? { }) ?? "?");
+            JsValue? text = g_runtime.rt.call(g_runtime.describe, a[..]);
+            io::eprintfn("error: Uncaught (in promise) %s", g_runtime.rt.as_string(text ?? { }) ?? "?");
         };
-        g_exit_code = 1;
+        g_runtime.exit_code = 1;
         exit_now();
+        return;
     }
 }
 
-JsValue g_describe;
 
 // ---- the watchdog ----
 
-long g_time_limit_ns;
-Thread g_watchdog;
-ulong g_entered_ns;
+
+struct WatchdogState {
+    JsRuntime* runtime;
+    ulong* entered;
+    long limit;
+    bool stopped;
+    Thread thread;
+}
 
 fn int watchdog(void* arg) {
-    long period = max(g_time_limit_ns / 4, 1_000_000);
-    while (true) {
+    WatchdogState* state = arg;
+    long period = min(max(state.limit / 4, 1_000_000), 50_000_000l);
+    while (!mem::@atomic_load(state.stopped)) {
         thread::sleep_ns((NanoDuration)period);
-        ulong t = mem::@atomic_load(g_entered_ns);
-        if (t && (long)(now_ns() - t) > g_time_limit_ns) g_rt.request_interrupt();
+        ulong t = mem::@atomic_load(*state.entered);
+        if (t && (long)(now_ns() - t) > state.limit) state.runtime.request_interrupt();
     }
+    return 0;
 }
 
 fn void start_watchdog(long ms) {
-    g_time_limit_ns = ms * 1_000_000;
-    g_watchdog.create(&watchdog, null)!!;
-    g_watchdog.detach();
+    g_runtime.time_limit_ns = ms * 1_000_000;
+    WatchdogState* state = mem::new(WatchdogState);
+    state.runtime = &g_runtime.rt;
+    state.entered = &g_runtime.entered_ns;
+    state.limit = g_runtime.time_limit_ns;
+    g_runtime.watchdog_state = state;
+    state.thread.create(&watchdog, state)!!;
+}
+
+fn void stop_watchdog() {
+    WatchdogState* state = g_runtime.watchdog_state;
+    if (!state) return;
+    mem::@atomic_store(state.stopped, true);
+    (void)state.thread.join();
+    free(state);
+    g_runtime.watchdog_state = null;
 }
 
 fn ulong now_ns() => clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
 
 // ---- entering JS ----
 
-uint g_depth;
 
 fn void? call_js(JsValue f, JsValue[] args) {
-    g_depth++;
-    defer g_depth--;
-    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, now_ns());
-    JsValue? r = g_rt.call(f, args);
-    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, (ulong)0);
+    if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
+    g_runtime.depth++;
+    defer g_runtime.depth--;
+    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, now_ns());
+    JsValue? r = g_runtime.rt.call(f, args);
+    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, (ulong)0);
     if (catch err = r) {
+        if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
         if (err == boomkat::INTERRUPTED) {
-            g_rt.clear_interrupt();
-            io::eprintfn("error: script ran past the %d ms time limit", g_time_limit_ns / 1_000_000);
+            g_runtime.rt.clear_interrupt();
+            if (worker_stopping()) return WORKER_STOPPED~;
+            if (g_runtime.worker) { worker_report_error("Worker script time limit exceeded"); worker_stop(); }
+            io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
             return TIMED_OUT~;
         }
         report_uncaught();
         return err~;
     }
-    g_rt.release(r);
+    g_runtime.rt.release(r);
     // The engine drains after a JS function, but not after a native one such
     // as a promise's resolve.
-    if (g_depth == 1) {
-        if (catch e = g_rt.drain_microtasks()) {
+    if (g_runtime.depth == 1) {
+        if (catch e = g_runtime.rt.drain_microtasks()) {
             report_uncaught();
             return e~;
         }
-        if (g_rejections.len()) flush_rejections();
+        if (g_runtime.rejections.len()) flush_rejections();
     }
 }
 
 fn void init_guard() {
-    g_rejections.init(mem);
-    g_rt.set_promise_rejection_tracker(&on_rejection);
+    g_runtime.rejections.init(mem);
+    g_runtime.rt.set_promise_rejection_tracker(&on_rejection);
 }

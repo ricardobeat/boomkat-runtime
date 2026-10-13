@@ -26,7 +26,7 @@ fn String sandbox_profile() {
 }
 
 fn void apply_sandbox() {
-    if (!g_sandbox || g_perms.prompt) return;
+    if (!g_sandbox || g_runtime.perms.prompt) return;
     char* err;
     if (sandbox_init(sandbox_profile().zstr_tcopy(), 0, &err) != 0) {
         io::eprintfn("warning: sandbox unavailable: %s", ((ZString)err).str_view());

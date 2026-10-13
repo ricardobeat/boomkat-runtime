@@ -86,13 +86,6 @@ struct SqlApi {
     SqlStmtStatus stmt_status;
 }
 
-SqlApi g_sql;
-void* g_sql_library;
-HashMap{ulong, SqlDatabase*} g_sql_databases;
-HashMap{ulong, SqlStatement*} g_sql_statements;
-ulong g_sql_next_id        =  1;
-long g_sql_statement_class = -1;
-JsValue[3] g_sql_statement_fallback;
 
 // Host objects carry an ID, never a borrowed statement pointer: close/finalize
 // can invalidate the resource while the JavaScript object remains reachable.
@@ -101,20 +94,20 @@ fn void sql_statement_object_free(void* payload, void* user) => mem::free(payloa
 fn void js_sqlite_statement_class(JsCtx ctx, void* user) {
     JsArg proto = ctx.arg(0);
     if (!proto.tv.is_object()) return ctx.throw_error(TYPE, "invalid statement prototype");
-    if (g_sql_statement_class >= 0) return ctx.throw_error(TYPE, "statement class already registered");
-    g_sql_statement_class = ctx.ctx.heap.register_host_class(
+    if (g_runtime.sql_statement_class >= 0) return ctx.throw_error(TYPE, "statement class already registered");
+    g_runtime.sql_statement_class = ctx.ctx.heap.register_host_class(
         (void*)&sql_statement_object_free,
         null,
         null,
         null,
         proto.tv.get_heapptr()
     );
-    if (g_sql_statement_class < 0) return ctx.throw_error(ERROR, "SQLite allocation failed");
-    for (uint i = 0; i < 3; i++) g_sql_statement_fallback[i] = ctx.persist(ctx.arg(i + 1))!!;
+    if (g_runtime.sql_statement_class < 0) return ctx.throw_error(ERROR, "SQLite allocation failed");
+    for (uint i = 0; i < 3; i++) g_runtime.sql_statement_fallback[i] = ctx.persist(ctx.arg(i + 1))!!;
 }
 
 fn void js_sqlite_statement_object(JsCtx ctx, void* user) {
-    if (g_sql_statement_class < 0) return ctx.throw_error(TYPE, "statement class is not initialized");
+    if (g_runtime.sql_statement_class < 0) return ctx.throw_error(TYPE, "statement class is not initialized");
     SqlStatement* stmt = sql_statement(ctx);
     if (!stmt) return;
     HObject*? obj = ctx.ctx.heap.alloc_object(HOST);
@@ -122,8 +115,8 @@ fn void js_sqlite_statement_object(JsCtx ctx, void* user) {
     ulong* id = mem::new(ulong);
     *id = stmt.id;
     (*obj.extra_ptr()).host.payload = id;
-    (*obj.extra_ptr()).host.class_id = (uint)g_sql_statement_class;
-    ctx.ctx.heap.set_prototype(obj, ctx.ctx.heap.host_class_at((uint)g_sql_statement_class).proto);
+    (*obj.extra_ptr()).host.class_id = (uint)g_runtime.sql_statement_class;
+    ctx.ctx.heap.set_prototype(obj, ctx.ctx.heap.host_class_at((uint)g_runtime.sql_statement_class).proto);
     JsArg result;
     result.tv.set_object(obj);
     ctx.ret(result);
@@ -221,7 +214,7 @@ fn bool load_sqlite(void* library) {
     if (!api.stmt_status) return false;
     // The binding requires SQLite 3.31 or newer.
     if (api.libversion_number() < 3031000) return false;
-    g_sql = api;
+    g_runtime.sql = api;
     return true;
 }
 
@@ -240,9 +233,9 @@ fn bool init_sqlite() {
             libc::dlclose(library);
             continue;
         }
-        g_sql_library = library;
-        g_sql_databases.init(mem);
-        g_sql_statements.init(mem);
+        g_runtime.sql_library = library;
+        g_runtime.sql_databases.init(mem);
+        g_runtime.sql_statements.init(mem);
         return true;
     }
     return false;
@@ -260,8 +253,8 @@ fn void sql_throw(JsCtx ctx, String code, String message) {
 }
 
 fn void sql_error(JsCtx ctx, SqlDatabase* db) {
-    String message = g_sql.errmsg(db.handle).str_view();
-    sql_throw(ctx, string::tformat("SQLITE_%d", g_sql.extended_errcode(db.handle)), message);
+    String message = g_runtime.sql.errmsg(db.handle).str_view();
+    sql_throw(ctx, string::tformat("SQLITE_%d", g_runtime.sql.extended_errcode(db.handle)), message);
 }
 
 fn ulong sql_id(JsArg value) {
@@ -271,32 +264,32 @@ fn ulong sql_id(JsArg value) {
 }
 
 fn SqlDatabase* sql_database(JsCtx ctx) {
-    SqlDatabase* db = g_sql_databases.get(sql_id(ctx.arg(0))) ?? null;
+    SqlDatabase* db = g_runtime.sql_databases.get(sql_id(ctx.arg(0))) ?? null;
     if (!db) ctx.throw_error(TYPE, "database is closed or invalid");
     return db;
 }
 
 fn SqlStatement* sql_statement(JsCtx ctx) {
-    SqlStatement* stmt = g_sql_statements.get(sql_id(ctx.arg(0))) ?? null;
+    SqlStatement* stmt = g_runtime.sql_statements.get(sql_id(ctx.arg(0))) ?? null;
     if (!stmt) ctx.throw_error(TYPE, "statement is finalized or its database is closed");
     return stmt;
 }
 
 fn void sql_finalize(SqlStatement* stmt) {
-    g_sql_statements.remove(stmt.id);
+    g_runtime.sql_statements.remove(stmt.id);
     if (stmt.prev) {
         stmt.prev.next = stmt.next;
     } else {
         stmt.db.statements = stmt.next;
     }
     if (stmt.next) stmt.next.prev = stmt.prev;
-    g_sql.finalize(stmt.handle);
+    g_runtime.sql.finalize(stmt.handle);
     sql_layout_clear(stmt);
     free(stmt);
 }
 
 fn void sql_layout_clear(SqlStatement* stmt) {
-    if (!stmt.layout.is_empty()) g_rt.release(stmt.layout);
+    if (!stmt.layout.is_empty()) g_runtime.rt.release(stmt.layout);
     if (stmt.keys.len) free(stmt.keys.ptr);
     if (stmt.slots.len) free(stmt.slots.ptr);
     stmt.layout = { };
@@ -307,10 +300,10 @@ fn void sql_layout_clear(SqlStatement* stmt) {
 
 fn bool sql_layout(JsCtx ctx, SqlStatement* stmt) {
     // step() can recompile a prepared statement after schema changes.
-    CInt reprepares = g_sql.stmt_status(stmt.handle, 5, 0); // SQLITE_STMTSTATUS_REPREPARE
+    CInt reprepares = g_runtime.sql.stmt_status(stmt.handle, 5, 0); // SQLITE_STMTSTATUS_REPREPARE
     if (!stmt.layout.is_empty() && stmt.reprepares == reprepares) return true;
     Heap* h         = ctx.ctx.heap;
-    CInt columns    = g_sql.column_count(stmt.handle);
+    CInt columns    = g_runtime.sql.column_count(stmt.handle);
     HString*[] keys = mem::new_array(HString*, columns);
     uint[] slots    = mem::new_array(uint, columns);
     bool saved;
@@ -326,7 +319,7 @@ fn bool sql_layout(JsCtx ctx, SqlStatement* stmt) {
     TVal undefined;
     undefined.set_undefined();
     for (CInt i = 0; i < columns; i++) {
-        HString* key = h.str_intern((char[])g_sql.column_name(stmt.handle, i).str_view());
+        HString* key = h.str_intern((char[])g_runtime.sql.column_name(stmt.handle, i).str_view());
         if (!key) {
             ctx.throw_error(ERROR, "SQLite allocation failed");
             return false;
@@ -362,21 +355,21 @@ fn bool sql_layout(JsCtx ctx, SqlStatement* stmt) {
 
 fn void sql_close(SqlDatabase* db) {
     while (db.statements) sql_finalize(db.statements);
-    g_sql_databases.remove(db.id);
-    g_sql.close(db.handle);
+    g_runtime.sql_databases.remove(db.id);
+    g_runtime.sql.close(db.handle);
     free(db);
 }
 
 fn void close_sqlite() {
-    if (!g_sql_library) return;
+    if (!g_runtime.sql_library) return;
     @pool() {
-        ulong[] ids = g_sql_databases.keys(tmem);
-        foreach (id : ids) sql_close(g_sql_databases.get(id)!!);
+        ulong[] ids = g_runtime.sql_databases.keys(tmem);
+        foreach (id : ids) sql_close(g_runtime.sql_databases.get(id)!!);
     };
-    g_sql_statements.free();
-    g_sql_databases.free();
-    libc::dlclose(g_sql_library);
-    g_sql_library = null;
+    g_runtime.sql_statements.free();
+    g_runtime.sql_databases.free();
+    libc::dlclose(g_runtime.sql_library);
+    g_runtime.sql_library = null;
 }
 
 // ATTACH also covers VACUUM INTO. File access is limited to the checked
@@ -397,14 +390,14 @@ fn CInt sql_authorize(void* user, CInt action, ZString first, ZString second, ZS
 fn CInt sql_progress(void* user) {
     SqlDatabase* db = user;
     if (db.deadline && now_ns() >= db.deadline) {
-        g_rt.request_interrupt();
+        g_runtime.rt.request_interrupt();
         return 1;
     }
     return 0;
 }
 
 fn void sql_deadline(SqlDatabase* db) {
-    db.deadline = g_time_limit_ms > 0 ? now_ns() + (ulong)g_time_limit_ms * 1_000_000 : 0;
+    db.deadline = g_runtime.time_limit_ms > 0 ? now_ns() + (ulong)g_runtime.time_limit_ms * 1_000_000 : 0;
 }
 
 fn String? sql_string(JsCtx ctx, uint index) {
@@ -453,13 +446,13 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
         SqlDatabase* db = mem::new(SqlDatabase);
         bool opened;
         defer if (!opened) {
-            if (db.handle) g_sql.close(db.handle);
+            if (db.handle) g_runtime.sql.close(db.handle);
             free(db);
         }
         // All handle access stays on the loop thread: per-connection mutexes
         // add no protection here. File locks and journal durability remain on.
         CInt flags = (readonly ? 1 : 2 | 4) | 0x8000; // NOMUTEX
-        if (g_sql.open_v2(path.zstr_tcopy(), &db.handle, flags, null) != 0) {
+        if (g_runtime.sql.open_v2(path.zstr_tcopy(), &db.handle, flags, null) != 0) {
             if (db.handle) {
                 sql_error(ctx, db);
             } else {
@@ -468,16 +461,16 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
             return;
         }
         // Avoid implicit temp files outside the database's permission scope.
-        if (g_sql.exec(
+        if (g_runtime.sql.exec(
             db.handle,
             "PRAGMA temp_store=MEMORY",
             null,
             null,
             null
-        ) != 0 || g_sql.set_authorizer(db.handle, &sql_authorize, db) != 0) return sql_error(ctx, db);
-        db.id = g_sql_next_id++;
-        g_sql.progress_handler(db.handle, 10000, &sql_progress, db);
-        g_sql_databases.set(db.id, db);
+        ) != 0 || g_runtime.sql.set_authorizer(db.handle, &sql_authorize, db) != 0) return sql_error(ctx, db);
+        db.id = g_runtime.sql_next_id++;
+        g_runtime.sql.progress_handler(db.handle, 10000, &sql_progress, db);
+        g_runtime.sql_databases.set(db.id, db);
         opened = true;
         ctx.ret_number((double)db.id);
     };
@@ -486,12 +479,12 @@ fn void js_sqlite_open(JsCtx ctx, void* user) {
 // Autocommit also detects explicit SQL transactions and nested savepoints.
 fn void js_sqlite_in_transaction(JsCtx ctx, void* user) {
     SqlDatabase* db = sql_database(ctx);
-    if (db) ctx.ret_bool(g_sql.get_autocommit(db.handle) == 0);
+    if (db) ctx.ret_bool(g_runtime.sql.get_autocommit(db.handle) == 0);
 }
 
 fn void js_sqlite_close(JsCtx ctx, void* user) {
     @pool() {
-        if (try db = g_sql_databases.get(sql_id(ctx.arg(0)))) sql_close(db);
+        if (try db = g_runtime.sql_databases.get(sql_id(ctx.arg(0)))) sql_close(db);
     };
 }
 
@@ -502,7 +495,7 @@ fn void js_sqlite_exec(JsCtx ctx, void* user) {
         String? sql = sql_string(ctx, 1);
         if (catch sql) return;
         sql_deadline(db);
-        if (g_sql.exec(db.handle, sql.zstr_tcopy(), null, null, null) != 0) sql_error(ctx, db);
+        if (g_runtime.sql.exec(db.handle, sql.zstr_tcopy(), null, null, null) != 0) sql_error(ctx, db);
     };
 }
 
@@ -516,20 +509,20 @@ fn void js_sqlite_prepare(JsCtx ctx, void* user) {
         SqlStatement* stmt = mem::new(SqlStatement);
         bool prepared;
         defer if (!prepared) {
-            if (stmt.handle) g_sql.finalize(stmt.handle);
+            if (stmt.handle) g_runtime.sql.finalize(stmt.handle);
             free(stmt);
         }
         char* tail;
         sql_deadline(db);
-        if (g_sql.prepare_v2(db.handle, sql.ptr, (CInt)sql.len, &stmt.handle, &tail) != 0) return sql_error(ctx, db);
+        if (g_runtime.sql.prepare_v2(db.handle, sql.ptr, (CInt)sql.len, &stmt.handle, &tail) != 0) return sql_error(ctx, db);
         if (!stmt.handle) return ctx.throw_error(TYPE, "expected one SQL statement");
         // Parse the tail to accept comments/semicolons but reject a second statement.
         sz remaining = sql.len - (tail - sql.ptr);
         if (remaining > 0) {
             void* extra;
             char* rest;
-            CInt rc = g_sql.prepare_v2(db.handle, tail, (CInt)remaining, &extra, &rest);
-            if (extra) g_sql.finalize(extra);
+            CInt rc = g_runtime.sql.prepare_v2(db.handle, tail, (CInt)remaining, &extra, &rest);
+            if (extra) g_runtime.sql.finalize(extra);
             if (rc != 0) return sql_error(ctx, db);
             if (extra) return ctx.throw_error(
                 TYPE,
@@ -537,11 +530,11 @@ fn void js_sqlite_prepare(JsCtx ctx, void* user) {
             );
         }
         stmt.db = db;
-        stmt.id = g_sql_next_id++;
+        stmt.id = g_runtime.sql_next_id++;
         stmt.next = db.statements;
         if (stmt.next) stmt.next.prev = stmt;
         db.statements = stmt;
-        g_sql_statements.set(stmt.id, stmt);
+        g_runtime.sql_statements.set(stmt.id, stmt);
         prepared = true;
         ctx.ret_number((double)stmt.id);
     };
@@ -576,10 +569,10 @@ fn void js_sqlite_params(JsCtx ctx, void* user) {
         if (!stmt) return;
         HObject*? names = sql_object(ctx, ARRAY);
         if (catch names) return ctx.throw_error(ERROR, "SQLite allocation failed");
-        CInt count = g_sql.bind_parameter_count(stmt.handle);
+        CInt count = g_runtime.sql.bind_parameter_count(stmt.handle);
         *names.array_len_ptr() = (uint)count;
         for (CInt i = 0; i < count; i++) {
-            ZString name = g_sql.bind_parameter_name(stmt.handle, i + 1);
+            ZString name = g_runtime.sql.bind_parameter_name(stmt.handle, i + 1);
             JsArg val    = name ? ctx.string(name.str_view()) : ctx.null_value();
             if (!names.set_array_idx(
                 (uint)i,
@@ -597,9 +590,9 @@ fn bool sql_bind(JsCtx ctx, SqlStatement* stmt, uint index, TVal value) {
     CInt position = (CInt)index + 1;
     CInt rc;
     if (value.is_null()) {
-        rc = g_sql.bind_null(stmt.handle, position);
+        rc = g_runtime.sql.bind_null(stmt.handle, position);
     } else if (value.is_boolean()) {
-        rc = g_sql.bind_int64(stmt.handle, position, value.get_boolean() ? 1 : 0);
+        rc = g_runtime.sql.bind_int64(stmt.handle, position, value.get_boolean() ? 1 : 0);
     } else if (value.is_numeric()) {
         double n = value.get_number_or_fastint();
         if (n != n || n > double::max || n < -double::max) {
@@ -607,9 +600,9 @@ fn bool sql_bind(JsCtx ctx, SqlStatement* stmt, uint index, TVal value) {
             return false;
         }
         if (n >= -9007199254740991.0 && n <= 9007199254740991.0 && (double)(long)n == n) {
-            rc = g_sql.bind_int64(stmt.handle, position, (long)n);
+            rc = g_runtime.sql.bind_int64(stmt.handle, position, (long)n);
         } else {
-            rc = g_sql.bind_double(stmt.handle, position, n);
+            rc = g_runtime.sql.bind_double(stmt.handle, position, n);
         }
     } else if (value.is_bigint()) {
         HBigInt* b = value.get_heapptr();
@@ -617,14 +610,14 @@ fn bool sql_bind(JsCtx ctx, SqlStatement* stmt, uint index, TVal value) {
             ctx.throw_error(RANGE, "SQLite BigInts must fit signed 64 bits");
             return false;
         }
-        rc = g_sql.bind_int64(stmt.handle, position, (long)b.to_int128());
+        rc = g_runtime.sql.bind_int64(stmt.handle, position, (long)b.to_int128());
     } else if (value.is_string()) {
         String text = (JsArg) { .tv = value }.as_string() ?? "";
         if (text.len > int::max) {
             ctx.throw_error(RANGE, "SQLite text is too long");
             return false;
         }
-        rc = g_sql.bind_text(stmt.handle, position, text.ptr, (CInt)text.len, (void*)usz::max);
+        rc = g_runtime.sql.bind_text(stmt.handle, position, text.ptr, (CInt)text.len, (void*)usz::max);
     } else {
         JsArg arg = { .tv = value };
         if (!arg.is_bytes()) {
@@ -637,7 +630,7 @@ fn bool sql_bind(JsCtx ctx, SqlStatement* stmt, uint index, TVal value) {
             return false;
         }
         // A non-null pointer preserves an empty BLOB instead of binding NULL.
-        rc = g_sql.bind_blob(stmt.handle, position, bytes.len ? bytes.ptr : "", (CInt)bytes.len, (void*)usz::max);
+        rc = g_runtime.sql.bind_blob(stmt.handle, position, bytes.len ? bytes.ptr : "", (CInt)bytes.len, (void*)usz::max);
     }
     if (rc != 0) {
         sql_error(ctx, stmt.db);
@@ -647,12 +640,12 @@ fn bool sql_bind(JsCtx ctx, SqlStatement* stmt, uint index, TVal value) {
 }
 
 fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
-    switch (g_sql.column_type(stmt.handle, column)) {
-        case 1: return sql_integer(ctx, g_sql.column_int64(stmt.handle, column));
-        case 2: return ctx.number(g_sql.column_double(stmt.handle, column));
+    switch (g_runtime.sql.column_type(stmt.handle, column)) {
+        case 1: return sql_integer(ctx, g_runtime.sql.column_int64(stmt.handle, column));
+        case 2: return ctx.number(g_runtime.sql.column_double(stmt.handle, column));
         case 3:
-            char* text = g_sql.column_text(stmt.handle, column);
-            CInt len = g_sql.column_bytes(stmt.handle, column);
+            char* text = g_runtime.sql.column_text(stmt.handle, column);
+            CInt len = g_runtime.sql.column_bytes(stmt.handle, column);
             if (!text && len) return boomkat::OUT_OF_MEMORY~;
             // Result data is not an identifier. Long ASCII values can avoid
             // hashing and comparing their entire contents in the intern table.
@@ -666,8 +659,8 @@ fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
             }
             return ctx.string((String)text[:len]);
         case 4:
-            char* data = g_sql.column_blob(stmt.handle, column);
-            CInt len = g_sql.column_bytes(stmt.handle, column);
+            char* data = g_runtime.sql.column_blob(stmt.handle, column);
+            CInt len = g_runtime.sql.column_bytes(stmt.handle, column);
             if (!data && len) return boomkat::OUT_OF_MEMORY~;
             return ctx.bytes(copy_bytes(data[:len]));
         default: return ctx.null_value();
@@ -676,11 +669,11 @@ fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
 
 fn void sql_execute(JsCtx ctx, SqlStatement* stmt, HObject* bindings, uint count, int mode) {
     @pool() {
-        g_sql.reset(stmt.handle);
-        g_sql.clear_bindings(stmt.handle);
+        g_runtime.sql.reset(stmt.handle);
+        g_runtime.sql.clear_bindings(stmt.handle);
         defer {
-            g_sql.reset(stmt.handle);
-            g_sql.clear_bindings(stmt.handle);
+            g_runtime.sql.reset(stmt.handle);
+            g_runtime.sql.clear_bindings(stmt.handle);
         }
         for (uint i = 0; i < count; i++) {
             TVal value = bindings ? (bindings.get_array_idx(i) ?? (TVal) { }) : ctx.arg(i).tv;
@@ -695,7 +688,7 @@ fn void sql_execute(JsCtx ctx, SqlStatement* stmt, HObject* bindings, uint count
         bool have_layout;
         sql_deadline(stmt.db);
         while (true) {
-            CInt rc = g_sql.step(stmt.handle);
+            CInt rc = g_runtime.sql.step(stmt.handle);
             if (rc == 101) break;
             if (rc != 100) return sql_error(ctx, stmt.db);
             if (mode == 2) continue;
@@ -734,9 +727,9 @@ fn void sql_execute(JsCtx ctx, SqlStatement* stmt, HObject* bindings, uint count
         if (mode == 2) {
             HObject*? stats = sql_object(ctx);
             if (catch stats) return ctx.throw_error(ERROR, "SQLite allocation failed");
-            JsArg? rowid = sql_integer(ctx, g_sql.last_insert_rowid(stmt.db.handle));
+            JsArg? rowid = sql_integer(ctx, g_runtime.sql.last_insert_rowid(stmt.db.handle));
             if (catch rowid) return ctx.throw_error(ERROR, "SQLite allocation failed");
-            if (!sql_put(ctx, stats, "changes", ctx.number(g_sql.changes(stmt.db.handle))
+            if (!sql_put(ctx, stats, "changes", ctx.number(g_runtime.sql.changes(stmt.db.handle))
                 .tv) || !sql_put(
                     ctx,
                     stats,
@@ -761,7 +754,7 @@ fn void js_sqlite_query(JsCtx ctx, void* user) {
     );
     HObject* bindings = params.tv.get_heapptr();
     uint count        = *bindings.array_len_ptr();
-    if (count != (uint)g_sql.bind_parameter_count(
+    if (count != (uint)g_runtime.sql.bind_parameter_count(
         stmt.handle
     )) return ctx.throw_error(RANGE, "incorrect SQLite parameter count");
     sql_execute(ctx, stmt, bindings, count, ctx.arg(2).as_int());
@@ -772,7 +765,7 @@ fn void sql_native_statement(JsCtx ctx, int mode) {
     if (!receiver.tv.is_object()) return ctx.throw_error(TYPE, "invalid SQLite statement");
     HObject* obj = receiver.tv.get_heapptr();
     if (obj.get_class() != HOST
-        || (*obj.extra_ptr()).host.class_id != (uint)g_sql_statement_class) return ctx.throw_error(
+        || (*obj.extra_ptr()).host.class_id != (uint)g_runtime.sql_statement_class) return ctx.throw_error(
         TYPE,
         "invalid SQLite statement"
     );
@@ -781,13 +774,13 @@ fn void sql_native_statement(JsCtx ctx, int mode) {
     // Do not retain a resource pointer across that JavaScript call.
     if (count == 1 && ctx.arg(0).tv.is_object()) {
         JsArg[1] args = { ctx.arg(0) };
-        if (try result = ctx.call(ctx.value(g_sql_statement_fallback[mode]), args[..], receiver)) ctx.ret(result);
+        if (try result = ctx.call(ctx.value(g_runtime.sql_statement_fallback[mode]), args[..], receiver)) ctx.ret(result);
         return;
     }
     ulong id           = *(ulong*)(*obj.extra_ptr()).host.payload;
-    SqlStatement* stmt = g_sql_statements.get(id) ?? null;
+    SqlStatement* stmt = g_runtime.sql_statements.get(id) ?? null;
     if (!stmt) return ctx.throw_error(TYPE, "statement is finalized or its database is closed");
-    if (count != (uint)g_sql.bind_parameter_count(
+    if (count != (uint)g_runtime.sql.bind_parameter_count(
         stmt.handle
     )) return ctx.throw_error(RANGE, "incorrect SQLite parameter count");
     sql_execute(ctx, stmt, null, count, mode);
@@ -798,10 +791,10 @@ fn void js_sqlite_run(JsCtx ctx, void* user) => sql_native_statement(ctx, 2);
 
 fn void js_sqlite_finalize(JsCtx ctx, void* user) {
     @pool() {
-        if (try stmt = g_sql_statements.get(sql_id(ctx.arg(0)))) sql_finalize(stmt);
+        if (try stmt = g_runtime.sql_statements.get(sql_id(ctx.arg(0)))) sql_finalize(stmt);
     };
 }
-fn void js_sqlite_version(JsCtx ctx, void* user) => ctx.ret_string(g_sql.libversion().str_view());
+fn void js_sqlite_version(JsCtx ctx, void* user) => ctx.ret_string(g_runtime.sql.libversion().str_view());
 
 const Native[] SQLITE_NATIVES = {
     { "sqliteStatementClass", &js_sqlite_statement_class, 4 },

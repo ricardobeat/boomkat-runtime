@@ -15,20 +15,9 @@ struct SinkSlot {
     void* key;
 }
 
-JsValue g_sink_fallback;
-JsValue g_sink_global;
-JsValue g_sink_constructor;
-HObject* g_sink_global_object;
-HObject* g_sink_constructor_object;
-SinkSlot[9] g_sink_slots;
-JsValue[9] g_sink_keys;
-uint g_sink_shape;
-uint g_sink_layout_epoch;
-uint[4] g_sink_indices;
-bool g_sink_layout_valid;
 
 fn void js_sink_types(JsCtx ctx, void* user) {
-    if (!g_sink_fallback.is_empty()) {
+    if (!g_runtime.sink_fallback.is_empty()) {
         ctx.throw_error(TYPE, "stream controller is already configured");
         return;
     }
@@ -40,21 +29,21 @@ fn void js_sink_types(JsCtx ctx, void* user) {
         ctx.throw_error(TYPE, "invalid stream controller configuration");
         return;
     }
-    g_sink_fallback = ctx.persist(ctx.arg(0)) ?? { };
-    g_sink_global = ctx.persist(ctx.arg(1)) ?? { };
-    g_sink_constructor = ctx.persist(ctx.arg(2)) ?? { };
-    g_sink_global_object = ctx.arg(1).tv.get_heapptr();
-    g_sink_constructor_object = ctx.arg(2).tv.get_heapptr();
+    g_runtime.sink_fallback = ctx.persist(ctx.arg(0)) ?? { };
+    g_runtime.sink_global = ctx.persist(ctx.arg(1)) ?? { };
+    g_runtime.sink_constructor = ctx.persist(ctx.arg(2)) ?? { };
+    g_runtime.sink_global_object = ctx.arg(1).tv.get_heapptr();
+    g_runtime.sink_constructor_object = ctx.arg(2).tv.get_heapptr();
     String[8] names = { "closed", "parts", "size", "nudge", "length", "push", "Uint8Array", "prototype" };
     foreach (i, name : names) {
-        JsValue key = g_rt.string(name) ?? { };
-        g_sink_keys[i] = key;
-        g_sink_slots[i].key = ctx.value(key).tv.get_heapptr();
+        JsValue key = g_runtime.rt.string(name) ?? { };
+        g_runtime.sink_keys[i] = key;
+        g_runtime.sink_slots[i].key = ctx.value(key).tv.get_heapptr();
         // Registry handles keep the interned keys alive for the runtime.
     }
     JsValue symbol = ctx.persist(ctx.arg(3)) ?? { };
-    g_sink_keys[8] = symbol;
-    g_sink_slots[8].key = ctx.value(symbol).tv.get_heapptr();
+    g_runtime.sink_keys[8] = symbol;
+    g_runtime.sink_slots[8].key = ctx.value(symbol).tv.get_heapptr();
 }
 
 // Shape and epoch protect the index; links are compared against the live
@@ -62,7 +51,7 @@ fn void js_sink_types(JsCtx ctx, void* user) {
 // accessor pairs, are always read from current storage.
 fn PropValue* sink_slot(HObject* receiver, uint index, heap::Heap* h, bool own = false) @inline {
     if (receiver == null || receiver.flags.exotic_proxyobj) return null;
-    SinkSlot* cache = &g_sink_slots[index];
+    SinkSlot* cache = &g_runtime.sink_slots[index];
     ICEntry* ic     = &cache.ic;
     // Globals use a mutable dictionary shape. An existing slot can be read,
     // but its index and flags must be checked against the live dictionary.
@@ -81,7 +70,7 @@ fn PropValue* sink_slot(HObject* receiver, uint index, heap::Heap* h, bool own =
 }
 
 fn PropValue* sink_slot_fill(HObject* receiver, uint index, heap::Heap* h, bool own) {
-    SinkSlot* cache = &g_sink_slots[index];
+    SinkSlot* cache = &g_runtime.sink_slots[index];
     ICEntry* ic     = &cache.ic;
     *ic = { };
     HObject* cur = receiver;
@@ -120,16 +109,16 @@ fn bool sink_layout(HObject* sink, heap::Heap* h) {
     if (sink.flags.exotic_proxyobj || sink.in_dict_mode(h)) return false;
     uint[4] indices;
     for (uint i = 0; i < 4; i++) {
-        int idx = sink.find_prop_idx(g_sink_slots[i].key, h);
+        int idx = sink.find_prop_idx(g_runtime.sink_slots[i].key, h);
         if (idx < 0) return false;
         PropFlags flags = sink.get_prop_flags((uint)idx, h);
         if (flags.is_accessor || (i == 2 && !flags.writable)) return false;
         indices[i] = (uint)idx;
     }
-    g_sink_shape = sink.shape_id;
-    g_sink_layout_epoch = h.shape_recycle_epoch;
-    g_sink_indices = indices;
-    g_sink_layout_valid = true;
+    g_runtime.sink_shape = sink.shape_id;
+    g_runtime.sink_layout_epoch = h.shape_recycle_epoch;
+    g_runtime.sink_indices = indices;
+    g_runtime.sink_layout_valid = true;
     return true;
 }
 
@@ -144,34 +133,34 @@ fn bool sink_enqueue_fast(JsCtx ctx) {
         || view.flags.exotic_proxyobj) return false;
     // Prove the same instanceof result as the fallback. Constructor changes,
     // custom @@hasInstance and alternate view prototypes use the JS method.
-    HObject* ctor = g_sink_constructor_object;
+    HObject* ctor = g_runtime.sink_constructor_object;
     if (view.prototype != h.uint8array_proto) return false;
     // A later global lexical declaration can shadow the object-record value
     // seen by the prelude's free variable without changing globalThis.
-    HObject* lexical = g_rt.rt.vm.global_lex_env.bindings;
-    if (lexical.find_prop_idx(g_sink_slots[6].key, h) >= 0) return false;
-    HObject* global        = g_sink_global_object;
+    HObject* lexical = g_runtime.rt.rt.vm.global_lex_env.bindings;
+    if (lexical.find_prop_idx(g_runtime.sink_slots[6].key, h) >= 0) return false;
+    HObject* global        = g_runtime.sink_global_object;
     PropValue* global_ctor = sink_slot(global, 6, h, true);
-    if (global_ctor == null || g_sink_slots[6].ic.prop_flags.is_accessor) return false;
+    if (global_ctor == null || g_runtime.sink_slots[6].ic.prop_flags.is_accessor) return false;
     TVal global_value = global_ctor.get();
     if (!global_value.is_object() || global_value.get_heapptr() != ctor) return false;
     PropValue* ctor_proto   = sink_slot(ctor, 7, h);
     PropValue* has_instance = sink_slot(ctor, 8, h);
-    if (ctor_proto == null || has_instance == null || g_sink_slots[7].ic.prop_flags.is_accessor
-        || g_sink_slots[8].ic.prop_flags.is_accessor) return false;
+    if (ctor_proto == null || has_instance == null || g_runtime.sink_slots[7].ic.prop_flags.is_accessor
+        || g_runtime.sink_slots[8].ic.prop_flags.is_accessor) return false;
     TVal prototype = ctor_proto.get();
     if (!prototype.is_object() || prototype.get_heapptr() != h.uint8array_proto || !sink_builtin(
         has_instance.get(),
         FUNCTION_PROTO_HASINSTANCE
     )) return false;
-    bool layout_matches = g_sink_layout_valid && sink.shape_id == g_sink_shape
-        && g_sink_layout_epoch == h.shape_recycle_epoch;
+    bool layout_matches = g_runtime.sink_layout_valid && sink.shape_id == g_runtime.sink_shape
+        && g_runtime.sink_layout_epoch == h.shape_recycle_epoch;
     if (!layout_matches && !sink_layout(sink, h)) return false;
     PropValue* slots  = sink.prop_values();
-    PropValue* closed = &slots[g_sink_indices[0]];
-    PropValue* parts  = &slots[g_sink_indices[1]];
-    PropValue* size   = &slots[g_sink_indices[2]];
-    PropValue* nudge  = &slots[g_sink_indices[3]];
+    PropValue* closed = &slots[g_runtime.sink_indices[0]];
+    PropValue* parts  = &slots[g_runtime.sink_indices[1]];
+    PropValue* size   = &slots[g_runtime.sink_indices[2]];
+    PropValue* nudge  = &slots[g_runtime.sink_indices[3]];
     TVal closed_value = closed.get();
     TVal parts_value  = parts.get();
     TVal size_value   = size.get();
@@ -182,12 +171,12 @@ fn bool sink_enqueue_fast(JsCtx ctx) {
     uint length = builtins::ta_element_count(view);
     if (count < 0 || count > types::FASTINT_MAX - length) return false;
     PropValue* view_length = sink_slot(view, 4, h);
-    if (view_length == null || !g_sink_slots[4].ic.prop_flags.is_accessor) return false;
+    if (view_length == null || !g_runtime.sink_slots[4].ic.prop_flags.is_accessor) return false;
     TVal getter = hobject::hobject_access_getter(view_length.get());
     if (!sink_builtin(getter, TYPEDARRAY_PROTO_LENGTH_GET)) return false;
     HObject* array  = parts_value.get_heapptr();
     PropValue* push = sink_slot(array, 5, h);
-    if (push == null || g_sink_slots[5].ic.prop_flags.is_accessor) return false;
+    if (push == null || g_runtime.sink_slots[5].ic.prop_flags.is_accessor) return false;
     if (!sink_builtin(push.get(), ARRAY_PROTO_PUSH)) return false;
     // Reserve capacity without entering JS. Growing storage is invisible and
     // does not invoke property hooks; the helper still validates the append.
@@ -204,5 +193,5 @@ fn bool sink_enqueue_fast(JsCtx ctx) {
 fn void js_sink_enqueue(JsCtx ctx, void* user) {
     if (sink_enqueue_fast(ctx)) return;
     JsArg[1] args = { ctx.arg(0) };
-    if (try result = ctx.call(ctx.value(g_sink_fallback), args[..], ctx.this_value())) ctx.ret(result);
+    if (try result = ctx.call(ctx.value(g_runtime.sink_fallback), args[..], ctx.this_value())) ctx.ret(result);
 }

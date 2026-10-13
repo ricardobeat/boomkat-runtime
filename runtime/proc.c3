@@ -86,17 +86,17 @@ fn void js_env_all(JsCtx ctx, void* udata) {
 fn void js_args(JsCtx ctx, void* udata) {
     @pool() {
         DString out = dstring::temp();
-        foreach (a : g_args) out.appendf("%s\n", a);
+        foreach (a : g_runtime.args) out.appendf("%s\n", a);
         ctx.ret_string(out.str_view());
     };
 }
 
-fn void js_main(JsCtx ctx, void* udata) => ctx.ret_string(g_main);
+fn void js_main(JsCtx ctx, void* udata) => ctx.ret_string(g_runtime.main);
 
 fn void js_pid(JsCtx ctx, void* udata) => ctx.ret_number(getpid());
 
 fn void js_exit(JsCtx ctx, void* udata) {
-    g_exit_code = ctx.arg(0).as_int(0);
+    g_runtime.exit_code = ctx.arg(0).as_int(0);
     exit_now();
 }
 

@@ -10,8 +10,6 @@ import boomkat::hstring;
 import boomkat::types;
 import std::io;
 
-JsRuntime g_rt;
-JsValue g_settle;
 
 // ---- bytes ----
 
@@ -48,7 +46,7 @@ fn bool JsArg.is_bytes(self) {
 
 // A Uint8Array that takes ownership of `data`, which must come from `mem`.
 fn HObject*? new_u8(char[] data) {
-    Heap* h      = g_rt.rt.heap;
+    Heap* h      = g_runtime.rt.rt.heap;
     HObject* buf = h.alloc_object(ARRAYBUFFER)!;
     h.set_prototype(buf, h.arraybuffer_proto);
     buf.extra_ptr().ab = { .data = data.len ? data.ptr : null, .byte_length = (uint)data.len };
@@ -92,7 +90,7 @@ fn JsValue? bytes_value(char[] owned) {
     }
     TVal tv;
     tv.set_object(o);
-    return g_rt.root(tv);
+    return g_runtime.rt.root(tv);
 }
 
 fn void release_string_bytes(char* data, void* user) => free(user ? user : data);
@@ -107,16 +105,16 @@ fn JsValue? owned_text_value(char[] owned) {
         String text = utf8_clean(owned, false) ?? "";
         $if $defined(Heap.alloc_external_string):
             if (owned.len && text.ptr == owned.ptr && !hstring::has_raw_utf8_astral(owned)) {
-                HString* hs = g_rt.rt.heap.alloc_external_string(owned, &release_string_bytes, base);
+                HString* hs = g_runtime.rt.rt.heap.alloc_external_string(owned, &release_string_bytes, base);
                 if (hs != null) {
                     transferred = true;
                     TVal tv;
                     tv.set_string_borrowed(hs);
-                    return g_rt.root(tv);
+                    return g_runtime.rt.root(tv);
                 }
             }
         $endif
-        return g_rt.string(text);
+        return g_runtime.rt.string(text);
     };
 }
 
@@ -126,36 +124,36 @@ fn JsValue? owned_text_value(char[] owned) {
 // now or from a later loop callback, through one of these. On the JS side
 // __settle(id, ok, value, code) resolves or rejects the op's promise.
 fn void settle(uint id, bool ok, JsValue value = { }, String code = "") {
-    g_rt.@scope() {
+    g_runtime.rt.@scope() {
         JsValue[4] args = {
-            g_rt.number(id) ?? { },
-            g_rt.boolean(ok) ?? { },
+            g_runtime.rt.number(id) ?? { },
+            g_runtime.rt.boolean(ok) ?? { },
             value,
-            code.len ? g_rt.string(code) ?? { } : (JsValue) { },
+            code.len ? g_runtime.rt.string(code) ?? { } : (JsValue) { },
         };
-        (void)call_js(g_settle, args[..]);
+        (void)call_js(g_runtime.settle, args[..]);
     };
 }
 
 fn void resolve(uint id, JsValue value = { }) => settle(id, true, value);
 fn void resolve_number(uint id, double n) {
-    g_rt.@scope() {
-        settle(id, true, g_rt.number(n) ?? { });
+    g_runtime.rt.@scope() {
+        settle(id, true, g_runtime.rt.number(n) ?? { });
     };
 }
 fn void resolve_string(uint id, String s) {
-    g_rt.@scope() {
-        settle(id, true, g_rt.string(s) ?? { });
+    g_runtime.rt.@scope() {
+        settle(id, true, g_runtime.rt.string(s) ?? { });
     };
 }
 fn void resolve_bytes(uint id, char[] owned) {
-    g_rt.@scope() {
+    g_runtime.rt.@scope() {
         settle(id, true, bytes_value(owned) ?? { });
     };
 }
 fn void reject(uint id, String code, String msg) {
-    g_rt.@scope() {
-        settle(id, false, g_rt.string(msg) ?? { }, code);
+    g_runtime.rt.@scope() {
+        settle(id, false, g_runtime.rt.string(msg) ?? { }, code);
     };
 }
 fn void reject_errno(
@@ -165,7 +163,7 @@ fn void reject_errno(
 ) => reject(id, errno_code(err), string::tformat("%s: %s", what, errno_text(err)));
 
 fn void JsCtx.throw_coded(self, String code, String msg) {
-    JsArg? make = self.get_prop(self.value(g_bk), "error");
+    JsArg? make = self.get_prop(self.value(g_runtime.bk), "error");
     if (try make) {
         JsArg[2] args = { self.string(code), self.string(msg) };
         if (try e = self.call(make, args[..])) {
@@ -178,53 +176,57 @@ fn void JsCtx.throw_coded(self, String code, String msg) {
 
 // ---- errors ----
 
-int g_exit_code;
 
 // An exception escaped into the loop. Like Deno, that ends the process.
 // Calls `f` like call_js, but a JS throw comes back as the thrown value in
 // `thrown` instead of ending the process. Rejections are left for the
 // caller to flush once it has handled the result.
 fn JsValue? call_catch(JsValue f, JsValue[] args, JsValue* thrown) {
-    g_depth++;
-    defer g_depth--;
+    if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
+    g_runtime.depth++;
+    defer g_runtime.depth--;
     TVal fv;
-    if (!g_rt.load(f, &fv)) return boomkat::STALE_VALUE~;
+    if (!g_runtime.rt.load(f, &fv)) return boomkat::STALE_VALUE~;
     TVal[4] argv;
-    foreach (i, a : args) if (!g_rt.load(a, &argv[i])) argv[i].set_undefined();
+    foreach (i, a : args) if (!g_runtime.rt.load(a, &argv[i])) argv[i].set_undefined();
     TVal this_tv;
     this_tv.set_undefined();
-    Heap* h = g_rt.rt.heap;
+    Heap* h = g_runtime.rt.rt.heap;
     h.has_error = false;
-    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, now_ns());
-    TVal res = h.call_fn((void*)g_rt.rt.vm, fv, &argv, (uint)args.len, this_tv);
-    if (g_time_limit_ns) mem::@atomic_store(g_entered_ns, (ulong)0);
+    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, now_ns());
+    TVal res = h.call_fn((void*)g_runtime.rt.rt.vm, fv, &argv, (uint)args.len, this_tv);
+    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, (ulong)0);
     if (h.uncatchable_throw) {
-        g_rt.clear_interrupt();
-        io::eprintfn("error: script ran past the %d ms time limit", g_time_limit_ns / 1_000_000);
+        g_runtime.rt.clear_interrupt();
+        if (worker_stopping()) {
+            h.has_error = false;
+            worker_stop();
+            return WORKER_STOPPED~;
+        }
+        io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
         h.has_error = false;
         return TIMED_OUT~;
     }
     if (h.has_error) {
         h.has_error = false;
-        Vm* vm = (Vm*)g_rt.rt.vm;
+        Vm* vm = (Vm*)g_runtime.rt.rt.vm;
         vm.has_error = false;
         vm.throw_pending = false;
-        *thrown = g_rt.root(h.error_value)!;
+        *thrown = g_runtime.rt.root(h.error_value)!;
         h.error_value.set_undefined();
         return boomkat::JS_EXCEPTION~;
     }
-    return g_rt.root(res);
+    return g_runtime.rt.root(res);
 }
 
 fn void report_uncaught() {
-    io::eprintfn("error: %s", g_rt.last_error());
-    g_exit_code = 1;
+    io::eprintfn("error: %s", g_runtime.rt.last_error());
+    g_runtime.exit_code = 1;
     exit_now();
 }
 
 // ---- the native table ----
 
-JsValue g_bk;
 
 struct Native {
     String name;
@@ -233,13 +235,13 @@ struct Native {
 }
 
 fn void? install_natives(Native[] natives) {
-    if (g_bk.is_empty()) {
-        g_bk = g_rt.object()!;
-        JsValue global = g_rt.global()!;
-        defer g_rt.release(global);
-        g_rt.set(global, "__bk", g_bk)!;
+    if (g_runtime.bk.is_empty()) {
+        g_runtime.bk = g_runtime.rt.object()!;
+        JsValue global = g_runtime.rt.global()!;
+        defer g_runtime.rt.release(global);
+        g_runtime.rt.set(global, "__bk", g_runtime.bk)!;
     }
-    foreach (n : natives) g_rt.register_method(g_bk, n.name, n.f, null, n.argc)!;
+    foreach (n : natives) g_runtime.rt.register_method(g_runtime.bk, n.name, n.f, null, n.argc)!;
 }
 
 fn uint JsArg.id(self) => (uint)(self.as_number() ?? 0);

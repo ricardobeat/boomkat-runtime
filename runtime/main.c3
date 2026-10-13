@@ -28,35 +28,36 @@ const Builtin[] BUILTINS = {
     { "crypto", $embed("js/crypto.js") },
 };
 
-List{String} g_args;
-long g_time_limit_ms;
-String g_main;
 
 fn void exit_now() {
+    if (g_runtime.worker) {
+        if (g_runtime.exit_code) worker_report_error(g_runtime.rt.last_error());
+        worker_stop();
+        g_runtime.rt.request_interrupt();
+        return;
+    }
     close_sqlite();
     $if $feat(OP_PROFILE):
         boomkat::vm::opprof_dump();
     $endif
-    libc::exit(g_exit_code);
+    libc::exit(g_runtime.exit_code);
 }
 
 // ---- core natives ----
 
-JsValue g_immediate_fire;
-bool g_immediate_armed;
 
 fn void on_immediates(void* user) {
-    g_immediate_armed = false;
+    g_runtime.immediate_armed = false;
     unhold();
-    (void)call_js(g_immediate_fire, { });
+    (void)call_js(g_runtime.immediate_fire, { });
 }
 
 // immediateArm(): run __bk.immediateFire on the next loop turn.
 fn void js_immediate_arm(JsCtx ctx, void* udata) {
-    if (g_immediate_armed) return;
-    g_immediate_armed = true;
+    if (g_runtime.immediate_armed) return;
+    g_runtime.immediate_armed = true;
     hold();
-    uws_loop_defer(g_loop, &on_immediates, null);
+    uws_loop_defer(g_runtime.loop, &on_immediates, null);
 }
 
 extern fn ulong clock_gettime_nsec_np(CInt clock);
@@ -292,17 +293,18 @@ const Native[] CORE_NATIVES = {
 // relative to its importer. A bare name that is not a built-in is an error.
 fn char[]? read_module(String name, void* udata) {
     if (!name.starts_with("/")) return MODULE_NOT_FOUND~;
+    if (g_runtime.worker && !check_path(READ, canonical(name))) return MODULE_NOT_FOUND~;
     return boomkat::read_module_file(name);
 }
 
 faultdef MODULE_NOT_FOUND, USAGE;
 
-fn JsValue? bk_get(String name) => g_rt.get(g_bk, name);
+fn JsValue? bk_get(String name) => g_runtime.rt.get(g_runtime.bk, name);
 
 fn void? boot() {
-    g_loop = uws_loop();
-    g_rt.set_module_reader(&read_module);
-    g_rt.open()!;
+    g_runtime.loop = uws_loop();
+    g_runtime.rt.set_module_reader(&read_module);
+    g_runtime.rt.open()!;
     install_natives(CORE_NATIVES)!;
     install_natives(WEB_NATIVES)!;
     install_natives(HTTP_NATIVES)!;
@@ -314,28 +316,32 @@ fn void? boot() {
     install_natives(IMMEDIATE_NATIVES)!;
     install_natives(TRANSPILE_NATIVES)!;
     install_natives(CRYPTO_NATIVES)!;
-    g_rt.exec(PRELUDE, "<prelude>")!;
-    g_rt.exec(FETCH, "<fetch>")!;
-    foreach (b : BUILTINS) g_rt.define_module(b.name, b.source)!;
+    install_natives(WORKER_NATIVES)!;
+    g_runtime.rt.exec(PRELUDE, "<prelude>")!;
+    g_runtime.rt.exec($embed("js/worker.js"), "<worker>")!;
+    g_runtime.rt.exec(FETCH, "<fetch>")!;
+    foreach (b : BUILTINS) g_runtime.rt.define_module(b.name, b.source)!;
     if (init_sqlite()) {
         install_natives(SQLITE_NATIVES)!;
-        g_rt.define_module("sqlite", $embed("js/sqlite.js"))!;
+        g_runtime.rt.define_module("sqlite", $embed("js/sqlite.js"))!;
     }
-    g_settle = bk_get("settle")!;
-    g_immediate_fire = bk_get("immediateFire")!;
-    g_dispatch = bk_get("dispatch")!;
-    g_handled = bk_get("handled")!;
-    g_failed = bk_get("failed")!;
-    g_pump = bk_get("pump")!;
-    g_drain = bk_get("drain")!;
-    g_aborted = bk_get("aborted")!;
-    g_unhandled = bk_get("unhandled")!;
-    g_describe = bk_get("describe")!;
+    g_runtime.settle = bk_get("settle")!;
+    g_runtime.immediate_fire = bk_get("immediateFire")!;
+    g_runtime.dispatch = bk_get("dispatch")!;
+    g_runtime.handled = bk_get("handled")!;
+    g_runtime.failed = bk_get("failed")!;
+    g_runtime.pump = bk_get("pump")!;
+    g_runtime.drain = bk_get("drain")!;
+    g_runtime.aborted = bk_get("aborted")!;
+    g_runtime.unhandled = bk_get("unhandled")!;
+    g_runtime.describe = bk_get("describe")!;
     init_guard();
     init_timers();
     init_immediates();
     init_res();
     init_http()!;
+    g_runtime.workers.init(mem);
+    g_runtime.worker_event = bk_get("workerEvent")!;
 }
 
 fn void usage() {
@@ -360,18 +366,18 @@ fn void? parse_args(String[] argv) {
             continue;
         }
         if (a.starts_with("--time-limit=")) {
-            g_time_limit_ms = a[13..].to_long() ?? USAGE~!;
+            g_runtime.time_limit_ms = a[13..].to_long() ?? USAGE~!;
             continue;
         }
         if (!parse_perm_flag(a)!) return USAGE~;
     }
     if (i >= argv.len) return USAGE~;
-    g_main = absolute(argv[i]).copy(mem);
-    g_args.init(mem);
-    foreach (a : argv[i + 1..]) g_args.push(a);
+    g_runtime.main = absolute(argv[i]).copy(mem);
+    g_runtime.args.init(mem);
+    foreach (a : argv[i + 1..]) g_runtime.args.push(a);
 
     if (!config.len) {
-        String beside = string::tformat("%s/boomkat.toml", g_main[:g_main.rindex_of_char('/')!!]);
+        String beside = string::tformat("%s/boomkat.toml", g_runtime.main[:g_runtime.main.rindex_of_char('/')!!]);
         if (file::is_file(beside)) config = beside;
     }
     if (config.len) {
@@ -391,31 +397,31 @@ fn int main(String[] argv) {
         return check_main(argv[2]);
     }
     init_perms();
-    g_perms.prompt = libc::isatty(0) != 0 && libc::isatty(2) != 0;
+    g_runtime.perms.prompt = libc::isatty(0) != 0 && libc::isatty(2) != 0;
     if (catch parse_args(argv)) {
         usage();
         return 2;
     }
     if (catch err = boot()) {
-        io::eprintfn("error: bootstrap failed: %s: %s", err, g_rt.last_error());
+        io::eprintfn("error: bootstrap failed: %s: %s", err, g_runtime.rt.last_error());
         return 1;
     }
-    char[]? src = file::load(mem, g_main);
+    char[]? src = file::load(mem, g_runtime.main);
     if (catch err = src) {
-        io::eprintfn("error: cannot read %s: %s", g_main, err);
+        io::eprintfn("error: cannot read %s: %s", g_runtime.main, err);
         return 1;
     }
     apply_sandbox();
-    g_depth++;
-    JsValue? ns = g_rt.eval_module((String)src, g_main);
-    g_depth--;
+    g_runtime.depth++;
+    JsValue? ns = g_runtime.rt.eval_module((String)src, g_runtime.main);
+    g_runtime.depth--;
     if (catch err = ns) {
-        io::eprintfn("error: %s", g_rt.last_error());
+        io::eprintfn("error: %s", g_runtime.rt.last_error());
         return 1;
     }
-    g_rt.release(ns);
+    g_runtime.rt.release(ns);
     flush_rejections();
-    if (g_time_limit_ms) start_watchdog(g_time_limit_ms);
+    if (g_runtime.time_limit_ms) start_watchdog(g_runtime.time_limit_ms);
     uws_loop_run();
-    return g_exit_code;
+    return g_runtime.exit_code;
 }

@@ -34,12 +34,11 @@ struct Permissions {
     bool locked; // an OS sandbox is applied; nothing can be widened
 }
 
-Permissions g_perms;
 
-fn Grant* grant(Perm p) => &g_perms.grants[p.ordinal];
+fn Grant* grant(Perm p) => &g_runtime.perms.grants[p.ordinal];
 
 fn void init_perms() {
-    foreach (&g : g_perms.grants) {
+    foreach (&g : g_runtime.perms.grants) {
         g.allow.init(mem);
         g.deny.init(mem);
         g.location_allow.init(mem);
@@ -113,7 +112,7 @@ fn PermState query(Perm p, String item = "", int port = -1) {
     } else if (g.all && !g.deny.len()) {
         return GRANTED;
     }
-    return g_perms.prompt && !g_perms.locked ? PROMPT : DENIED;
+    return g_runtime.perms.prompt && !g_runtime.perms.locked ? PROMPT : DENIED;
 }
 
 // ---- checking ----
@@ -201,7 +200,7 @@ fn bool check_path_location(Perm p, String path) {
     foreach (entry : g.location_deny) if (path_match(entry, path)) return false;
     if (g.all) return true;
     foreach (entry : g.location_allow) if (path_match(entry, path)) return true;
-    return g_perms.prompt && !g_perms.locked && ask(p, path, -1);
+    return g_runtime.perms.prompt && !g_runtime.perms.locked && ask(p, path, -1);
 }
 
 // ---- revoking ----
@@ -278,8 +277,6 @@ struct DirEntry {
     ulong stamp;
 }
 
-DirEntry[4] g_dirs;
-usz g_dir_next;
 
 fn String canonical_cached(String abs) {
     sz slash = abs.rindex_of_char('/') ?? -1;
@@ -287,7 +284,7 @@ fn String canonical_cached(String abs) {
     String dir  = abs[:slash];
     String leaf = abs[slash + 1..];
     ulong now   = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
-    foreach (&e : g_dirs) {
+    foreach (&e : g_runtime.dirs) {
         if (!e.dir.len || e.dir != dir || now - e.stamp > DIR_TTL_NS) continue;
         String full = e.real == dir ? abs : string::tformat("%s/%s", e.real, leaf);
         libc::Stat st;
@@ -298,7 +295,7 @@ fn String canonical_cached(String abs) {
 }
 
 fn void remember_dir(String dir, String real) {
-    DirEntry* e = &g_dirs[g_dir_next++ % g_dirs.len];
+    DirEntry* e = &g_runtime.dirs[g_runtime.dir_next++ % g_runtime.dirs.len];
     if (e.dir.len) {
         free(e.dir.ptr);
         free(e.real.ptr);
@@ -338,15 +335,15 @@ fn String canonical_slow(String abs) {
 // Returns false for an argument that is not a permission flag.
 fn bool? parse_perm_flag(String arg) {
     if (arg == "-A" || arg == "--allow-all") {
-        foreach (&g : g_perms.grants) g.all = true;
+        foreach (&g : g_runtime.perms.grants) g.all = true;
         return true;
     }
     if (arg == "--no-prompt") {
-        g_perms.prompt = false;
+        g_runtime.perms.prompt = false;
         return true;
     }
     if (arg == "--prompt") {
-        g_perms.prompt = true;
+        g_runtime.perms.prompt = true;
         return true;
     }
     bool deny = arg.starts_with("--deny-");
@@ -404,7 +401,7 @@ fn void? load_config(String file_path) {
     foreach (kv : t.entries) {
         if (kv.table != "permissions") continue;
         if (kv.key == "prompt") {
-            g_perms.prompt = kv.value.flag;
+            g_runtime.perms.prompt = kv.value.flag;
             continue;
         }
         Perm? p = perm_named(kv.key);

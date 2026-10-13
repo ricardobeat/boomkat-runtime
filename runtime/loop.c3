@@ -1,4 +1,4 @@
-// The event loop is uSockets, owned by uWS on the main thread. Blocking work
+// Each runtime's event loop is uSockets, owned by uWS on its execution thread. Blocking work
 // (files, DNS, waiting on children) runs on a small thread pool and posts
 // its completion back through uws_loop_defer.
 module bkr;
@@ -20,7 +20,6 @@ extern fn void us_timer_set(UsTimer* t, UsTimerCb cb, CInt ms, CInt repeat_ms);
 extern fn void uws_timer_set_ns(UsTimer* t, UsTimerCb cb, ulong ns);
 extern fn void us_timer_close(UsTimer* t);
 
-void* g_loop;
 
 // ---- timers ----
 
@@ -37,7 +36,7 @@ fn void timer_fired(UsTimer* t) {
 
 // One-shot. The handle is valid until the callback starts or it is cancelled.
 fn UsTimer* timer_start(long ms, Callback cb, void* user) {
-    UsTimer* t = us_create_timer(g_loop, 0, TimerExt::size);
+    UsTimer* t = us_create_timer(g_runtime.loop, 0, TimerExt::size);
     *(TimerExt*)us_timer_ext(t) = { cb, user };
     // uSockets reads 0 as disarmed.
     us_timer_set(t, &timer_fired, (CInt)max(1, min(ms, (long)int::max)), 0);
@@ -46,7 +45,7 @@ fn UsTimer* timer_start(long ms, Callback cb, void* user) {
 
 // Precise one-shot for JS deadlines, including deadlines already overdue.
 fn UsTimer* timer_start_ns(ulong ns, Callback cb, void* user) {
-    UsTimer* t = us_create_timer(g_loop, 0, TimerExt::size);
+    UsTimer* t = us_create_timer(g_runtime.loop, 0, TimerExt::size);
     *(TimerExt*)us_timer_ext(t) = { cb, user };
     uws_timer_set_ns(t, &timer_fired, max(ns, 1ul));
     return t;
@@ -59,22 +58,20 @@ fn void timer_cancel(UsTimer* t) => us_timer_close(t);
 // uSockets returns from run once nothing but fallthrough polls remain, and
 // the cross-thread wakeup is one. A pending pool task holds this timer so the
 // loop waits for it.
-int g_holds;
-UsTimer* g_hold_timer;
 
 fn void hold_tick(UsTimer* t) {
 }
 
 fn void hold() {
-    if (g_holds++) return;
-    g_hold_timer = us_create_timer(g_loop, 0, 0);
-    us_timer_set(g_hold_timer, &hold_tick, 1 << 30, 1 << 30);
+    if (g_runtime.holds++) return;
+    g_runtime.hold_timer = us_create_timer(g_runtime.loop, 0, 0);
+    us_timer_set(g_runtime.hold_timer, &hold_tick, 1 << 30, 1 << 30);
 }
 
 fn void unhold() {
-    if (--g_holds) return;
-    us_timer_close(g_hold_timer);
-    g_hold_timer = null;
+    if (--g_runtime.holds) return;
+    us_timer_close(g_runtime.hold_timer);
+    g_runtime.hold_timer = null;
 }
 
 // ---- thread pool ----
@@ -87,6 +84,7 @@ struct Task {
     TaskFn work;
     TaskFn done;
     Task* next;
+    void* return_loop;
 }
 
 const POOL_THREADS = 16;
@@ -96,11 +94,11 @@ struct Pool {
     ConditionVariable ready;
     Task* head;
     Task* tail;
-    bool started;
     Thread[POOL_THREADS] threads;
 }
 
 Pool g_pool;
+OnceFlag g_pool_once;
 
 fn void task_done(void* user) {
     Task* t = user;
@@ -123,21 +121,23 @@ fn int pool_thread(void* arg) {
             @pool() {
                 t.work(t);
             };
-            uws_loop_defer(g_loop, &task_done, t);
+            uws_loop_defer(t.return_loop, &task_done, t);
         }
     };
 }
 
-fn void submit(Task* t) {
-    if (!g_pool.started) {
-        g_pool.lock.init()!!;
-        g_pool.ready.init()!!;
-        foreach (&th : g_pool.threads) {
-            th.create(&pool_thread, null)!!;
-            th.detach();
-        }
-        g_pool.started = true;
+fn void init_pool() {
+    g_pool.lock.init()!!;
+    g_pool.ready.init()!!;
+    foreach (&th : g_pool.threads) {
+        th.create(&pool_thread, null)!!;
+        th.detach();
     }
+}
+
+fn void submit(Task* t) {
+    g_pool_once.call(&init_pool);
+    t.return_loop = g_runtime.loop;
     hold();
     t.next = null;
     g_pool.lock.@in_lock() {

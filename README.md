@@ -70,6 +70,31 @@ The [Taskboard sample](examples/taskboard/README.md) serves a Preact TSX UI this
 way, with accounts, shared teams, boards and SQLite BLOB image attachments.
 It includes full, pinned Preact sources and browser modules; no npm or build step.
 
+### Module workers
+
+`new Worker("./worker.ts", { type: "module", name: "optional" })` creates a
+thread with its own VM, heap and event loop. Paths resolve against the spawning
+entry module; workers inherit its permissions without interactive prompts.
+JavaScript and TypeScript modules, including top-level await, are supported.
+
+Use `postMessage(value, [arrayBuffer])`, `onmessage`/`addEventListener`,
+`onerror`, and `terminate()` on the parent. Workers expose `self`, `name`,
+`postMessage`, `close()` and the same native modules as the parent. A worker's
+`close` event signals that its thread and resources have finished shutting down.
+Termination interrupts JavaScript and waits for in-flight native jobs to return.
+
+Messages clone primitives, ordinary records, arrays, Maps, Sets, Dates, RegExps,
+Errors, ArrayBuffers and typed views, preserving cycles and shared references
+within each message. ArrayBuffer transfers copy bytes and detach the sender;
+they are not zero-copy. SharedArrayBuffer and native handles cannot be cloned.
+Limits are 64 workers per process, 16 MiB per message, 64 MiB queued per direction,
+and 32,768 graph objects/entries. `structuredClone` uses the same codec.
+
+```sh
+./out/bkr --allow-read=examples/workers examples/workers/main.ts
+python3 tests/run_workers.py
+```
+
 ### Native crypto
 
 `randomBytes(size)` returns a system-random Uint8Array (0–65536 bytes).

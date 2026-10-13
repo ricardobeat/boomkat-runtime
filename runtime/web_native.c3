@@ -29,8 +29,6 @@ struct NativeWebClass {
     JsValue[4] keep;
 }
 
-NativeWebClass g_native_url;
-NativeWebClass g_native_response;
 
 // Raw reads are safe only for ordinary data properties. Accessors and proxies
 // must run through JS so their effects occur in the same order.
@@ -72,7 +70,7 @@ fn void native_url_construct(BuiltinContext* raw, void* user) {
         cls.k_string,
         h,
         &string_ctor
-    ) || string_ctor.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_bk)
+    ) || string_ctor.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_runtime.bk)
         .tv.get_heapptr(), cls.k_url_fast, h, &url_fast) || url_fast.get_raw_bits()
             != cls.url_fast.get_raw_bits() || !web_can_assign(
             obj,
@@ -206,7 +204,7 @@ fn void native_response_construct(BuiltinContext* raw, void* user) {
             cls.k_u8,
             h,
             &u8
-        ) || u8.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_bk)
+        ) || u8.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_runtime.bk)
             .tv.get_heapptr(), cls.k_file, h, &file) || file.get_raw_bits()
                 != cls.file_ctor.get_raw_bits()) return web_initialize(
                 ctx,
@@ -275,7 +273,7 @@ fn void js_native_class(JsCtx ctx, void* user) {
     String name = (String)ctx.arg(2).bytes();
     if (name != "URL" && name != "Response") return ctx.throw_error(JsErrorKind.TYPE, "Invalid native class");
     bool is_url         = name == "URL";
-    NativeWebClass* cls = is_url ? &g_native_url : &g_native_response;
+    NativeWebClass* cls = is_url ? &g_runtime.native_url : &g_runtime.native_response;
     HObject* original   = ctx.arg(0).tv.get_heapptr();
     HObject* initialize = ctx.arg(1).tv.get_heapptr();
     if (cls.prototype || original.flags.exotic_proxyobj || !original.is_callable() || initialize.flags.exotic_proxyobj
@@ -325,7 +323,7 @@ fn void js_native_class(JsCtx ctx, void* user) {
     if (!cls.k_raw || !cls.k_flags || !cls.k_string || !cls.k_url_fast || !cls.k_slice) {
         return ctx.throw_error(JsErrorKind.ERROR, "Native class allocation failed");
     }
-    (void)web_own_data(ctx.value(g_bk).tv.get_heapptr(), cls.k_url_fast, h, &cls.url_fast);
+    (void)web_own_data(ctx.value(g_runtime.bk).tv.get_heapptr(), cls.k_url_fast, h, &cls.url_fast);
     (void)web_own_data(h.string_proto, cls.k_slice, h, &cls.slice);
     cls.keep[2] = ctx.persist((JsArg) { .tv = cls.url_fast }) ?? { };
     cls.keep[3] = ctx.persist((JsArg) { .tv = cls.slice }) ?? { };
@@ -342,7 +340,7 @@ fn void js_native_class(JsCtx ctx, void* user) {
         return ctx.throw_error(JsErrorKind.TYPE, "Invalid URL getter");
     }
     TVal pair = cls.prototype.prop_values()[slot].get();
-    cls.getter = g_rt.root(hobject::hobject_access_getter(pair)) ?? { };
+    cls.getter = g_runtime.rt.root(hobject::hobject_access_getter(pair)) ?? { };
     if (cls.getter.is_empty()) return ctx.throw_error(JsErrorKind.ERROR, "Native getter allocation failed");
     HObject*? getter = web_host_function(h, "get pathname", &native_url_pathname, cls, 0, false);
     if (catch getter) return ctx.throw_error(JsErrorKind.ERROR, "Native getter allocation failed");
@@ -366,7 +364,6 @@ struct NativeHeadersBlob {
     TVal blob_method;
     JsValue[9] roots;
 }
-NativeHeadersBlob g_native_headers_blob;
 
 // A getter or proxy may run guest code; let the JS implementation perform
 // those lookups in order. A plain data method can be checked without effects.
@@ -382,7 +379,7 @@ fn bool web_method_is(HObject* obj, HString* key, TVal expected, Heap* h) {
 }
 
 fn bool web_headers_blob(Heap* h, HObject* obj, builtins::StrBuf* output, bool ascii_only = false) {
-    NativeHeadersBlob* cls = &g_native_headers_blob;
+    NativeHeadersBlob* cls = &g_runtime.native_headers_blob;
     TVal map_value, cookies;
     bool fast              = obj && obj.prototype == cls.prototype && web_method_is(
         obj,
@@ -451,7 +448,7 @@ fn void native_headers_blob(BuiltinContext* raw, void* user) {
 }
 
 fn void js_native_headers_blob(JsCtx ctx, void* user) {
-    NativeHeadersBlob* cls = &g_native_headers_blob;
+    NativeHeadersBlob* cls = &g_runtime.native_headers_blob;
     if (cls.prototype || !ctx.arg(0).tv.is_object()) return ctx.throw_error(TYPE, "Invalid Headers prototype");
     for (uint i = 0; i < 4; i++) cls.roots[i] = ctx.persist(ctx.arg(i))!!;
     cls.prototype = ctx.arg(0).tv.get_heapptr();
@@ -484,7 +481,6 @@ struct NativeHeadersParse {
     HString*[8] keys;
     JsValue[17] roots;
 }
-NativeHeadersParse g_native_headers_parse;
 
 fn bool web_header_ascii_space(char c) => c == ' ' || (c >= 9 && c <= 13);
 
@@ -492,7 +488,7 @@ fn void native_headers_from_blob(BuiltinContext* raw, void* user) {
     @pool() {
         JsCtx ctx                  = { .ctx = raw };
         NativeHeadersParse* cls    = user;
-        NativeHeadersBlob* headers = &g_native_headers_blob;
+        NativeHeadersBlob* headers = &g_runtime.native_headers_blob;
         TVal input                 = ctx.arg(0).tv;
         TVal map_ctor, string_ctor;
         bool fast                  = input.is_string() && ((HString*)input.get_heapptr()).is_ascii() && web_own_data(
@@ -629,7 +625,7 @@ fn void native_headers_from_blob(BuiltinContext* raw, void* user) {
 }
 
 fn void js_native_headers_from_blob(JsCtx ctx, void* user) {
-    NativeHeadersParse* cls = &g_native_headers_parse;
+    NativeHeadersParse* cls = &g_runtime.native_headers_parse;
     if (!cls.roots[0].is_empty()) return ctx.throw_error(TYPE, "Headers parser already installed");
     for (uint i = 0; i < 9; i++) {
         cls.dependencies[i] = ctx.arg(i).tv;
@@ -659,7 +655,6 @@ struct NativeHeadersRecord
 	HString* iterator_key;
 	JsValue[11] roots;
 }
-NativeHeadersRecord g_native_headers_record;
 
 fn bool web_data_or_missing(HObject* obj, HString* key, Heap* h, TVal* value)
 {
@@ -683,8 +678,8 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 		JsCtx ctx = { .ctx = raw };
 		ctx.ret_bool(false);
 		NativeHeadersRecord* cls   = user;
-		NativeHeadersBlob* headers = &g_native_headers_blob;
-		NativeHeadersParse* parse  = &g_native_headers_parse;
+		NativeHeadersBlob* headers = &g_runtime.native_headers_blob;
+		NativeHeadersParse* parse  = &g_runtime.native_headers_parse;
 		TVal receiver              = ctx.arg(0).tv;
 		TVal input                 = ctx.arg(1).tv;
 		if (!receiver.is_object() || !input.is_object()) return;
@@ -832,7 +827,7 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 
 fn void js_native_headers_record(JsCtx ctx, void* user)
 {
-	NativeHeadersRecord* cls = &g_native_headers_record;
+	NativeHeadersRecord* cls = &g_runtime.native_headers_record;
 	if (!cls.roots[0].is_empty()) return ctx.throw_error(TYPE, "Headers record initializer already installed");
 	for (uint i = 0; i < 7; i++)
 	{

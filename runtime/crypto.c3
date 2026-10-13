@@ -10,7 +10,6 @@ extern fn CInt crypto_memcmp(void* a, void* b, usz len) @cname("CRYPTO_memcmp");
 
 const String PASSWORD_PREFIX = "$argon2id$v=19$m=19456,t=2,p=1$";
 const uint MAX_PASSWORD_JOBS = 2;
-uint g_password_jobs;
 
 struct PasswordTask {
     inline Task task;
@@ -85,7 +84,7 @@ fn void password_work(Task* task) {
 
 fn void password_done(Task* task) {
     PasswordTask* p = (PasswordTask*)task;
-    g_password_jobs--;
+    g_runtime.password_jobs--;
     defer {
         free(p.password.ptr);
         free(p.encoded.ptr);
@@ -93,8 +92,8 @@ fn void password_done(Task* task) {
         free(p);
     }
     if (p.verify) {
-        g_rt.@scope() {
-            resolve(p.op, g_rt.boolean(p.valid) ?? { });
+        g_runtime.rt.@scope() {
+            resolve(p.op, g_runtime.rt.boolean(p.valid) ?? { });
         };
     } else {
         resolve_string(p.op, p.result);
@@ -122,13 +121,13 @@ fn void js_crypto_password(JsCtx ctx, void* udata) {
             }
             encoded = (String)ctx.arg(2).bytes();
             if (!password_format(encoded)) {
-                g_rt.@scope() {
-                    resolve(op, g_rt.boolean(false) ?? { });
+                g_runtime.rt.@scope() {
+                    resolve(op, g_runtime.rt.boolean(false) ?? { });
                 };
                 return;
             }
         }
-        if (g_password_jobs >= MAX_PASSWORD_JOBS) {
+        if (g_runtime.password_jobs >= MAX_PASSWORD_JOBS) {
             reject(op, "BUSY", "password hashing workers are busy");
             return;
         }
@@ -138,7 +137,7 @@ fn void js_crypto_password(JsCtx ctx, void* udata) {
         p.password = copy_bytes(password);
         p.encoded = (String)copy_bytes(encoded);
         p.verify = verify;
-        g_password_jobs++;
+        g_runtime.password_jobs++;
         submit(p);
     };
 }
