@@ -7,8 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / 'examples/taskboard'
 BKR = os.environ.get('BKR_BIN', str(ROOT / 'out/bkr'))
 BUN = os.environ.get('BUN_BIN') or shutil.which('bun')
-marker = 'const root = dirname(main);'
-assert (APP / 'server.ts').read_text().split(marker, 1)[1] == (APP / 'server.bun.ts').read_text().split(marker, 1)[1], 'Application implementations diverged'
+# Both entry points load the exact same application; only adapters differ.
+for entry, adapter in [('server.ts', './platform.ts'), ('server.bun.ts', './bun/platform.ts')]:
+    expected = f'import * as platform from "{adapter}";\nimport {{ startTaskboard }} from "./server/application.ts";\n\nawait startTaskboard(platform);\n'
+    assert (APP / entry).read_text() == expected, 'Application implementations diverged'
 
 def run(command):
     result = subprocess.run(command, capture_output=True, text=True, timeout=30)

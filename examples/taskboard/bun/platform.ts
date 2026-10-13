@@ -86,7 +86,7 @@ export function transpile(
 ) {
 	// The benchmark can serve BKR's emitted artifact, making /app.js byte-identical.
 	// Normal Bun operation uses its own transpiler and needs no BKR binary.
-	if (process.env.TASKBOARD_BENCH_ASSET)
+	if (options.filename === "app.tsx" && process.env.TASKBOARD_BENCH_ASSET)
 		return readFileSync(process.env.TASKBOARD_BENCH_ASSET, "utf8");
 	return new Bun.Transpiler({
 		loader: "tsx",

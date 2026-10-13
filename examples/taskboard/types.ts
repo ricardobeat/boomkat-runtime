@@ -44,3 +44,5 @@ export interface Workspace {
 	teams: Team[];
 	boards: Board[];
 }
+
+export type Session = { user: User; csrf: string };

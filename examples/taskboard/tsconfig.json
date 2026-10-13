@@ -15,6 +15,6 @@
 			"preact/jsx-runtime": ["./vendor/preact/jsx-runtime/src/index.d.ts"]
 		}
 	},
-	"include": ["*.ts", "*.tsx"],
+	"include": ["**/*.ts", "**/*.tsx"],
 	"exclude": ["vendor", "data", "server.bun.ts", "bun"]
 }

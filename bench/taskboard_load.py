@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / 'examples/taskboard'
 BIN = Path(os.environ.get('BKR_BIN', ROOT / 'out/bkr')).resolve()
 WORKLOADS = ['asset', 'board', 'image', 'update', 'mixed', 'upload_delete']
-LABELS = {'asset':'JS asset', 'board':'Board JSON (200 cards)', 'image':'Image read (128 KiB)',
+LABELS = {'asset':'JS entry module', 'board':'Board JSON (200 cards)', 'image':'Image read (128 KiB)',
           'update':'Card update (250 B)', 'mixed':'Mixed 70% board / 20% image / 10% update',
           'upload_delete':'Image upload + delete (128 KiB)'}
 PASSWORD = 'disposable taskboard load test password'
@@ -236,7 +236,7 @@ def main():
         if opts.byte_json:
             app=directory/'app'
             shutil.copytree(APP,app,ignore=shutil.ignore_patterns('data'))
-            server=app/'server.ts'
+            server=app/'lib/http.ts'
             text=server.read_text()
             assert 'new Response(JSON.stringify(value)' in text
             server.write_text(text.replace('new Response(JSON.stringify(value)','new Response(enc.encode(JSON.stringify(value))',1))

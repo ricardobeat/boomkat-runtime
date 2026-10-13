@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the real TS server, membership checks, sessions and SQLite BLOBs."""
-import base64,hashlib,json,os,socket,sqlite3,subprocess,tempfile,time,urllib.request,urllib.error
+import base64,hashlib,json,os,socket,sqlite3,subprocess,tempfile,time,urllib.request,urllib.error,urllib.parse
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(os.environ.get('BKR_BIN',ROOT/'out/bkr'))
@@ -52,6 +52,24 @@ def main():
    a.call('/app.js','POST',expected=404)
    assert b'interface User' not in js and b'<App/>' not in js and b'import type' not in js
    emitted=Path(directory)/'app.mjs';emitted.write_bytes(js);subprocess.run(['node','--check',str(emitted)],check=True,capture_output=True)
+   # Check the browser's whole module graph, not just its small entry point.
+   import re
+   pending=['/app.js']; seen=set()
+   while pending:
+    route=pending.pop()
+    if route in seen: continue
+    seen.add(route)
+    source,module_headers=a.call(route,raw=True)
+    assert module_headers['Content-Type'].startswith('text/javascript'),route
+    emitted.write_bytes(source);subprocess.run(['node','--check',str(emitted)],check=True,capture_output=True)
+    for specifier in re.findall(r'from\s+[\'"]([^\'"]+)[\'"]',source.decode()):
+     if specifier.startswith('.'):
+      target=urllib.parse.urlparse(urllib.parse.urljoin(base+route,specifier)).path
+      assert target.endswith('.js'),(route,target)
+      pending.append(target)
+   assert {'/client/lib/api.js','/client/components/card-editor.js','/client/components/common.js'} <= seen,seen
+   for private in ['/server/application.ts','/lib/sqlite.ts','/client/components/app.tsx','/schema.sql','/data/taskboard.sqlite']:
+    a.call(private,expected=404)
    for route in ['/style.css','/vendor/preact.mjs','/vendor/hooks.mjs','/vendor/jsx-runtime.mjs']:a.call(route,raw=True)
    a.call('/api/me',expected=401)
    a.call('/api/register','POST',{'name':'Alice','email':'alice@example.com','password':'short'},expected=400)

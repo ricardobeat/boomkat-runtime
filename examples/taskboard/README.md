@@ -26,7 +26,8 @@ Changes refresh on window focus and every 15 seconds while you are browsing.
 
 No npm, Node, bundler, or TypeScript compiler is needed to run the app.
 Boomkat executes `server.ts` directly, then calls the built-in `typescript`
-module to turn `app.tsx` into browser JavaScript once at startup. Preact,
+module to compile `app.tsx` and the client modules into browser JavaScript once
+at startup. Preact,
 hooks, and its JSX runtime are vendored locally with their full upstream
 sources and license. If needed, reproduce the download with:
 
@@ -61,7 +62,8 @@ Run the same app on Bun without installing packages:
 bun examples/taskboard/server.bun.ts 8081 /tmp/taskboard-bun
 ```
 
-The application body is identical to `server.ts`; `bun/platform.ts` adapts
+Both entry points call the same `server/application.ts` and domain/HTTP modules.
+`platform.ts` provides Boomkat's native modules; `bun/platform.ts` adapts
 the runtime imports to Bun's native HTTP server, system SQLite, filesystem,
 crypto and TypeScript transpiler. It uses the same SQL, prepared statements,
 authorization, request limits and WAL/FULL durability. The same vendored
@@ -93,11 +95,27 @@ measurement per case, and records latency, errors, CPU and peak RSS.
 
 ## Implementation
 
-- `server.ts`: JSON API, access checks, prepared statements, native static
-  routes, and direct TSX-to-JS transpilation.
-- `app.tsx`: Preact components and hooks, responsive board and card editor.
+- `server.ts` / `server.bun.ts`: small entry points selecting a runtime adapter.
+- `platform.ts` / `bun/platform.ts`: runtime-specific HTTP, SQLite, filesystem,
+  crypto, and transpiler implementations. Shared code uses `server/platform.ts`.
+- `server/application.ts`: configuration, schema loading, and application startup.
+- `server/domain/`: account/session, team, board, list, card, and image operations,
+  plus membership checks. Domain methods operate on values and return data;
+  they do not construct HTTP responses.
+- `server/http/`: routing, cookies/CSRF, request parsing, response handling,
+  and static assets. Browser sources are served from an explicit allowlist.
+- `lib/`: reusable errors, HTTP/JSON helpers, validation, prepared statement
+  caching, auth rate limits, and image signature detection.
+- `app.tsx`: browser entry point. `client/components/` contains the app shell,
+  account form, team members, card editor, columns, and shared UI components.
+- `client/lib/`: browser API client, CSRF state, binary uploads, and errors.
 - `schema.sql`: foreign keys, indexes, memberships, sessions, and BLOB storage.
 - `types.ts`: shared UI data types.
+
+Browser components import their served `.js` routes. Each TS/TSX source is
+compiled once at startup; there is no bundling or request-time compilation.
+The static route allowlist exposes browser modules without exposing server
+sources or database files.
 
 Passwords use C3 stdlib Argon2id, with a random 16-byte salt and a 32-byte
 hash (`m=19456 KiB, t=2, p=1`), matching an
@@ -120,6 +138,9 @@ maps. Native SQLite operations are synchronous.
 
 ```sh
 python3 tests/run_taskboard.py
+TASKBOARD_RUNTIME=bun python3 tests/run_taskboard.py
+python3 tests/run_taskboard_parity.py
+python3 tests/run_modules.py
 python3 tests/run_transpile.py
 python3 tests/run_crypto.py
 ```
