@@ -47,6 +47,13 @@ for workers, mode in [(1, "forced"), (2, "forced"), (4, "forced"), (4, "graceful
             assert set(results) == expected, (workers, results)
             counts = {identity: results.count(identity) for identity in expected}
             assert max(counts.values()) - min(counts.values()) <= 1, counts
+            def static_request(i):
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/static", timeout=3) as response:
+                    assert response.status == 201 and response.read() == b"static"
+                    return response.headers['x-static']
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                static_results = list(pool.map(static_request, range(64)))
+            assert set(static_results) == expected
             if mode == "graceful":
                 keep_alive = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
                 keep_alive.request("GET", "/")

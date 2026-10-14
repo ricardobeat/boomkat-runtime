@@ -5,6 +5,7 @@ let count: number = 0;
 const server = serve({
 	hostname: "127.0.0.1",
 	port: Number(args[0]),
+	routes: { "/static": new Response("static", { status: 201, headers: { "x-static": identity } }) },
 	fetch: async (request) => {
 		if (new URL(request.url).pathname === "/slow") {
 			await new Promise((resolve) => setTimeout(resolve, 450));

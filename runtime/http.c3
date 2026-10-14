@@ -48,6 +48,8 @@ extern fn CInt uws_res_write(UwsRes* res, char* data, sz len);
 extern fn void uws_res_end(UwsRes* res, char* body, sz len);
 extern fn void uws_res_close(UwsRes* res);
 extern fn void uws_res_end_empty(UwsRes* res);
+extern fn void uws_res_end_static(UwsRes* res, char* status, sz status_len,
+    char* headers, sz headers_len, char* body, sz body_len, bool empty);
 extern fn void uws_res_cork(UwsRes* res, Callback cb, void* user);
 extern fn void uws_loop_on_pre(Callback cb, void* user);
 
@@ -83,6 +85,8 @@ struct Static {
     String status_text;
     String blob;
     char[] body;
+    String status_line;
+    String headers;
 }
 
 // uWS owns the route tree; its callback selects a rooted handler directly.
@@ -624,6 +628,37 @@ fn void write_head(UwsRes* res, int status, String status_text, String blob) {
     }
 }
 
+// Serialize only immutable application headers; uWS owns Date and body framing.
+fn void prepare_static(Static* response) {
+    @pool() {
+        if (response.status != 200) {
+            response.status_line = string::tformat("%d %s", response.status, response.status_text).copy(mem);
+        }
+        DString headers = dstring::temp();
+        String rest = response.blob;
+        while (rest.len) {
+            sz nl = rest.index_of_char('\n') ?? rest.len;
+            String key = rest[:nl];
+            rest = nl < rest.len ? rest[nl + 1..] : "";
+            sz nl2 = rest.index_of_char('\n') ?? rest.len;
+            String val = rest[:nl2];
+            rest = nl2 < rest.len ? rest[nl2 + 1..] : "";
+            if (key == "content-length" || key == "transfer-encoding") continue;
+            headers.append(key);
+            headers.append(": ");
+            headers.append(val);
+            headers.append("\r\n");
+        }
+        response.headers = headers.str_view().copy(mem);
+    };
+}
+
+fn void end_static(UwsRes* res, Static* response, bool head) {
+    uws_res_end_static(res, response.status_line.ptr, response.status_line.len,
+        response.headers.ptr, response.headers.len, response.body.ptr, response.body.len,
+        head || response.status == 204 || response.status == 304);
+}
+
 fn void write_reply(void* user) {
     Reply* r    = user;
     UwsRes* res = r.c.res;
@@ -1008,12 +1043,7 @@ fn void on_route(void* user, UwsReq* req, UwsRes* res) {
         Static* response = &route.response;
         char* method;
         sz length        = uws_req_method(req, &method);
-        write_head(res, response.status, response.status_text, response.blob);
-        if ((String)method[:length] == "HEAD" || response.status == 204 || response.status == 304) {
-            uws_res_end_empty(res);
-        } else {
-            uws_res_end(res, response.body.ptr, response.body.len);
-        }
+        end_static(res, response, (String)method[:length] == "HEAD");
         return;
     }
     request_arrive(route.server, route, req, res);
@@ -1083,12 +1113,7 @@ fn bool serve_static(Server* s, String method, String path, UwsRes* res) {
     if (!head && method != "GET") return false;
     Static? st = s.statics.get(path);
     if (catch st) return false;
-    write_head(res, st.status, st.status_text, st.blob);
-    if (head || st.status == 204 || st.status == 304) {
-        uws_res_end_empty(res);
-    } else {
-        uws_res_end(res, st.body.ptr, st.body.len);
-    }
+    end_static(res, &st, head);
     return true;
 }
 
@@ -1100,12 +1125,10 @@ fn void js_static_route(JsCtx ctx, void* udata) {
     foreach (s : g_runtime.servers) {
         if (s.index != index) continue;
         String path = ((String)ctx.arg(1).bytes()).copy(mem);
-        s.statics.set(
-            path,
-            {
-                ctx.arg(2)
-            .as_int(200), ((String)ctx.arg(3)
-                .bytes()).copy(mem), ((String)ctx.arg(4).bytes()).copy(mem), copy_bytes(ctx.arg(5).bytes()), });
+        Static response = {ctx.arg(2).as_int(200), ((String)ctx.arg(3).bytes()).copy(mem),
+            ((String)ctx.arg(4).bytes()).copy(mem), copy_bytes(ctx.arg(5).bytes()), {}, {}};
+        prepare_static(&response);
+        s.statics.set(path, response);
     }
 }
 
@@ -1156,7 +1179,8 @@ fn void js_http_static_route(JsCtx ctx, void* udata) {
             route.fixed = true;
             route.response = { ctx.arg(3)
                 .as_int(200), ((String)ctx.arg(4)
-                    .bytes()).copy(mem), ((String)ctx.arg(5).bytes()).copy(mem), copy_bytes(ctx.arg(6).bytes()) };
+                    .bytes()).copy(mem), ((String)ctx.arg(5).bytes()).copy(mem), copy_bytes(ctx.arg(6).bytes()), {}, {} };
+            prepare_static(&route.response);
             server.routes.push(route);
             String method = ctx.arg(1).as_string() ?? "*";
             String path   = ctx.arg(2).as_string() ?? "";

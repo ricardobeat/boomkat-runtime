@@ -15,6 +15,29 @@ OUT=vendor/libuws_shim.a
 
 mkdir -p "$OBJ"
 
+# Static responses serialize their immutable headers once. This writes only
+# that block; uWS still owns status, Date, framing and socket lifecycle.
+python3 - "$UWS/src/HttpResponse.h" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+s = p.read_text()
+marker = '    /* Write an HTTP header with string value */'
+addition = '''    /* A serialized header block from runtime-owned static responses. */
+    HttpResponse *writeHeaders(std::string_view headers) {
+        writeStatus(HTTP_200_OK);
+        Super::write(headers.data(), (int) headers.length());
+        return this;
+    }
+
+'''
+if addition not in s:
+    if marker not in s:
+        raise SystemExit('unrecognized uWebSockets header writer')
+    s = s.replace(marker, addition + marker, 1)
+p.write_text(s)
+PY
+
 # A clean FIN can accompany unread data. An EV_EOF with a socket error in
 # fflags is a reset: discard its buffered requests before entering handlers.
 python3 - "$UWS/uSockets/src/eventing/epoll_kqueue.c" <<'PY'

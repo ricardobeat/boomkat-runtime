@@ -2,6 +2,7 @@
 """Native method/path routing, static responses, params and async lifetimes."""
 import concurrent.futures
 import json
+import http.client
 import os
 from pathlib import Path
 import socket
@@ -16,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='bkr-http-routes-') as directory:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     with open(Path(directory) / 'server.log', 'w+') as log:
-        proc = subprocess.Popen([str(BIN), '--no-prompt', f'--allow-net=127.0.0.1:{port}', f'--allow-read={ROOT}/tests',
+        proc = subprocess.Popen([str(BIN), '--no-prompt', '--http-workers='+os.environ.get('HTTP_WORKERS','1'), f'--allow-net=127.0.0.1:{port}', f'--allow-read={ROOT}/tests',
             str(ROOT / 'tests/http-routes.js'), str(port)], stdout=log, stderr=log)
         try:
             for _ in range(100):
@@ -52,6 +53,26 @@ with tempfile.TemporaryDirectory(prefix='bkr-http-routes-') as directory:
             assert call('/method','HEAD') == b''
             for _ in range(3): assert call('/cached',status=201) == b'cached'
             assert call('/cached','HEAD',status=201) == b''
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            for path, status, payload in [('/static-headers',201,b'static'), ('/legacy-static',200,b'legacy'),
+                                          ('/static-empty',204,b''), ('/static-unmodified',304,b'')]:
+                for method in ['GET', 'HEAD', 'GET']:
+                    connection.request(method,path)
+                    response = connection.getresponse()
+                    assert response.status == status
+                    assert response.read() == (b'' if method == 'HEAD' else payload)
+                    assert response.getheader('x-static') == 'yes'
+                    assert response.headers.get_all('set-cookie') == ['a=1','b=2']
+                    assert response.getheader('transfer-encoding') is None
+                    assert response.getheader('content-length') != '999'
+                    if status == 201: assert response.reason == 'Custom'
+            connection.request('GET','/static-large')
+            response = connection.getresponse()
+            assert response.getheader('x-large') == 'y'*32768
+            assert response.read() == b'x'*(2*1024*1024)
+            connection.request('GET','/cached')
+            assert connection.getresponse().read() == b'cached'
+            connection.close()
             assert call('/bytes','POST',b'') == bytes([0,1,255])
             for kind in ['normal', 'iterator', 'header-method', 'response-method', 'cookies', 'instance-guard']:
                 with urllib.request.urlopen(f'http://127.0.0.1:{port}/headers/{kind}') as response:

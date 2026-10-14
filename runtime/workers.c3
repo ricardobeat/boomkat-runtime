@@ -718,6 +718,8 @@ fn void stop_worker_resources() {
 }
 
 fn void worker_free_static(Static* response) {
+    if (response.headers.len) free(response.headers.ptr);
+    if (response.status_line.len) free(response.status_line.ptr);
     if (response.status_text.len) free(response.status_text.ptr);
     if (response.blob.len) free(response.blob.ptr);
     if (response.body.len) free(response.body.ptr);

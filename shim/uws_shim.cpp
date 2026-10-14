@@ -294,6 +294,16 @@ void uws_res_end_empty(uws_res *res) {
     ((Res *)res)->endWithoutBody(std::nullopt);
 }
 
+void uws_res_end_static(uws_res *res, const char *status, size_t status_len,
+                        const char *headers, size_t headers_len,
+                        const char *body, size_t body_len, bool empty) {
+    auto *response = (Res *)res;
+    if (status_len) response->writeStatus(std::string_view(status, status_len));
+    if (headers_len) response->writeHeaders(std::string_view(headers, headers_len));
+    if (empty) response->endWithoutBody(std::nullopt);
+    else response->end(std::string_view(body, body_len));
+}
+
 void uws_res_cork(uws_res *res, void (*cb)(void *), void *user) {
     ((Res *)res)->cork([cb, user]() { cb(user); });
 }

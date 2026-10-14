@@ -5,11 +5,19 @@ import { readText } from "file";
 const text = (value, status = 200) => new Response(value, { status });
 const json = value => new Response(JSON.stringify(value), { headers: { "content-type": "application/json" } });
 const fixed = text("cached", 201);
+const staticHeaders = new Headers({ "x-static": "yes", "content-length": "999", "transfer-encoding": "chunked" });
+staticHeaders.append("set-cookie", "a=1");
+staticHeaders.append("set-cookie", "b=2");
 // Starting after await must retain the server ID used by error callbacks.
 await readText(main);
 const server = serve({
     hostname: "127.0.0.1", port: Number(args[0]),
+    static: { "/legacy-static": new Response("legacy", { headers: staticHeaders }) },
     routes: {
+        "/static-headers": new Response("static", { status: 201, statusText: "Custom", headers: staticHeaders }),
+        "/static-empty": new Response(null, { status: 204, headers: staticHeaders }),
+        "/static-unmodified": new Response(null, { status: 304, headers: staticHeaders }),
+        "/static-large": new Response("x".repeat(2 * 1024 * 1024), { headers: { "x-large": "y".repeat(32768) } }),
         "/items/:id": {
             GET: req => json({ id: req.params.id, query: new URL(req.url).search }),
             POST: async req => {
