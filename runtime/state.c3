@@ -71,7 +71,8 @@ struct RuntimeState {
     Permissions perms;
     DirEntry[4] dirs;
     usz dir_next;
-    JsRuntime rt;
+    JsRuntime engine;
+    JsContext rt;
     JsValue settle;
     int exit_code;
     JsValue bk;

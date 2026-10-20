@@ -459,6 +459,8 @@ fn JsValue method_value(String method) {
 }
 
 fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
+    bool started = begin_dispatch();
+    defer end_dispatch(started);
     Server* s = c.server;
     ulong id  = c.id;
     g_runtime.rt.@scope() {
@@ -479,10 +481,12 @@ fn void dispatch_fast(Conn* c, String method, char[] body, bool has_body) {
             return;
         }
         defer if (g_runtime.depth == 0 && g_runtime.rejections.len()) flush_rejections();
+        // Stream initialization jobs must finish before the native response path takes its source.
+        if (catch checkpoint()) { report_uncaught(); return; }
         if (conn_find(id) != c || !c.res) return;
         if (respond_fast(c, r)) return;
         if (subscribe_response(r, id)) {
-            if (catch g_runtime.rt.drain_microtasks()) report_uncaught();
+            if (catch checkpoint()) report_uncaught();
             return;
         }
         JsValue[3] ha = { s.index_value, g_runtime.rt.number((double)id) ?? { }, r };

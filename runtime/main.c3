@@ -33,7 +33,7 @@ fn void exit_now() {
     if (g_runtime.worker) {
         if (g_runtime.exit_code) worker_report_error(g_runtime.rt.last_error());
         worker_stop();
-        g_runtime.rt.request_interrupt();
+        g_runtime.engine.request_interrupt();
         return;
     }
     close_sqlite();
@@ -303,8 +303,9 @@ fn JsValue? bk_get(String name) => g_runtime.rt.get(g_runtime.bk, name);
 
 fn void? boot() {
     g_runtime.loop = uws_loop();
-    g_runtime.rt.set_module_reader(&read_module);
-    g_runtime.rt.open()!;
+    g_runtime.engine.set_module_reader(&read_module);
+    g_runtime.engine.create()!;
+    g_runtime.rt.create(&g_runtime.engine)!;
     install_natives(CORE_NATIVES)!;
     install_natives(WEB_NATIVES)!;
     install_natives(HTTP_NATIVES)!;
@@ -425,6 +426,7 @@ fn int main(String[] argv) {
         return 1;
     }
     g_runtime.rt.release(ns);
+    if (catch checkpoint()) report_uncaught();
     flush_rejections();
     if (g_runtime.time_limit_ms) start_watchdog(g_runtime.time_limit_ms);
     uws_loop_run();

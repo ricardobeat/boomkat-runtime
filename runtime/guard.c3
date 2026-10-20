@@ -90,7 +90,7 @@ fn int watchdog(void* arg) {
 fn void start_watchdog(long ms) {
     g_runtime.time_limit_ns = ms * 1_000_000;
     WatchdogState* state = mem::new(WatchdogState);
-    state.runtime = &g_runtime.rt;
+    state.runtime = &g_runtime.engine;
     state.entered = &g_runtime.entered_ns;
     state.limit = g_runtime.time_limit_ns;
     g_runtime.watchdog_state = state;
@@ -111,38 +111,50 @@ fn ulong now_ns() => clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
 // ---- entering JS ----
 
 
+fn bool begin_dispatch() {
+    if (!g_runtime.time_limit_ns || mem::@atomic_load(g_runtime.entered_ns)) return false;
+    mem::@atomic_store(g_runtime.entered_ns, now_ns());
+    return true;
+}
+
+fn void end_dispatch(bool started) {
+    if (started) mem::@atomic_store(g_runtime.entered_ns, (ulong)0);
+}
+
+fn void? checkpoint() {
+    bool started = begin_dispatch();
+    defer end_dispatch(started);
+    return g_runtime.engine.drain_microtasks();
+}
+
+fn fault dispatch_error(fault err) {
+    if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED;
+    if (err == boomkat::INTERRUPTED) {
+        g_runtime.engine.clear_interrupt();
+        if (g_runtime.worker) { worker_report_error("Worker script time limit exceeded"); worker_stop(); }
+        io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
+        return TIMED_OUT;
+    }
+    report_uncaught();
+    return err;
+}
+
 fn void? call_js(JsValue f, JsValue[] args) {
     if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
     g_runtime.depth++;
     defer g_runtime.depth--;
-    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, now_ns());
+    bool started = begin_dispatch();
+    defer end_dispatch(started);
     JsValue? r = g_runtime.rt.call(f, args);
-    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, (ulong)0);
-    if (catch err = r) {
-        if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
-        if (err == boomkat::INTERRUPTED) {
-            g_runtime.rt.clear_interrupt();
-            if (worker_stopping()) return WORKER_STOPPED~;
-            if (g_runtime.worker) { worker_report_error("Worker script time limit exceeded"); worker_stop(); }
-            io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
-            return TIMED_OUT~;
-        }
-        report_uncaught();
-        return err~;
-    }
+    if (catch err = r) return dispatch_error(err)~;
     g_runtime.rt.release(r);
-    // The engine drains after a JS function, but not after a native one such
-    // as a promise's resolve.
     if (g_runtime.depth == 1) {
-        if (catch e = g_runtime.rt.drain_microtasks()) {
-            report_uncaught();
-            return e~;
-        }
+        if (catch err = checkpoint()) return dispatch_error(err)~;
         if (g_runtime.rejections.len()) flush_rejections();
     }
 }
 
 fn void init_guard() {
     g_runtime.rejections.init(mem);
-    g_runtime.rt.set_promise_rejection_tracker(&on_rejection);
+    g_runtime.engine.set_promise_rejection_tracker(&on_rejection);
 }

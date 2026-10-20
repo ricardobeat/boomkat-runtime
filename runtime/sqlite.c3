@@ -390,7 +390,7 @@ fn CInt sql_authorize(void* user, CInt action, ZString first, ZString second, ZS
 fn CInt sql_progress(void* user) {
     SqlDatabase* db = user;
     if (db.deadline && now_ns() >= db.deadline) {
-        g_runtime.rt.request_interrupt();
+        g_runtime.engine.request_interrupt();
         return 1;
     }
     return 0;

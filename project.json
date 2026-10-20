@@ -33,7 +33,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat/src",
-        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "src/**"
       ],
       "opt": "O3",
@@ -50,7 +49,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat/src",
-        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O3",
@@ -66,7 +64,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat/src",
-        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O3",
@@ -82,7 +79,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat/src",
-        "/Users/rtomasi/cousas/boomkat/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O3",
@@ -98,7 +94,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat-perf/src",
-        "/Users/rtomasi/cousas/boomkat-perf/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O3",
@@ -114,7 +109,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat-perf/src",
-        "/Users/rtomasi/cousas/boomkat-perf/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O0",
@@ -131,7 +125,6 @@
       "type": "executable",
       "sources": [
         "/Users/rtomasi/cousas/boomkat-perf/src",
-        "/Users/rtomasi/cousas/boomkat-perf/bindings/c3/boomkat.c3",
         "runtime/**"
       ],
       "opt": "O3",

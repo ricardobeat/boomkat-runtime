@@ -185,38 +185,20 @@ fn JsValue? call_catch(JsValue f, JsValue[] args, JsValue* thrown) {
     if (g_runtime.closing || worker_stopping()) return WORKER_STOPPED~;
     g_runtime.depth++;
     defer g_runtime.depth--;
-    TVal fv;
-    if (!g_runtime.rt.load(f, &fv)) return boomkat::STALE_VALUE~;
-    TVal[4] argv;
-    foreach (i, a : args) if (!g_runtime.rt.load(a, &argv[i])) argv[i].set_undefined();
-    TVal this_tv;
-    this_tv.set_undefined();
-    Heap* h = g_runtime.rt.rt.heap;
-    h.has_error = false;
-    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, now_ns());
-    TVal res = h.call_fn((void*)g_runtime.rt.rt.vm, fv, &argv, (uint)args.len, this_tv);
-    if (g_runtime.time_limit_ns) mem::@atomic_store(g_runtime.entered_ns, (ulong)0);
-    if (h.uncatchable_throw) {
-        g_runtime.rt.clear_interrupt();
-        if (worker_stopping()) {
-            h.has_error = false;
-            worker_stop();
-            return WORKER_STOPPED~;
+    bool started = begin_dispatch();
+    defer end_dispatch(started);
+    JsValue? result = g_runtime.rt.call(f, args);
+    if (catch err = result) {
+        if (err == boomkat::INTERRUPTED) {
+            g_runtime.engine.clear_interrupt();
+            if (worker_stopping()) { worker_stop(); return WORKER_STOPPED~; }
+            io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
+            return TIMED_OUT~;
         }
-        io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
-        h.has_error = false;
-        return TIMED_OUT~;
+        *thrown = g_runtime.rt.get_exception()!;
+        return err~;
     }
-    if (h.has_error) {
-        h.has_error = false;
-        Vm* vm = (Vm*)g_runtime.rt.rt.vm;
-        vm.has_error = false;
-        vm.throw_pending = false;
-        *thrown = g_runtime.rt.root(h.error_value)!;
-        h.error_value.set_undefined();
-        return boomkat::JS_EXCEPTION~;
-    }
-    return g_runtime.rt.root(res);
+    return result;
 }
 
 fn void report_uncaught() {

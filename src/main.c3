@@ -44,7 +44,8 @@ handler
 struct Worker
 {
     int tsi;             // libwebsockets thread service index
-    JsRuntime rt;
+    JsRuntime engine;
+    JsContext rt;
     JsValue handler;     // rooted for the life of the process
 }
 
@@ -221,7 +222,11 @@ fn int main(String[] args)
     {
         Worker* w = &g_workers[i];
         w.tsi = i;
-        if (catch err = w.rt.open())
+        if (catch err = w.engine.create()) {
+            io::eprintfn("failed to open JS runtime %d: %s", i, err);
+            return 1;
+        }
+        if (catch err = w.rt.create(&w.engine))
         {
             io::eprintfn("failed to open JS runtime %d: %s", i, err);
             return 1;
@@ -234,7 +239,7 @@ fn int main(String[] args)
         }
         w.handler = h;
     }
-    defer for (int i = 0; i < threads; i++) g_workers[i].rt.close();
+    defer for (int i = 0; i < threads; i++) { g_workers[i].rt.destroy(); g_workers[i].engine.destroy(); }
 
     // Keep lws quiet; its default log level writes a line per connection.
     libwebsockets::lws_set_log_level(libwebsockets::LLL_ERR | libwebsockets::LLL_WARN, null);

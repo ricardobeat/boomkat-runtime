@@ -322,7 +322,7 @@ fn int worker_thread_main(void* arg) {
             bool stopping;
             w.lock.@in_lock() {
                 w.loop = g_runtime.loop;
-                w.runtime = &g_runtime.rt;
+                w.runtime = &g_runtime.engine;
                 stopping = w.stopping;
                 if (w.inbox_head && !stopping) {
                     w.inbox_armed = true;
@@ -349,6 +349,7 @@ fn int worker_thread_main(void* arg) {
                         worker_stop();
                     } else {
                         g_runtime.rt.release(ns);
+                        if (catch checkpoint()) worker_report_error(g_runtime.rt.last_error());
                         if (!g_runtime.closing) flush_rejections();
                     }
                 } else {
@@ -366,7 +367,8 @@ fn int worker_thread_main(void* arg) {
         };
         if (booted) free_worker_resources();
         close_sqlite();
-        g_runtime.rt.close();
+        g_runtime.rt.destroy();
+        g_runtime.engine.destroy();
         free_worker_permissions();
         g_runtime.args.free();
         w.lock.@in_lock() {
