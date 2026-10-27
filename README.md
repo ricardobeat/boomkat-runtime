@@ -27,7 +27,7 @@ built-in or an error, and remote imports are not supported.
 
 | module | surface |
 |---|---|
-| `http` | `serve({ port, hostname, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }` |
+| `http` | `serve({ port, hostname, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }`; `upgradeWebSocket(req)` |
 | `net` | `connect({ hostname, port, tls })`, `listen({ hostname, port })`, `resolve(host)`; connections expose `read`, `write`, `closeWrite`, `close`, `readable`, `writable` |
 | `file` | `body`, `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
 | `process` | `args`, `pid`, `execPath`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
@@ -69,6 +69,32 @@ Enums and other syntax requiring unsupported TS runtime transforms throw.
 The [Taskboard sample](examples/taskboard/README.md) serves a Preact TSX UI this
 way, with accounts, shared teams, boards and SQLite BLOB image attachments.
 It includes full, pinned Preact sources and browser modules; no npm or build step.
+
+### WebSockets
+
+`upgradeWebSocket(request, { protocol })` from `http` accepts an upgrade inside
+any handler, including routes and async handlers, and returns the server end
+of the socket with the Response that completes the upgrade:
+
+```js
+import { serve, upgradeWebSocket } from "http";
+
+serve({ port: 8080, fetch(req) {
+    if (req.headers.get("upgrade") !== "websocket") return new Response("not a socket", { status: 426 });
+    const { socket, response } = upgradeWebSocket(req);
+    socket.onmessage = (e) => socket.send(e.data);
+    return response;
+}});
+```
+
+Both ends are the standard `WebSocket` class with `open`, `message`, `close` and
+`error` events, `send`, `close`, `binaryType`, `protocol` and `bufferedAmount`.
+The global `WebSocket` client connects to `ws:` and `wss:` URLs through `net`,
+so it needs a net grant. Server sockets run on uWebSockets: 16 MiB message
+limit, automatic pings, a 120 s idle timeout, and no compression. Open sockets
+keep the process alive.
+
+Validation: `bkr --no-sandbox -A tests/websocket.js`.
 
 ### Module workers
 

@@ -47,7 +47,27 @@ struct App {
     bool dispatch_owner = false;
     us_socket_context_t *dispatch_context = nullptr;
     std::unordered_set<Res *> connections; // owned by this app's loop
+    std::unordered_set<std::string> ws_paths;
 };
+
+// A server WebSocket carries the runtime's id for it.
+struct WsData { uint64_t id = 0; };
+using Ws = uWS::WebSocket<false, true, WsData>;
+
+typedef void (*uws_ws_open_cb)(uint64_t id, void *ws);
+typedef void (*uws_ws_message_cb)(uint64_t id, const char *data, size_t len, int binary);
+typedef void (*uws_ws_close_cb)(uint64_t id, int code, const char *reason, size_t len);
+typedef void (*uws_ws_drain_cb)(uint64_t id);
+struct WsCallbacks {
+    uws_ws_open_cb open;
+    uws_ws_message_cb message;
+    uws_ws_close_cb close;
+    uws_ws_drain_cb drain;
+} ws_callbacks;
+
+// The WebSocket context of the upgrade request being dispatched, read by the
+// request callback. Null for every other request.
+thread_local void *upgrade_context = nullptr;
 
 std::mutex dispatch_registry_lock;
 std::unordered_map<us_socket_context_t *, std::shared_ptr<Dispatch>> dispatch_registry;
@@ -123,11 +143,68 @@ void uws_loop_defer(void *loop, void (*cb)(void *), void *user) {
     ((uWS::Loop *)loop)->defer([cb, user]() { cb(user); });
 }
 
+void uws_ws_callbacks(uws_ws_open_cb open, uws_ws_message_cb message, uws_ws_close_cb close, uws_ws_drain_cb drain) {
+    ws_callbacks = { open, message, close, drain };
+}
+
+// uWS tries WebSocket routes before ordinary ones, and they yield a request
+// without Sec-WebSocket-Key, so each request path that may upgrade gets one.
+// The upgrade runs the ordinary request callback with its context set.
+static void add_ws_route(App *a, const char *path, uws_req_cb cb, void *user) {
+    if (!a->ws_paths.insert(path).second) return;
+    a->app.ws<WsData>(path, {
+        .compression = uWS::DISABLED,
+        .maxPayloadLength = 16 * 1024 * 1024,
+        .idleTimeout = 120,
+        .maxBackpressure = 16 * 1024 * 1024,
+        .closeOnBackpressureLimit = false,
+        .resetIdleTimeoutOnSend = true,
+        .sendPingsAutomatically = true,
+        .upgrade = [cb, user](auto *res, auto *req, auto *context) {
+            upgrade_context = context;
+            cb(user, (uws_req *)req, (uws_res *)res);
+            upgrade_context = nullptr;
+        },
+        .open = [](Ws *ws) { ws_callbacks.open(ws->getUserData()->id, ws); },
+        .message = [](Ws *ws, std::string_view message, uWS::OpCode op) {
+            ws_callbacks.message(ws->getUserData()->id, message.data(), message.size(), op == uWS::OpCode::BINARY);
+        },
+        .drain = [](Ws *ws) { ws_callbacks.drain(ws->getUserData()->id); },
+        .close = [](Ws *ws, int code, std::string_view reason) {
+            ws_callbacks.close(ws->getUserData()->id, code, reason.data(), reason.size());
+        },
+    });
+}
+
 uws_app *uws_app_new(uws_req_cb cb, void *user) {
     App *a = new App();
     a->app.any("/*", [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)res); });
+    add_ws_route(a, "/*", cb, user);
     return (uws_app *)a;
 }
+
+void *uws_req_upgrade_context(void) { return upgrade_context; }
+
+// Completes an upgrade, now or after an async handler. uWS answers 101 and
+// calls the open callback before this returns.
+void uws_res_upgrade(uws_res *res, uint64_t id, const char *key, size_t key_len, const char *protocol,
+                     size_t protocol_len, const char *extensions, size_t extensions_len, void *context) {
+    ((Res *)res)->template upgrade<WsData>({ id }, std::string_view(key, key_len), std::string_view(protocol, protocol_len),
+        std::string_view(extensions, extensions_len), (us_socket_context_t *)context);
+}
+
+// 0 sent, 1 buffered under backpressure, 2 dropped.
+int uws_ws_send(void *ws, const char *data, size_t len, int binary) {
+    return (int)((Ws *)ws)->send(std::string_view(data, len), binary ? uWS::OpCode::BINARY : uWS::OpCode::TEXT);
+}
+
+void uws_ws_end(void *ws, int code, const char *reason, size_t len) {
+    ((Ws *)ws)->end(code, std::string_view(reason, len));
+}
+
+void uws_ws_terminate(void *ws) { ((Ws *)ws)->close(); }
+
+size_t uws_ws_buffered(void *ws) { return ((Ws *)ws)->getBufferedAmount(); }
 
 void uws_app_route(uws_app *app, const char *method, const char *path, uws_req_cb cb, void *user) {
     App *a = (App *)app;
@@ -143,6 +220,7 @@ void uws_app_route(uws_app *app, const char *method, const char *path, uws_req_c
     else if (m == "TRACE") a->app.trace(path, std::move(handler));
     else if (m == "CONNECT") a->app.connect(path, std::move(handler));
     else a->app.any(path, std::move(handler));
+    if (m == "GET" || m == "*") add_ws_route(a, path, cb, user);
 }
 
 size_t uws_req_parameter(uws_req *req, unsigned short index, const char **out) {

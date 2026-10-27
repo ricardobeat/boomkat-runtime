@@ -60,6 +60,12 @@ function compileRoutes(routes, fallback) {
     return compiled;
 }
 
+// Accepts a WebSocket upgrade request: returns the server end of the socket
+// and the Response the handler returns to complete the upgrade.
+export function upgradeWebSocket(req, options) {
+    return bk.wsServer(req, options);
+}
+
 export function serve(opts, fetch) {
     if (typeof opts === "function") [opts, fetch] = [{}, opts];
     opts = opts || {};

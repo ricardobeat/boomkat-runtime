@@ -121,6 +121,11 @@ struct Conn {
     String url;
     String blob;
     List{char} body;
+    // A WebSocket upgrade request: the uWS context and the headers its
+    // upgrade answers with.
+    void* ws_ctx;
+    String ws_key;
+    String ws_ext;
 }
 
 const ulong HTTP_TURN_NS = 2_000_000;
@@ -201,6 +206,7 @@ fn void conn_free(Conn* c) {
     if (c.url.len) free(c.url.ptr);
     if (c.blob.len) free(c.blob.ptr);
     if (c.body.is_initialized()) c.body.free();
+    c.free_upgrade();
     *c = { };
     if (g_runtime.spare.len() < 1024) {
         g_runtime.spare.push(c);
@@ -1086,6 +1092,8 @@ fn void request_arrive(Server* s, Route* route, UwsReq* req, UwsRes* res) {
         }
         c.req = req;
         c.hdrs = hbuf[:nh];
+        void* upgrade = uws_req_upgrade_context();
+        if (upgrade) c.capture_upgrade(c.hdrs, upgrade);
         c.path = (String)up[:ul];
         c.query = (String)qp[:ql];
         c.head = method == "HEAD";

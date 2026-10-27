@@ -1433,6 +1433,7 @@ function send(id, res) {
         fail(id, new TypeError("fetch handler must return a Response, got " + typeof res));
         return;
     }
+    if (res._ws) { bk.wsRespond(id, res); return; }
     if (bk.nativeResponse(id, res)) return;
     res._used = true;
     const st = res.status;

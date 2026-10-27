@@ -318,9 +318,11 @@ fn void? boot() {
     install_natives(TRANSPILE_NATIVES)!;
     install_natives(CRYPTO_NATIVES)!;
     install_natives(WORKER_NATIVES)!;
+    install_natives(WS_NATIVES)!;
     g_runtime.rt.exec(PRELUDE, "<prelude>")!;
     g_runtime.rt.exec($embed("js/worker.js"), "<worker>")!;
     g_runtime.rt.exec(FETCH, "<fetch>")!;
+    g_runtime.rt.exec($embed("js/websocket.js"), "<websocket>")!;
     foreach (b : BUILTINS) g_runtime.rt.define_module(b.name, b.source)!;
     if (init_sqlite()) {
         install_natives(SQLITE_NATIVES)!;
@@ -341,6 +343,7 @@ fn void? boot() {
     init_immediates();
     init_res();
     init_http()!;
+    init_ws()!;
     g_runtime.workers.init(mem);
     g_runtime.worker_event = bk_get("workerEvent")!;
 }

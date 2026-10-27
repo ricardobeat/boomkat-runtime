@@ -41,7 +41,7 @@ Blockers:
 - [ ] Third-party code without npm: URL imports with a lockfile (see remote imports above).
 
 Web APIs:
-- [ ] WebSocket: server in `serve` (uWS) and the global client.
+- [x] WebSocket: `upgradeWebSocket` on uWS and the global client.
 - [ ] Compression: `CompressionStream`/`DecompressionStream`, gzip in `fetch` and `serve`.
 - [ ] Source maps for transpiled TypeScript in error stacks.
 - [ ] `crypto.subtle`.
