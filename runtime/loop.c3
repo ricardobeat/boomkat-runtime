@@ -18,6 +18,7 @@ extern fn UsTimer* us_create_timer(void* loop, CInt fallthrough, CUInt ext_size)
 extern fn void* us_timer_ext(UsTimer* t);
 extern fn void us_timer_set(UsTimer* t, UsTimerCb cb, CInt ms, CInt repeat_ms);
 extern fn void uws_timer_set_ns(UsTimer* t, UsTimerCb cb, ulong ns);
+extern fn void uws_loop_ref_delta(void* loop, CInt delta);
 extern fn void us_timer_close(UsTimer* t);
 
 

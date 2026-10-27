@@ -22,3 +22,10 @@ void uws_timer_set_ns(struct us_timer_t *timer, void (*cb)(struct us_timer_t *),
 #error "Precise timers require the epoll or kqueue backend"
 #endif
 }
+
+// uSockets runs its loop while any non-fallthrough poll exists and has no
+// per-poll unref. A weak socket leaves the count while it waits for nothing,
+// and must rejoin it before uSockets frees its poll.
+void uws_loop_ref_delta(struct us_loop_t *loop, int delta) {
+    loop->num_polls += delta;
+}

@@ -30,7 +30,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 - [ ] Remote imports (gated under `import`), `ffi`, `sys`.
 - [ ] Linux sandbox (Landlock + seccomp) beside Seatbelt.
 - [x] `console` printed builtin-created arrays (`split`, `match`, `Object.entries`) with a `length:` entry: the engine wrote their `length` as enumerable (fixed in boomkat `635d8971`).
-- [ ] Dropping an unread `fetch` response body leaves its socket open until closed or garbage collected.
+- [x] An unread `fetch` body kept the process alive: fetch sockets are unref'd while no read is pending, and bodies pull on demand.
 
 ## Toward a Deno/Bun alternative
 

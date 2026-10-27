@@ -138,6 +138,8 @@ fn UsSocket* on_sock_close(CInt ssl, UsSocket* s, CInt code) {
     Res* r = sock_res(ssl, s);
     r.gone = true;
     r.sock = null;
+    // uSockets frees the poll after this callback and decrements the count.
+    r.update_ref();
     if (r.connect_op) {
         uint op = r.connect_op;
         r.connect_op = 0;
@@ -209,6 +211,7 @@ fn void Res.socket_write(&self, uint op, char[] data) {
     self.outbox.push_all(data);
     self.write_op = op;
     self.write_len = total;
+    self.update_ref();
 }
 
 fn void Res.flush(&self) {
@@ -222,6 +225,7 @@ fn void Res.flush(&self) {
     if (self.outbox.len() || !self.write_op) return;
     uint op = self.write_op;
     self.write_op = 0;
+    self.update_ref();
     resolve_number(op, self.write_len);
 }
 

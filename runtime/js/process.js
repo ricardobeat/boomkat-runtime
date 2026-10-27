@@ -6,6 +6,7 @@ const rids = (text) => text.split(" ").map(Number);
 
 export const args = lines(bk.args());
 export const main = bk.mainPath();
+export const execPath = bk.execPath();
 export const pid = bk.pid();
 export const exit = (code = 0) => bk.exit(code);
 

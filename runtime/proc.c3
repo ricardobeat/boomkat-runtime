@@ -95,6 +95,26 @@ fn void js_main(JsCtx ctx, void* udata) => ctx.ret_string(g_runtime.main);
 
 fn void js_pid(JsCtx ctx, void* udata) => ctx.ret_number(getpid());
 
+extern fn CInt ns_get_executable_path(char* buf, uint* size) @cname("_NSGetExecutablePath") @if(env::DARWIN);
+
+// The running binary, so scripts can start another bkr.
+fn void js_exec_path(JsCtx ctx, void* udata) {
+    char[1024] raw;
+    $if env::DARWIN:
+        uint size = raw.len;
+        if (ns_get_executable_path(&raw, &size) != 0) raw[0] = 0;
+    $else
+        raw[..] = 0;
+        mem::copy(&raw, "/proc/self/exe", 14);
+    $endif
+    char[1024] real;
+    if (!raw[0] || !realpath((ZString)&raw, &real)) {
+        ctx.ret_string("");
+        return;
+    }
+    ctx.ret_string(((ZString)&real).str_view());
+}
+
 fn void js_exit(JsCtx ctx, void* udata) {
     g_runtime.exit_code = ctx.arg(0).as_int(0);
     exit_now();
@@ -232,6 +252,7 @@ const Native[] PROC_NATIVES = {
     { "envAll", &js_env_all, 0 },
     { "args", &js_args, 0 },
     { "mainPath", &js_main, 0 },
+    { "execPath", &js_exec_path, 0 },
     { "pid", &js_pid, 0 },
     { "exit", &js_exit, 1 },
     { "wait", &js_wait, 2 },

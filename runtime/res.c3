@@ -34,6 +34,8 @@ struct Res {
     UsSocket* sock;
     CInt ssl;
     bool paused;
+    bool weak; // keeps the loop alive only while a read is pending
+    bool unrefd; // its poll is out of the loop's count
     String host; // for TLS verification
     bool cert_failed;
     uint connect_op;
@@ -108,6 +110,7 @@ fn Res* JsCtx.res(self, uint i = 0) {
 
 // Settles a pending read from the inbox or the end state.
 fn void Res.deliver(&self) {
+    defer self.update_ref();
     if (!self.read_op) return;
     uint op = self.read_op;
     if (self.inbox.len()) {
@@ -132,6 +135,15 @@ fn void Res.deliver(&self) {
         self.read_op = 0;
         resolve(op, g_runtime.rt.null_value() ?? { });
     }
+}
+
+// A weak socket counts toward the loop's liveness only while JS waits on it,
+// so an unread fetch body does not keep the process running.
+fn void Res.update_ref(&self) {
+    bool want = !self.weak || self.read_op || self.write_op || !self.sock;
+    if (want == !self.unrefd) return;
+    self.unrefd = !want;
+    uws_loop_ref_delta(g_runtime.loop, want ? 1 : -1);
 }
 
 // ---- pool reads and writes on fds ----
@@ -296,8 +308,17 @@ fn void close_resource(Res* r) {
 
 fn void js_close(JsCtx ctx, void* udata) => close_resource(res_find(ctx.arg(0).id()));
 
+// unref(rid): the socket stops keeping the process alive while idle
+fn void js_unref(JsCtx ctx, void* udata) {
+    Res* r = ctx.res();
+    if (!r || r.kind != SOCKET) return;
+    r.weak = true;
+    r.update_ref();
+}
+
 const Native[] RES_NATIVES = {
     { "read", &js_read, 2 },
     { "write", &js_write, 3 },
     { "close", &js_close, 1 },
+    { "unref", &js_unref, 1 },
 };

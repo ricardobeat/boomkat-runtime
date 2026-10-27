@@ -30,7 +30,7 @@ built-in or an error, and remote imports are not supported.
 | `http` | `serve({ port, hostname, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }` |
 | `net` | `connect({ hostname, port, tls })`, `listen({ hostname, port })`, `resolve(host)`; connections expose `read`, `write`, `closeWrite`, `close`, `readable`, `writable` |
 | `file` | `body`, `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
-| `process` | `args`, `pid`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
+| `process` | `args`, `pid`, `execPath`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
 | `path` | `join`, `resolve`, `relative`, `dirname`, `basename`, `extname`, `parse`, `format`, `toFileUrl`, `fromFileUrl` |
 | `permissions` | `query`, `request`, `revoke` |
 | `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |

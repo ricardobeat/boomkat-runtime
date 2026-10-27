@@ -22,6 +22,9 @@ function indexOf(buf, needle, from = 0) {
 
 const CRLFCRLF = enc.encode("\r\n\r\n");
 const CRLF = enc.encode("\r\n");
+// Bodies read the socket only while a consumer waits, which is also when the
+// unref'd connection keeps the process alive.
+const PULL_ON_DEMAND = { highWaterMark: 0 };
 
 class Reader {
     constructor(conn) {
@@ -89,7 +92,7 @@ function bodyStream(reader, headers, method, status) {
                 await reader.take(2);
             },
             cancel: () => conn.close(),
-        });
+        }, PULL_ON_DEMAND);
     }
     const length = headers.get("content-length");
     if (length !== null) {
@@ -105,7 +108,7 @@ function bodyStream(reader, headers, method, status) {
                 if (left === 0) done(c);
             },
             cancel: () => conn.close(),
-        });
+        }, PULL_ON_DEMAND);
     }
     return new ReadableStream({
         async pull(c) {
@@ -114,7 +117,7 @@ function bodyStream(reader, headers, method, status) {
             c.enqueue(chunk.slice());
         },
         cancel: () => conn.close(),
-    });
+    }, PULL_ON_DEMAND);
 }
 
 async function requestOnce(url, method, headers, body, signal) {
@@ -149,6 +152,8 @@ async function requestOnce(url, method, headers, body, signal) {
             if (c > 0) rh.append(lines[i].slice(0, c).trim(), lines[i].slice(c + 1).trim());
         }
         const status = Number(m[1]);
+        // An unread body must not keep the process alive.
+        bk.unref(rid);
         return { status, statusText: m[2], headers: rh, reader, conn };
     } catch (e) {
         conn.close();
