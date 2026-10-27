@@ -24,10 +24,35 @@ Runtime build order from PLAN.md, tracked here as it lands.
 - [x] Native `file.readText` with owned external strings in the `boomkat-perf` worktree; UTF-8 decoding fallback for the main engine.
 - [ ] Merge external-string support from `boomkat-perf` into the engine after reviewing the performance branch. HTTP URL/header buffers and mutable `Uint8Array` storage still require copies.
 
-- [ ] Merge `fix/sort-concat-strings` (boomkat worktree `~/cousas/boomkat-sort-fix`, commit `bb59c1a5`) into the engine's main: `Array.prototype.sort` freed strings it still needed, and bkr compiles the engine from main. Also check `toSorted` for the same borrowing.
+- [x] `Array.prototype.sort` freeing strings it still needed: fixed on engine main (`7ea3ba21`, `e0530118`). Still check `toSorted` for the same borrowing.
 - [ ] Close the gap to node/bun on json, echo, stream and file: the cost is interpreted JS per request (`new Request`, header blobs, promise hops) and `open` on the pool; a per-thread JS worker model (`SO_REUSEPORT`) would multiply throughput past the single-thread ceiling.
 - [ ] TLS server in `serve` (cert/key options) and HTTP/2.
 - [ ] Remote imports (gated under `import`), `ffi`, `sys`.
 - [ ] Linux sandbox (Landlock + seccomp) beside Seatbelt.
 - [ ] `console` prints arrays returned by `String.prototype.split` with a stray `length:` entry (engine/console quirk).
 - [ ] Dropping an unread `fetch` response body leaves its socket open until closed or garbage collected.
+
+## Toward a Deno/Bun alternative
+
+npm and Node compatibility are a non-goal: bare specifiers stay reserved for built-ins.
+
+Blockers:
+- [ ] Linux build: `project.json` targets macOS 26 and Homebrew OpenSSL archives only.
+- [ ] Third-party code without npm: URL imports with a lockfile (see remote imports above).
+
+Web APIs:
+- [ ] WebSocket: server in `serve` (uWS) and the global client.
+- [ ] Compression: `CompressionStream`/`DecompressionStream`, gzip in `fetch` and `serve`.
+- [ ] Source maps for transpiled TypeScript in error stacks.
+- [ ] `crypto.subtle`.
+- [ ] Confirm `Intl` coverage from the engine.
+- [ ] TypeScript enums and other syntax needing runtime transforms.
+
+Tooling:
+- [ ] `bkr test`: a built-in test runner, replacing the per-test Python wrappers where possible.
+- [ ] REPL.
+- [ ] `--watch`.
+- [ ] Inspector / debugger protocol.
+- [ ] `.d.ts` files for the built-in modules.
+- [ ] Single-binary compile.
+- [ ] Format and lint.
