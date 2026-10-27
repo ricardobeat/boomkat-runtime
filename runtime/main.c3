@@ -27,6 +27,7 @@ const Builtin[] BUILTINS = {
     { "typescript", $embed("js/typescript.js") },
     { "crypto", $embed("js/crypto.js") },
     { "test", $embed("js/test.js") },
+    { "repl", $embed("js/repl.js") },
 };
 
 
@@ -322,6 +323,7 @@ fn void? boot() {
     install_natives(WS_NATIVES)!;
     install_natives(ZLIB_NATIVES)!;
     install_natives(TEST_NATIVES)!;
+    install_natives(REPL_NATIVES)!;
     g_runtime.rt.exec(PRELUDE, "<prelude>")!;
     g_runtime.rt.exec($embed("js/worker.js"), "<worker>")!;
     g_runtime.rt.exec(FETCH, "<fetch>")!;
@@ -353,7 +355,7 @@ fn void? boot() {
 
 fn void usage() {
     io::eprintn(
-        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...]"
+        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...] | bkr [flags] [repl] | bkr test [flags] [--filter=text] [paths...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
 }
@@ -414,6 +416,8 @@ fn int main(String[] argv) {
         String[]? rewritten = test_argv(argv);
         if (catch rewritten) return 2;
         argv = rewritten;
+    } else {
+        argv = repl_argv(argv)!!;
     }
     if (catch parse_args(argv)) {
         usage();
@@ -423,7 +427,7 @@ fn int main(String[] argv) {
         io::eprintfn("error: bootstrap failed: %s: %s", err, g_runtime.rt.last_error());
         return 1;
     }
-    char[]? src = g_testing ? TEST_RUNNER.copy(mem) : file::load(mem, g_runtime.main);
+    char[]? src = g_testing ? TEST_RUNNER.copy(mem) : g_repl ? REPL_MAIN.copy(mem) : file::load(mem, g_runtime.main);
     if (catch err = src) {
         io::eprintfn("error: cannot read %s: %s", g_runtime.main, err);
         return 1;
