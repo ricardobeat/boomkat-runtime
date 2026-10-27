@@ -30,6 +30,9 @@ struct Res {
 
     CInt fd;
     bool busy; // a pool task holds the fd
+    // Native code is still using it across a call into JS, which can close
+    // it; the holder releases it after.
+    uint pins;
 
     UsSocket* sock;
     CInt ssl;
@@ -89,7 +92,7 @@ fn Res* res_find(uint rid) {
 
 // Freed once both JS and the OS are done with it.
 fn void res_release(Res* r) {
-    if (!r.closed || !r.gone || r.busy) return;
+    if (!r.closed || !r.gone || r.busy || r.pins) return;
     uint slot = r.rid & SLOT_MASK;
     g_runtime.res[slot] = null;
     g_runtime.res_free.push(slot);
@@ -108,9 +111,14 @@ fn Res* JsCtx.res(self, uint i = 0) {
 
 // ---- delivering reads ----
 
-// Settles a pending read from the inbox or the end state.
+// Settles a pending read from the inbox or the end state. Settling runs JS,
+// which may close the resource, so the caller releases it afterwards.
 fn void Res.deliver(&self) {
-    defer self.update_ref();
+    self.pins++;
+    defer {
+        self.update_ref();
+        self.pins--;
+    }
     if (!self.read_op) return;
     uint op = self.read_op;
     if (self.inbox.len()) {
@@ -176,6 +184,12 @@ fn void fd_read_done(Task* t) {
     r.busy = false;
     fd_finish(r);
     defer free(f);
+    // Settling runs JS, which may close the resource; release it after.
+    r.pins++;
+    defer {
+        r.pins--;
+        res_release(r);
+    }
     if (f.n < 0) {
         free(f.buf.ptr);
         reject_errno(f.op, f.err, "read");
@@ -185,7 +199,6 @@ fn void fd_read_done(Task* t) {
     } else {
         resolve_bytes(f.op, f.buf[:f.n]);
     }
-    res_release(r);
 }
 
 fn void fd_write_work(Task* t) {
@@ -210,12 +223,16 @@ fn void fd_write_done(Task* t) {
     fd_finish(r);
     free(f.buf.ptr);
     defer free(f);
+    r.pins++;
+    defer {
+        r.pins--;
+        res_release(r);
+    }
     if (f.err) {
         reject_errno(f.op, f.err, "write");
     } else {
         resolve_number(f.op, f.n);
     }
-    res_release(r);
 }
 
 fn void fd_task(Res* r, uint op, TaskFn work, TaskFn done, char[] buf = { }) {
@@ -243,6 +260,7 @@ fn void js_read(JsCtx ctx, void* udata) {
         case SOCKET:
             r.read_op = op;
             r.deliver();
+            res_release(r);
         case STDIO:
         case FILE:
         case PIPE:

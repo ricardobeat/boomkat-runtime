@@ -114,6 +114,11 @@ fn UsSocket* on_sock_data(CInt ssl, UsSocket* s, char[] data) {
     r.inbox.push_all(data);
     if (r.read_op) {
         r.deliver();
+        // JS may have closed it while the read settled.
+        if (r.gone) {
+            res_release(r);
+            return s;
+        }
     } else if (r.inbox.len() > (sz)INBOX_HIGH) {
         r.pause();
     }
@@ -129,6 +134,10 @@ fn UsSocket* on_sock_end(CInt ssl, UsSocket* s) {
     Res* r = sock_res(ssl, s);
     r.eof = true;
     r.deliver();
+    if (r.gone) {
+        res_release(r);
+        return s;
+    }
     // Both halves done: nothing more can happen on it.
     if (us_socket_is_shut_down(ssl, s)) return us_socket_close(ssl, s, 0, null);
     return s;
