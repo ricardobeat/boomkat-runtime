@@ -1,4 +1,7 @@
-// Observable results are compared with the unchanged runtime by run_native_web.py.
+// Observable results are compared with native-web.expected.json. Pass "update"
+// (with --allow-write) to rewrite it after an intended change, or "stress" for
+// fewer GC-churn URLs.
+import { write } from "file";
 import { args } from "process";
 const rows = [];
 function observe(name, fn) {
@@ -394,4 +397,18 @@ observe("Headers record receiver setter",()=>{
     try {Object.defineProperty(Headers.prototype,"_map",{configurable:true,set(value){calls++;Object.defineProperty(this,"_map",{value,writable:true,configurable:true,enumerable:true});}});return [new Headers({x:"y"})._blob(),calls];}
     finally{if(saved)Object.defineProperty(Headers.prototype,"_map",saved);else delete Headers.prototype._map;}
 });
-console.log(JSON.stringify(rows));
+
+const actual = rows.map(row => JSON.stringify(row));
+if (args[0] === "update") {
+    await write(import.meta.url.replace(/\.js$/, ".expected.json"), "[\n" + actual.join(",\n") + "\n]\n");
+    console.log(`native-web: wrote ${actual.length} cases`);
+} else {
+    const { default: expectedRows } = await import("./native-web.expected.json", { with: { type: "json" } });
+    const expected = expectedRows.map(row => JSON.stringify(row));
+    const failures = [];
+    for (let i = 0; i < Math.max(actual.length, expected.length); i++) {
+        if (actual[i] !== expected[i]) failures.push(`  expected ${expected[i]}\n  actual   ${actual[i]}`);
+    }
+    if (failures.length) throw new Error(`native-web: ${failures.length} cases differ\n${failures.join("\n")}`);
+    console.log(`native-web: ${actual.length} cases passed`);
+}
