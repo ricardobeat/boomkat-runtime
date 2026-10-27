@@ -52,7 +52,9 @@ Web APIs:
 - [ ] TypeScript enums and other syntax needing runtime transforms.
 
 Tooling:
-- [ ] `bkr test`: a built-in test runner, replacing the per-test Python wrappers where possible.
+- [x] `bkr test` with the `test` module. Files share one runtime; per-file isolation in workers would need the worker entry to load through `read_module`.
+- [ ] Move the per-test Python wrappers to `bkr test` where they only drive bkr.
+- [ ] Engine: arrow functions are missing from stack traces (`() => inner()` shows only `inner` and the module frame).
 - [ ] REPL.
 - [ ] `--watch`.
 - [ ] Inspector / debugger protocol.

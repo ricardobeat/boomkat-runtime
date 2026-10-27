@@ -26,6 +26,7 @@ const Builtin[] BUILTINS = {
     { "permissions", $embed("js/permissions.js") },
     { "typescript", $embed("js/typescript.js") },
     { "crypto", $embed("js/crypto.js") },
+    { "test", $embed("js/test.js") },
 };
 
 
@@ -320,6 +321,7 @@ fn void? boot() {
     install_natives(WORKER_NATIVES)!;
     install_natives(WS_NATIVES)!;
     install_natives(ZLIB_NATIVES)!;
+    install_natives(TEST_NATIVES)!;
     g_runtime.rt.exec(PRELUDE, "<prelude>")!;
     g_runtime.rt.exec($embed("js/worker.js"), "<worker>")!;
     g_runtime.rt.exec(FETCH, "<fetch>")!;
@@ -408,6 +410,11 @@ fn int main(String[] argv) {
     }
     init_perms();
     g_runtime.perms.prompt = libc::isatty(0) != 0 && libc::isatty(2) != 0;
+    if (argv.len >= 2 && argv[1] == "test") {
+        String[]? rewritten = test_argv(argv);
+        if (catch rewritten) return 2;
+        argv = rewritten;
+    }
     if (catch parse_args(argv)) {
         usage();
         return 2;
@@ -416,7 +423,7 @@ fn int main(String[] argv) {
         io::eprintfn("error: bootstrap failed: %s: %s", err, g_runtime.rt.last_error());
         return 1;
     }
-    char[]? src = file::load(mem, g_runtime.main);
+    char[]? src = g_testing ? TEST_RUNNER.copy(mem) : file::load(mem, g_runtime.main);
     if (catch err = src) {
         io::eprintfn("error: cannot read %s: %s", g_runtime.main, err);
         return 1;

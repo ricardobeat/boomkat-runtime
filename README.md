@@ -36,6 +36,7 @@ built-in or an error, and remote imports are not supported.
 | `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |
 | `crypto` | `randomBytes`, `sha256`, `hex`, `timingSafeEqual`, async `hashPassword` / `verifyPassword` |
 | `typescript` | `transpile(source, options)`; native TS type erasure and JSX lowering to JavaScript source |
+| `test` | `test`, `describe`, hooks and assertions for `bkr test` |
 
 ### Serving TypeScript and JSX
 
@@ -95,6 +96,37 @@ limit, automatic pings, a 120 s idle timeout, and no compression. Open sockets
 keep the process alive.
 
 Validation: `bkr --no-sandbox -A tests/websocket.js`.
+
+### Testing
+
+`bkr test [flags] [--filter=text] [paths...]` runs every `*.test.*`, `*_test.*`
+and `*.spec.*` file (`.js`, `.mjs`, `.jsx`, `.ts`, `.mts`, `.tsx`) under the
+given paths, or the working directory. Hidden directories and `node_modules`
+are skipped. Discovery needs no grant; tests get the permissions the flags
+give, as a script would.
+
+```ts
+import { test, describe, beforeEach, assertEquals, assertRejects } from "test";
+
+describe("sums", () => {
+    test("adds", () => assertEquals(1 + 2, 3));
+    test("rejects", () => assertRejects(Promise.reject(new RangeError("no")), RangeError));
+});
+```
+
+`test`/`it` and `describe` take `.skip` and `.only`; `test.todo(name)` lists
+work to do. Hooks: `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, scoped to
+the file or the enclosing `describe`. Assertions: `assert`, `assertEquals` (deep:
+arrays, plain objects, Maps, Sets, Dates, RegExps, typed arrays),
+`assertNotEquals`, `assertStrictEquals`, `assertMatch`, `assertThrows`,
+`assertRejects`, `fail`, and the `AssertionError` they throw.
+
+Files are imported one after another into one runtime, then their tests run in
+order. An unhandled rejection during a test fails that test. The run exits
+with status 1 on any failure or when no test file is found, and does not wait
+for servers or timers the tests leave open.
+
+Validation: `bkr --no-sandbox -A tests/test-runner.js`.
 
 ### Module workers
 
@@ -301,6 +333,8 @@ descriptors, conversions and wake callbacks fall back to the original JS method.
 
 `bkr check script.js` lists the built-ins a module graph imports and the
 flags it will probably need.
+
+`bkr test` runs test files; see [Testing](#testing).
 
 Regression checks:
 
