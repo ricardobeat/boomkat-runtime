@@ -64,7 +64,7 @@ fn PropValue* sink_slot(HObject* receiver, uint index, heap::Heap* h, bool own =
     if (ic.key != (hstring::StringRef)null && cache.epoch == h.shape_recycle_epoch
         && ic.shape_id == receiver.shape_id) {
         PropValue* slot = hobject::ic_resolve_slot(ic, receiver);
-        if (slot != null && (!own || ic.proto == null)) return slot;
+        if (slot != null && (!own || !ic.has_proto)) return slot;
     }
     return sink_slot_fill(receiver, index, h, own);
 }
@@ -72,7 +72,9 @@ fn PropValue* sink_slot(HObject* receiver, uint index, heap::Heap* h, bool own =
 fn PropValue* sink_slot_fill(HObject* receiver, uint index, heap::Heap* h, bool own) {
     SinkSlot* cache = &g_runtime.sink_slots[index];
     ICEntry* ic     = &cache.ic;
-    *ic = { };
+    // The chain block is pool memory the entry keeps across refills.
+    hobject::ICChain* chain = ic.chain;
+    *ic = { .chain = chain };
     HObject* cur = receiver;
     uint depth   = 0;
     while (cur != null) {
@@ -83,16 +85,16 @@ fn PropValue* sink_slot_fill(HObject* receiver, uint index, heap::Heap* h, bool 
             ic.prop_idx = (uint)idx;
             ic.prop_flags = cur.get_prop_flags((uint)idx, h);
             ic.chain_len = (char)depth;
-            ic.proto = depth ? cur : null;
+            ic.has_proto = depth != 0;
             ic.key = (hstring::StringRef)cache.key;
             cache.epoch = h.shape_recycle_epoch;
             return &cur.prop_values()[idx];
         }
         if (own || depth == hobject::IC_MAX_CHAIN) return null;
         cur = cur.prototype;
-        if (cur == null) return null;
-        ic.chain_protos[depth] = cur;
-        ic.chain_shapes[depth++] = cur.shape_id;
+        if (cur == null || !hobject::ic_reserve_chain(ic, h)) return null;
+        ic.chain.snapshot.protos[depth] = cur;
+        ic.chain.snapshot.shapes[depth++] = cur.shape_id;
     }
     return null;
 }
