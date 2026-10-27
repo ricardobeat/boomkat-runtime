@@ -29,7 +29,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 - [ ] TLS server in `serve` (cert/key options) and HTTP/2.
 - [ ] Remote imports (gated under `import`), `ffi`, `sys`.
 - [ ] Linux sandbox (Landlock + seccomp) beside Seatbelt.
-- [ ] `console` prints arrays returned by `String.prototype.split` with a stray `length:` entry (engine/console quirk).
+- [x] `console` printed builtin-created arrays (`split`, `match`, `Object.entries`) with a `length:` entry: the engine wrote their `length` as enumerable (fixed in boomkat `635d8971`).
 - [ ] Dropping an unread `fetch` response body leaves its socket open until closed or garbage collected.
 
 ## Toward a Deno/Bun alternative
