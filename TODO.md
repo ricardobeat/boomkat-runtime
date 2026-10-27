@@ -44,7 +44,9 @@ Web APIs:
 - [x] WebSocket: `upgradeWebSocket` on uWS and the global client.
 - [x] Compression: `CompressionStream`/`DecompressionStream` and gzip/deflate decoding in `fetch`.
 - [ ] Automatic response compression in `serve` (opt-in, negotiating `accept-encoding`).
-- [ ] Source maps for transpiled TypeScript in error stacks.
+- [x] Source maps for TypeScript stacks: not needed. The engine parses TS and TSX natively, so stack positions are already in the original source. Uncaught errors now print their stack.
+- [ ] Engine: a module's SyntaxError has no file, line or stack (`SyntaxError: unexpected token` only). The engine records line/col (`err_line`/`err_col`) but neither the error object nor the embedding API carries the file.
+- [ ] `typescript.transpile()` source maps for browser devtools: needs position tracking in the engine's printer.
 - [ ] `crypto.subtle`.
 - [ ] Confirm `Intl` coverage from the engine.
 - [ ] TypeScript enums and other syntax needing runtime transforms.

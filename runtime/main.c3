@@ -426,7 +426,7 @@ fn int main(String[] argv) {
     JsValue? ns = g_runtime.rt.eval_module((String)src, g_runtime.main);
     g_runtime.depth--;
     if (catch err = ns) {
-        io::eprintfn("error: %s", g_runtime.rt.last_error());
+        io::eprintfn("error: %s", uncaught_text());
         return 1;
     }
     g_runtime.rt.release(ns);

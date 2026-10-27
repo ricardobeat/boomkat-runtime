@@ -201,8 +201,25 @@ fn JsValue? call_catch(JsValue f, JsValue[] args, JsValue* thrown) {
     return result;
 }
 
+// The uncaught exception's stack when it has one, else the engine's message,
+// which also covers syntax errors and other failures before code runs.
+fn String uncaught_text() {
+    String message = g_runtime.rt.last_error().tcopy();
+    if (g_runtime.describe.is_empty()) return message;
+    g_runtime.rt.@scope() {
+        JsValue? thrown = g_runtime.rt.get_exception();
+        if (catch thrown) return message;
+        TVal tv;
+        if (!g_runtime.rt.load(thrown, &tv) || !tv.is_object()) return message;
+        JsValue[1] a = { thrown };
+        String? stack = g_runtime.rt.as_string(g_runtime.rt.call(g_runtime.describe, a[..]) ?? { });
+        if (try stack && stack.contains("\n    at ")) return stack.tcopy();
+    };
+    return message;
+}
+
 fn void report_uncaught() {
-    io::eprintfn("error: %s", g_runtime.rt.last_error());
+    io::eprintfn("error: %s", uncaught_text());
     g_runtime.exit_code = 1;
     exit_now();
 }
