@@ -42,7 +42,8 @@ Blockers:
 
 Web APIs:
 - [x] WebSocket: `upgradeWebSocket` on uWS and the global client.
-- [ ] Compression: `CompressionStream`/`DecompressionStream`, gzip in `fetch` and `serve`.
+- [x] Compression: `CompressionStream`/`DecompressionStream` and gzip/deflate decoding in `fetch`.
+- [ ] Automatic response compression in `serve` (opt-in, negotiating `accept-encoding`).
 - [ ] Source maps for transpiled TypeScript in error stacks.
 - [ ] `crypto.subtle`.
 - [ ] Confirm `Intl` coverage from the engine.

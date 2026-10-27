@@ -133,7 +133,7 @@ async function requestOnce(url, method, headers, body, signal) {
         if (!h.has("host")) h.set("host", url.host);
         if (!h.has("user-agent")) h.set("user-agent", "bkr");
         if (!h.has("accept")) h.set("accept", "*/*");
-        h.set("accept-encoding", "identity");
+        if (!h.has("accept-encoding")) h.set("accept-encoding", "gzip, deflate");
         h.set("connection", "close");
         if (body !== null) h.set("content-length", String(body.length));
         else if (method === "POST" || method === "PUT" || method === "PATCH") h.set("content-length", "0");
@@ -198,7 +198,9 @@ async function fetch(input, init = {}) {
             url = next;
             continue;
         }
-        const stream = bodyStream(res.reader, res.headers, method, res.status);
+        let stream = bodyStream(res.reader, res.headers, method, res.status);
+        const coding = CONTENT_CODINGS[(res.headers.get("content-encoding") || "").trim().toLowerCase()];
+        if (stream && coding) stream = decoded(stream, coding);
         const out = new Response(stream, { status: res.status === 101 ? 200 : res.status, statusText: res.statusText, headers: res.headers });
         Object.defineProperty(out, "url", { value: url.href });
         Object.defineProperty(out, "redirected", { value: hops > 0 });
@@ -206,5 +208,71 @@ async function fetch(input, init = {}) {
     }
 }
 
+// ---- compression ----
+
+const FORMATS = { "gzip": 0, "deflate": 1, "deflate-raw": 2 };
+
+function codec(format, compress) {
+    const f = FORMATS[format];
+    if (f === undefined) throw new TypeError(`unsupported compression format: ${format}`);
+    return bk.zlibNew(f, compress);
+}
+
+function codecStream(format, compress) {
+    const id = codec(format, compress);
+    const end = () => bk.zlibEnd(id);
+    return new TransformStream({
+        transform(chunk, c) {
+            let out;
+            try { out = bk.zlibPush(id, bk.asBytes(chunk), false); } catch (e) { end(); throw e; }
+            if (out.length) c.enqueue(out);
+        },
+        flush(c) {
+            try {
+                const out = bk.zlibPush(id, new Uint8Array(0), true);
+                if (out.length) c.enqueue(out);
+            } finally { end(); }
+        },
+        cancel: end,
+    });
+}
+
+class CompressionStream {
+    constructor(format) { const t = codecStream(String(format), true); this.readable = t.readable; this.writable = t.writable; }
+}
+
+class DecompressionStream {
+    constructor(format) { const t = codecStream(String(format), false); this.readable = t.readable; this.writable = t.writable; }
+}
+
+// A decoded view of a fetch body that, like the body, reads only while a
+// consumer waits.
+function decoded(source, format) {
+    const id = codec(format, false);
+    const reader = source.getReader();
+    return new ReadableStream({
+        async pull(c) {
+            try {
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    const out = bk.zlibPush(id, done ? new Uint8Array(0) : value, done);
+                    if (out.length) c.enqueue(out);
+                    if (done) { bk.zlibEnd(id); c.close(); return; }
+                    if (out.length) return;
+                }
+            } catch (e) {
+                bk.zlibEnd(id);
+                reader.cancel(e).catch(() => {});
+                throw e;
+            }
+        },
+        cancel(r) { bk.zlibEnd(id); return reader.cancel(r); },
+    }, PULL_ON_DEMAND);
+}
+
+const CONTENT_CODINGS = { "gzip": "gzip", "x-gzip": "gzip", "deflate": "deflate" };
+
+for (const [name, value] of Object.entries({ CompressionStream, DecompressionStream }))
+    Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
 globalThis.fetch = fetch;
 })(__bk);

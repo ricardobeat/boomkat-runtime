@@ -407,7 +407,8 @@ class ReadableStream {
                 yield value;
             }
         } finally {
-            if (!preventCancel) reader.cancel();
+            // An errored stream rejects the cancel; the error already surfaced.
+            if (!preventCancel) reader.cancel().catch(() => {});
             reader.releaseLock();
         }
     }
@@ -542,7 +543,10 @@ class WritableStreamDefaultWriter {
 class TransformStream {
     constructor(t = {}) {
         let rc;
-        this.readable = new ReadableStream({ start(c) { rc = c; } }, { highWaterMark: Infinity });
+        this.readable = new ReadableStream({
+            start(c) { rc = c; },
+            cancel: (r) => t.cancel?.(r),
+        }, { highWaterMark: Infinity });
         const controller = {
             enqueue: (c) => rc.enqueue(c),
             error: (e) => rc.error(e),
@@ -553,7 +557,7 @@ class TransformStream {
         this.writable = new WritableStream({
             write: (chunk) => t.transform ? t.transform(chunk, controller) : controller.enqueue(chunk),
             close: async () => { if (t.flush) await t.flush(controller); rc.close(); },
-            abort: (e) => rc.error(e),
+            abort: (e) => { t.cancel?.(e); rc.error(e); },
         });
     }
 }

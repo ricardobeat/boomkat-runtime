@@ -319,6 +319,7 @@ fn void? boot() {
     install_natives(CRYPTO_NATIVES)!;
     install_natives(WORKER_NATIVES)!;
     install_natives(WS_NATIVES)!;
+    install_natives(ZLIB_NATIVES)!;
     g_runtime.rt.exec(PRELUDE, "<prelude>")!;
     g_runtime.rt.exec($embed("js/worker.js"), "<worker>")!;
     g_runtime.rt.exec(FETCH, "<fetch>")!;

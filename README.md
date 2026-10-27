@@ -278,8 +278,10 @@ including accessing `response.body`, currently loads the file into memory;
 the bounded native path applies when the server sends the untouched descriptor.
 
 Globals: `fetch` (HTTP/1.1 over `net`, TLS with certificate and hostname
-verification, redirects re-checked against the net grants), `Request`,
-`Response`, `Headers`, `URL`, `URLSearchParams`, streams, `Blob`, `File`,
+verification, redirects re-checked against the net grants, gzip and deflate
+bodies decoded), `Request`, `Response`, `Headers`, `URL`, `URLSearchParams`,
+streams, `CompressionStream`/`DecompressionStream` (gzip, deflate, deflate-raw;
+system zlib), `WebSocket`, `Blob`, `File`,
 `AbortController`, `EventTarget`, `TextEncoder`/`TextDecoder`, `crypto`,
 `performance`, timers, `structuredClone`, and an `unhandledrejection` event
 (unhandled rejections end the process with status 1 unless prevented).

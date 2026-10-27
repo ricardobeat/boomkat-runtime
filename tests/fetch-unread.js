@@ -15,6 +15,7 @@ const server = serve({
     routes: {
         "/endless": () => new Response(endless()),
         "/large": () => new Response("x".repeat(1 << 20)),
+        "/gzip": () => new Response(endless().pipeThrough(new CompressionStream("gzip")), { headers: { "content-encoding": "gzip" } }),
     },
 });
 await server.ready;
@@ -34,6 +35,10 @@ const cases = {
     "awaited body with nothing else running": `
         const r = await fetch("${base}/large");
         console.log((await r.text()).length);`,
+    "one chunk of an endless gzip body": `
+        const r = await fetch("${base}/gzip");
+        const reader = r.body.getReader();
+        console.log((await reader.read()).value.length > 0);`,
     "timer still runs after an unread body": `
         await fetch("${base}/endless");
         setTimeout(() => console.log("timer"), 50);`,
@@ -43,6 +48,7 @@ const expected = {
     "unread body larger than the socket buffers": "200",
     "one chunk of an endless body": "true",
     "awaited body with nothing else running": String(1 << 20),
+    "one chunk of an endless gzip body": "true",
     "timer still runs after an unread body": "timer",
 };
 
