@@ -154,7 +154,7 @@ and 32,768 graph objects/entries. `structuredClone` uses the same codec.
 
 ```sh
 ./out/bkr --allow-read=examples/workers examples/workers/main.ts
-python3 tests/run_workers.py
+./out/bkr test --no-sandbox -A tests/workers.test.js
 ```
 
 ### HTTP server workers
