@@ -53,10 +53,12 @@ Web APIs:
 
 Tooling:
 - [x] `bkr test` with the `test` module. Files share one runtime; per-file isolation in workers would need the worker entry to load through `read_module`.
-- [ ] Move the per-test Python wrappers to `bkr test` where they only drive bkr.
+- [x] Move the Python wrappers that only drive bkr to `bkr test`: `tests/modules.test.js` and `tests/workers.test.js` replace `run_modules.py` and `run_workers.py`.
+- [ ] `run_sqlite.py` and `run_crypto.py` stay in Python: they also drive `sqlite3`, `cc` or `openssl`.
 - [ ] Engine: arrow functions are missing from stack traces (`() => inner()` shows only `inner` and the module frame).
-- [ ] REPL.
-- [ ] `--watch`.
+- [x] REPL: `bkr` or `bkr repl` with no script. Declarations persist, entries may use `await`, and `_` holds the last result.
+- [ ] REPL regression test and a README section. `process.run` cannot pass stdin to the child yet, so the test needs that first.
+- [x] `--watch`: `bkr test --watch` reruns after any file under the paths changes (250 ms poll, fresh process per run).
 - [ ] Inspector / debugger protocol.
 - [ ] `.d.ts` files for the built-in modules.
 - [ ] Single-binary compile.
