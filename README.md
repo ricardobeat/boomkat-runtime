@@ -105,6 +105,10 @@ given paths, or the working directory. Hidden directories and `node_modules`
 are skipped. Discovery needs no grant; tests get the permissions the flags
 give, as a script would.
 
+`--watch` keeps the runner going: after each run it waits for any file under
+the paths to change (polled every 250 ms) and runs again in a fresh process, so
+edited modules reload. Ctrl-C stops it.
+
 ```ts
 import { test, describe, beforeEach, assertEquals, assertRejects } from "test";
 

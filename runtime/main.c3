@@ -355,7 +355,7 @@ fn void? boot() {
 
 fn void usage() {
     io::eprintn(
-        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...] | bkr [flags] [repl] | bkr test [flags] [--filter=text] [paths...]"
+        "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...] | bkr [flags] [repl] | bkr test [flags] [--watch] [--filter=text] [paths...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
 }
@@ -409,6 +409,10 @@ fn int main(String[] argv) {
     if (argv.len == 3 && argv[1] == "check") {
         init_perms();
         return check_main(argv[2]);
+    }
+    if (argv.len >= 2 && argv[1] == "test" && watch_requested(argv)) {
+        watch_tests(argv);
+        return 0;
     }
     init_perms();
     g_runtime.perms.prompt = libc::isatty(0) != 0 && libc::isatty(2) != 0;

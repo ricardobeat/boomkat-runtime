@@ -7,6 +7,8 @@ import boomkat;
 import std::io;
 import std::collections::list;
 import std::sort;
+import std::thread;
+import std::time;
 import libc;
 
 const String TEST_RUNNER = `import { __run } from "test";
@@ -29,7 +31,9 @@ fn bool is_test_file(String name) {
     return false;
 }
 
-fn void find_tests(String path, List{String}* out) {
+// find_tests appends the test files under path. With `every`, every regular
+// file counts, which is what the watcher stamps.
+fn void find_tests(String path, List{String}* out, bool every) {
     Stat st;
     if (libc::stat(path.zstr_tcopy(), &st) != 0) return;
     if ((st.st_mode & libc::S_IFMT) != libc::S_IFDIR) {
@@ -44,8 +48,8 @@ fn void find_tests(String path, List{String}* out) {
         if (name.starts_with(".") || name == "node_modules") continue;
         String child = string::tformat("%s/%s", path, name);
         if (e.type == DT_DIR) {
-            find_tests(child, out);
-        } else if (is_test_file(name)) {
+            find_tests(child, out, every);
+        } else if (every || is_test_file(name)) {
             out.push(child.copy(mem));
         }
     }
@@ -85,7 +89,7 @@ fn String[]? test_argv(String[] argv) {
             io::eprintfn("error: %s does not exist", p);
             return USAGE~;
         }
-        find_tests(abs, &files);
+        find_tests(abs, &files, false);
     }
     String[] found = files.array_view();
     sort::quicksort(found, &compare_paths);
@@ -95,6 +99,58 @@ fn String[]? test_argv(String[] argv) {
     if (filter.len) flags.push(filter);
     foreach (f : found) flags.push(f);
     return flags.array_view();
+}
+
+// watch_stamp hashes the path, size and mtime of every file under the paths.
+// It changes when a file is edited, added or removed.
+fn ulong watch_stamp(String[] paths) {
+    @pool() {
+        ulong hash = 1469598103934665603;
+        List{String} files;
+        files.tinit();
+        foreach (p : paths) find_tests(absolute(p), &files, true);
+        foreach (f : files) {
+            for (usz i = 0; i < f.len; i++) hash = (hash ^ (ulong)f[i]) * 1099511628211;
+            Stat st;
+            if (libc::stat(f.zstr_tcopy(), &st) != 0) continue;
+            hash = (hash ^ (ulong)st.st_size) * 1099511628211;
+            hash = (hash ^ (ulong)st.st_mtimespec.s) * 1099511628211;
+            hash = (hash ^ (ulong)st.st_mtimespec.ns) * 1099511628211;
+        }
+        return hash;
+    };
+}
+
+fn bool watch_requested(String[] argv) {
+    foreach (a : argv) {
+        if (a == "--watch") return true;
+    }
+    return false;
+}
+
+// `bkr test --watch`: runs the tests, then reruns them whenever a file under
+// the paths changes. Each run is a fresh bkr, so edited modules reload.
+fn void watch_tests(String[] argv) {
+    List{String} child;
+    child.init(mem);
+    List{String} paths;
+    paths.init(mem);
+    foreach (a : argv) {
+        if (a != "--watch") child.push(a);
+    }
+    foreach (a : argv[2..]) {
+        if (!a.starts_with("-")) paths.push(a);
+    }
+    if (!paths.len()) paths.push(".");
+    for (;;) {
+        io::eprintn("\n[watch] running tests");
+        run_inherit(child.array_view());
+        io::eprintn("[watch] waiting for changes, Ctrl-C to stop");
+        ulong stamp = watch_stamp(paths.array_view());
+        while (watch_stamp(paths.array_view()) == stamp) {
+            thread::sleep_ns((NanoDuration)250000000);
+        }
+    }
 }
 
 fn void js_isatty(JsCtx ctx, void* udata) => ctx.ret_bool(libc::isatty(ctx.arg(0).as_int(1)) != 0);

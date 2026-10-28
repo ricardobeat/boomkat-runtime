@@ -139,6 +139,29 @@ fn void wait_work(Task* t) {
     }
 }
 
+// run_inherit(argv) runs a child on this terminal and environment, and waits
+// for it. Used by `bkr test --watch`, which needs no grant of its own.
+fn void run_inherit(String[] argv) {
+    @pool() {
+        List{ZString} list;
+        list.tinit();
+        foreach (a : argv) list.push(a.zstr_tcopy());
+        list.push(null);
+        void* actions;
+        posix_spawn_file_actions_init(&actions);
+        defer posix_spawn_file_actions_destroy(&actions);
+        CInt pid;
+        if (posix_spawnp(&pid, argv[0].zstr_tcopy(), &actions, null, list.entries, environ())) {
+            io::eprintfn("error: cannot run %s", argv[0]);
+            return;
+        }
+        CInt status;
+        while (waitpid(pid, &status, 0) < 0) {
+            if (libc::errno() != Errno.EINTR) return;
+        }
+    };
+}
+
 fn void wait_done(Task* t) {
     WaitTask* w = (WaitTask*)t;
     defer free(w);
