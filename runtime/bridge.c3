@@ -121,18 +121,81 @@ fn JsValue? owned_text_value(char[] owned) {
 
 // ---- settling async ops ----
 
-// JS starts an op by passing a fresh id to a native; the native finishes it,
-// now or from a later loop callback, through one of these. On the JS side
-// __settle(id, ok, value, code) resolves or rejects the op's promise.
-fn void settle(uint id, bool ok, JsValue value = { }, String code = "") {
+// Async ops own native promise capabilities. IDs are never reused, so a late
+// completion cannot settle a different operation after cancellation.
+fn void js_op(JsCtx ctx, void* user) {
+    if (ctx.arg(0).type_of() != FUNCTION) {
+        ctx.throw_error(TYPE, "operation must be callable");
+        return;
+    }
+    if (g_runtime.next_op == uint::max) {
+        ctx.throw_error(RANGE, "async operation IDs exhausted");
+        return;
+    }
+    JsDeferred? made = g_runtime.rt.deferred();
+    if (catch made) { ctx.throw_error(ERROR, "cannot create async operation"); return; }
+    JsDeferred op = made;
+    uint id = ++g_runtime.next_op;
+    // The operation may complete synchronously, releasing its owned roots.
     g_runtime.rt.@scope() {
-        JsValue[4] args = {
-            g_runtime.rt.number(id) ?? { },
-            g_runtime.rt.boolean(ok) ?? { },
-            value,
-            code.len ? g_runtime.rt.string(code) ?? { } : (JsValue) { },
-        };
-        (void)call_js(g_runtime.settle, args[..]);
+        JsValue promise = g_runtime.rt.root(ctx.value(op.promise).tv) ?? { };
+        if (promise.is_empty()) {
+            g_runtime.rt.release_deferred(op);
+            ctx.throw_error(ERROR, "cannot retain async operation");
+            return;
+        }
+        g_runtime.pending_ops.set(id, op);
+        JsArg[5] args = { ctx.number(id), ctx.arg(1), ctx.arg(2), ctx.arg(3), ctx.arg(4) };
+        if (catch ctx.call(ctx.arg(0), args[..])) {
+            if (try pending = g_runtime.pending_ops.get(id)) {
+                g_runtime.pending_ops.remove(id);
+                g_runtime.rt.release_deferred(pending);
+            }
+            return;
+        }
+        ctx.ret(ctx.value(promise));
+    };
+}
+
+fn JsValue? system_error(String code, String message) {
+    Heap* h = g_runtime.rt.rt.heap;
+    HString* text = h.str_intern((char[])message);
+    if (!text) return boomkat::OUT_OF_MEMORY~;
+    TVal value;
+    if (!builtins::host_new_error(h, g_runtime.rt.rt.vm, 0, text, &value)) return boomkat::OUT_OF_MEMORY~;
+    JsValue error = g_runtime.rt.root(value)!;
+    TVal proto;
+    if (g_runtime.rt.load(g_runtime.system_error_proto, &proto)) h.set_prototype(value.get_heapptr(), proto.get_heapptr());
+    g_runtime.rt.set(error, "code", g_runtime.rt.string(code)!)!;
+    return error;
+}
+
+fn void settle(uint id, bool ok, JsValue value = { }, String code = "") {
+    if (g_runtime.closing || worker_stopping()) return;
+    JsDeferred? found = g_runtime.pending_ops.get(id);
+    if (catch found) return;
+    JsDeferred op = found;
+    g_runtime.pending_ops.remove(id);
+    defer g_runtime.rt.release_deferred(op);
+    g_runtime.depth++;
+    defer g_runtime.depth--;
+    bool started = begin_dispatch();
+    defer end_dispatch(started);
+    g_runtime.rt.@scope() {
+        if (!ok) {
+            String message = g_runtime.rt.as_string(value) ?? "";
+            JsValue? error = system_error(code, message);
+            if (catch err = error) { (void)dispatch_error(err); return; }
+            value = error;
+        }
+        if (catch err = g_runtime.rt.settle_deferred(op, ok, value)) {
+            (void)dispatch_error(err);
+            return;
+        }
+        if (g_runtime.depth == 1) {
+            if (catch err = checkpoint()) { (void)dispatch_error(err); return; }
+            if (g_runtime.rejections.len()) flush_rejections();
+        }
     };
 }
 

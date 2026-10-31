@@ -28,25 +28,7 @@ class SystemError extends Error {
 }
 def("SystemError", SystemError);
 bk.error = (code, message) => new SystemError(code, message);
-
-const pending = new Map();
-let nextOp = 1;
-
-bk.op = function (native, a, b, c, d) {
-    const id = nextOp++;
-    const p = Promise.withResolvers();
-    pending.set(id, p);
-    native(id, a, b, c, d);
-    return p.promise;
-};
-
-bk.settle = function (id, ok, value, code) {
-    const p = pending.get(id);
-    if (p === undefined) return;
-    pending.delete(id);
-    if (ok) p.resolve(value);
-    else p.reject(new SystemError(code, value));
-};
+bk.systemErrorPrototype = SystemError.prototype;
 
 // ---- encoding ----
 

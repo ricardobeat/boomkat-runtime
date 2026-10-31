@@ -775,3 +775,5 @@ fn void free_worker_resources() {
     g_runtime.rejections.free();
     g_runtime.workers.free();
 }
+    foreach (op : g_runtime.pending_ops.values(tmem)) g_runtime.rt.release_deferred(op);
+    g_runtime.pending_ops.free();

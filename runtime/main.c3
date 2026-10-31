@@ -276,6 +276,7 @@ fn HostPort split_host_port(String s) {
 }
 
 const Native[] CORE_NATIVES = {
+    { "op", &js_op, 5 },
     { "immediateArm", &js_immediate_arm, 0 },
     { "now", &js_now, 0 },
     { "urlFast", &js_url_fast, 1 },
@@ -333,7 +334,8 @@ fn void? boot() {
         install_natives(SQLITE_NATIVES)!;
         g_runtime.rt.define_module("sqlite", $embed("js/sqlite.js"))!;
     }
-    g_runtime.settle = bk_get("settle")!;
+    g_runtime.system_error_proto = bk_get("systemErrorPrototype")!;
+    g_runtime.pending_ops.init(mem);
     g_runtime.immediate_fire = bk_get("immediateFire")!;
     g_runtime.dispatch = bk_get("dispatch")!;
     g_runtime.handled = bk_get("handled")!;

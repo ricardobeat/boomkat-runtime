@@ -73,7 +73,9 @@ struct RuntimeState {
     usz dir_next;
     JsRuntime engine;
     JsContext rt;
-    JsValue settle;
+    JsValue system_error_proto;
+    HashMap{uint, JsDeferred} pending_ops;
+    uint next_op;
     int exit_code;
     JsValue bk;
     List{Res*} res;
