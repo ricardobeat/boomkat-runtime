@@ -1189,7 +1189,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
         String host = ctx.arg(1).as_string() ?? "0.0.0.0";
         int port    = ctx.arg(2).as_int(8080);
         Server* parent = g_runtime.worker ? g_runtime.worker.http_server : null;
-        if ((parent || g_runtime.http_workers > 1) && g_runtime.servers.len()) {
+        if ((parent || g_runtime.http_workers > 1 || g_runtime.http_processes) && g_runtime.servers.len()) {
             return ctx.throw_error(TYPE, "HTTP worker mode supports one serve() per entry module");
         }
         if (parent && (host != parent.hostname || port != parent.requested_port)) {
@@ -1274,7 +1274,7 @@ fn void js_http_pool_count(JsCtx ctx, void* user) {
 fn void js_http_pool_pending(JsCtx ctx, void* user) {
     foreach (s : g_runtime.servers) if (s.index == ctx.arg(0).id()) {
         bool draining;
-        if (s.stopped && g_runtime.http_workers > 1) {
+        if (s.stopped && (g_runtime.http_workers > 1 || g_runtime.http_processes)) {
             draining = !uws_app_pool_idle(s.app);
             // Retire idle main-loop keep-alive sockets once all responses drain.
             if (!draining && !s.pool_live) uws_app_stop(s.app, 1);

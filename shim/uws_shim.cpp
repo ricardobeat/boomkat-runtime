@@ -19,6 +19,9 @@ typedef void (*uws_req_cb)(void *user, uws_req *req, uws_res *res);
 typedef void (*uws_data_cb)(void *user, const char *chunk, size_t len, int last);
 typedef int (*uws_writable_cb)(void *user, uintmax_t offset);
 typedef struct { const char *key; size_t key_len; const char *val; size_t val_len; } uws_header;
+int bkr_process_listen(void *app, const char *host, int port, void *loop,
+    void (*adopt)(void *, int, const char *, int));
+void bkr_process_stop(void *app);
 
 }
 
@@ -28,6 +31,8 @@ using Res = uWS::HttpResponse<false>;
 namespace {
 
 struct App;
+struct WsData;
+using Ws = uWS::WebSocket<false, true, WsData>;
 struct Endpoint {
     App *app;
     uWS::Loop *loop;
@@ -47,12 +52,12 @@ struct App {
     bool dispatch_owner = false;
     us_socket_context_t *dispatch_context = nullptr;
     std::unordered_set<Res *> connections; // owned by this app's loop
+    std::unordered_set<Ws *> websockets;
     std::unordered_set<std::string> ws_paths;
 };
 
 // A server WebSocket carries the runtime's id for it.
-struct WsData { uint64_t id = 0; };
-using Ws = uWS::WebSocket<false, true, WsData>;
+struct WsData { uint64_t id = 0; App *owner = nullptr; };
 
 typedef void (*uws_ws_open_cb)(uint64_t id, void *ws);
 typedef void (*uws_ws_message_cb)(uint64_t id, const char *data, size_t len, int binary);
@@ -68,6 +73,7 @@ struct WsCallbacks {
 // The WebSocket context of the upgrade request being dispatched, read by the
 // request callback. Null for every other request.
 thread_local void *upgrade_context = nullptr;
+thread_local std::unordered_map<us_socket_context_t *, App *> tracked_contexts;
 
 std::mutex dispatch_registry_lock;
 std::unordered_map<us_socket_context_t *, std::shared_ptr<Dispatch>> dispatch_registry;
@@ -121,7 +127,10 @@ void detach_dispatch(App *app) {
 
 void track_connections(App *app) {
     app->app.filter([app](Res *res, int change) {
-        if (change > 0) app->connections.insert(res);
+        if (change > 0) {
+            tracked_contexts[us_socket_context(0, (us_socket_t *)res)] = app;
+            app->connections.insert(res);
+        }
         else app->connections.erase(res);
     });
 }
@@ -165,12 +174,16 @@ static void add_ws_route(App *a, const char *path, uws_req_cb cb, void *user) {
             cb(user, (uws_req *)req, (uws_res *)res);
             upgrade_context = nullptr;
         },
-        .open = [](Ws *ws) { ws_callbacks.open(ws->getUserData()->id, ws); },
+        .open = [](Ws *ws) {
+            if (auto *owner = ws->getUserData()->owner) owner->websockets.insert(ws);
+            ws_callbacks.open(ws->getUserData()->id, ws);
+        },
         .message = [](Ws *ws, std::string_view message, uWS::OpCode op) {
             ws_callbacks.message(ws->getUserData()->id, message.data(), message.size(), op == uWS::OpCode::BINARY);
         },
         .drain = [](Ws *ws) { ws_callbacks.drain(ws->getUserData()->id); },
         .close = [](Ws *ws, int code, std::string_view reason) {
+            if (auto *owner = ws->getUserData()->owner) owner->websockets.erase(ws);
             ws_callbacks.close(ws->getUserData()->id, code, reason.data(), reason.size());
         },
     });
@@ -189,7 +202,15 @@ void *uws_req_upgrade_context(void) { return upgrade_context; }
 // calls the open callback before this returns.
 void uws_res_upgrade(uws_res *res, uint64_t id, const char *key, size_t key_len, const char *protocol,
                      size_t protocol_len, const char *extensions, size_t extensions_len, void *context) {
-    ((Res *)res)->template upgrade<WsData>({ id }, std::string_view(key, key_len), std::string_view(protocol, protocol_len),
+    App *owner = nullptr;
+    auto found = tracked_contexts.find(us_socket_context(0, (us_socket_t *)res));
+    if (found != tracked_contexts.end()) {
+        owner = found->second;
+        // Upgrade can realloc the socket. Retire the HTTP pointer before it
+        // moves; the WebSocket open/close callbacks track its new lifetime.
+        owner->connections.erase((Res *)res);
+    }
+    ((Res *)res)->template upgrade<WsData>({ id, owner }, std::string_view(key, key_len), std::string_view(protocol, protocol_len),
         std::string_view(extensions, extensions_len), (us_socket_context_t *)context);
 }
 
@@ -232,6 +253,14 @@ size_t uws_req_parameter(uws_req *req, unsigned short index, const char **out) {
 // The bound port, or -1.
 int uws_app_listen(uws_app *app, const char *host, int port) {
     App *a = (App *)app;
+    int process_port = bkr_process_listen(a, host, port, uWS::Loop::get(),
+        [](void *app, int fd, const char *ip, int length) {
+            ((App *)app)->app.adoptSocket(fd, std::string_view(ip, length));
+        });
+    if (process_port != -2) {
+        if (process_port >= 0) track_connections(a);
+        return process_port;
+    }
     a->app.listen(std::string(host), port, [a](auto *token) { a->listener = token; });
     if (!a->listener) return -1;
     return us_socket_local_port(0, (us_socket_t *)a->listener);
@@ -277,6 +306,7 @@ int uws_app_pool_count(uws_app *app) {
 
 int uws_app_pool_idle(uws_app *app) {
     auto *a = (App *)app;
+    if (!a->websockets.empty()) return 0;
     for (auto *res : a->connections) {
         auto *data = (uWS::HttpResponseData<false> *)us_socket_ext(0, (us_socket_t *)res);
         if (!res->hasResponded() || data->buffer.length()) return 0;
@@ -286,6 +316,7 @@ int uws_app_pool_idle(uws_app *app) {
 
 void uws_app_stop(uws_app *app, int force) {
     App *a = (App *)app;
+    bkr_process_stop(a);
     detach_dispatch(a);
     if (a->listener) us_listen_socket_close(0, a->listener);
     a->listener = nullptr;
@@ -294,10 +325,15 @@ void uws_app_stop(uws_app *app, int force) {
 
 void uws_app_free(uws_app *app) {
     auto *a = (App *)app;
+    bkr_process_stop(a);
     detach_dispatch(a);
     if (a->dispatch_owner) {
         std::lock_guard<std::mutex> guard(dispatch_registry_lock);
         dispatch_registry.erase(a->dispatch_context);
+    }
+    for (auto it = tracked_contexts.begin(); it != tracked_contexts.end();) {
+        if (it->second == a) it = tracked_contexts.erase(it);
+        else ++it;
     }
     delete a;
 }

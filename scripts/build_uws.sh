@@ -135,6 +135,7 @@ clang "${CFLAGS[@]}" -c "$UWS/uSockets/src/crypto/openssl.c" -o "$OBJ/openssl.o"
 clang++ "${CXXFLAGS[@]}" -c "$UWS/uSockets/src/crypto/sni_tree.cpp" -o "$OBJ/sni_tree.o"
 
 clang++ "${CXXFLAGS[@]}" -c shim/uws_shim.cpp -o "$OBJ/uws_shim.o"
+clang++ "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
 clang "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
 
 rm -f "$OUT"

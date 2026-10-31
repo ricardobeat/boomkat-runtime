@@ -361,6 +361,7 @@ fn void usage() {
         "usage: bkr check script.js | bkr [--allow-<perm>[=list]] [--deny-<perm>=list] [-A] [--no-prompt] [--no-sandbox] [--config file] [--time-limit=ms] [--http-workers=1..64] script.js [args...] | bkr [flags] [repl] | bkr test [flags] [--watch] [--filter=text] [paths...]"
     );
     io::eprintn("permissions: net read write env run ffi sys import");
+    io::eprintn("--http-processes=1..64 runs isolated HTTP processes behind a native socket dispatcher");
 }
 
 fn void? parse_args(String[] argv) {
@@ -386,9 +387,15 @@ fn void? parse_args(String[] argv) {
             if (g_runtime.http_workers < 1 || g_runtime.http_workers > 64) return USAGE~;
             continue;
         }
+        if (a.starts_with("--http-processes=")) {
+            g_runtime.http_processes = a[17..].to_uint() ?? USAGE~!;
+            if (g_runtime.http_processes < 1 || g_runtime.http_processes > 64) return USAGE~;
+            continue;
+        }
         if (!parse_perm_flag(a)!) return USAGE~;
     }
     if (i >= argv.len) return USAGE~;
+    if (g_runtime.http_processes && (g_runtime.http_workers > 1 || g_testing || g_repl)) return USAGE~;
     g_runtime.main = absolute(argv[i]).copy(mem);
     g_runtime.args.init(mem);
     foreach (a : argv[i + 1..]) g_runtime.args.push(a);
@@ -406,6 +413,8 @@ fn void? parse_args(String[] argv) {
         for (usz j = 1; j < i; j++) (void)parse_perm_flag(argv[j]);
     }
 }
+
+extern fn CInt bkr_process_supervise(ZString* argv, CInt count);
 
 fn int main(String[] argv) {
     defer close_sqlite();
@@ -430,6 +439,14 @@ fn int main(String[] argv) {
         usage();
         return 2;
     }
+    // Spawn before any VM, event loop or native pool thread is initialized.
+    // Child runtimes consume their private IPC descriptor inside the shim.
+    @pool() {
+        ZString[] native_args = mem::temp_array(ZString, argv.len + 1);
+        foreach (i, arg : argv) native_args[i] = arg.zstr_tcopy();
+        int status = bkr_process_supervise(native_args.ptr, (CInt)g_runtime.http_processes);
+        if (status >= 0) return status;
+    };
     if (catch err = boot()) {
         io::eprintfn("error: bootstrap failed: %s: %s", err, g_runtime.rt.last_error());
         return 1;

@@ -184,6 +184,37 @@ the process rather than silently reducing the pool.
 Validation: `python3 tests/run_http_workers.py` checks balanced distribution,
 request bodies, forced shutdown and graceful completion of large responses.
 
+### HTTP server processes
+
+`--http-processes=N` (1–64) runs N independent processes behind a native
+supervisor. The supervisor accepts TCP connections and passes their descriptors
+round-robin over Unix sockets with `SCM_RIGHTS`; each worker handles HTTP bodies,
+streams and WebSockets directly. Keep-alive requests stay in the same process.
+This works on macOS without relying on `SO_REUSEPORT` distribution.
+
+```sh
+./out/bkr --http-processes=4 --allow-net=127.0.0.1:8080 \
+  --allow-read=examples/taskboard --allow-write=examples/taskboard/data \
+  examples/taskboard/server.ts 8080 examples/taskboard/data
+```
+
+This is an experimental process pool: one supervisor plus N workers, one
+`serve()` per worker, and no combination with `--http-workers`. Each process
+re-runs the entry module with the same arguments and permissions; memory and
+startup side effects are independent. The supervisor waits for every worker to
+announce the same listener before accepting connections, including when port 0
+is used. It prints `HTTP processes ready: N (port PORT)` at that point.
+`server.ready` and `server.workers` describe the local thread pool, not the
+process pool. `stop()` drains that worker's active responses and WebSockets; the supervisor
+exits when all workers exit. SIGINT/SIGTERM stop the whole pool. A worker crash
+or nonzero exit terminates the pool; automatic respawning is not implemented.
+
+Validation: `python3 tests/run_http_processes.py` checks distinct PIDs,
+connection distribution, keep-alive affinity, bodies, streams, WebSockets,
+backpressure, graceful drains, permissions and failure cleanup. Benchmark with
+`python3 bench/http-processes.py --report bench/http-processes.json`; its RSS
+measurement includes the supervisor and all descendant processes.
+
 ### Native crypto
 
 `randomBytes(size)` returns a system-random Uint8Array (0–65536 bytes).

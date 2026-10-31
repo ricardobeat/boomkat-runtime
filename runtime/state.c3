@@ -98,6 +98,7 @@ struct RuntimeState {
     JsValue worker_event;
     WatchdogState* watchdog_state;
     uint http_workers;
+    uint http_processes;
 }
 
 tlocal RuntimeState g_runtime = {
