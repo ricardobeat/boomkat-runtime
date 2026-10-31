@@ -1,0 +1,41 @@
+Native API runtime benchmark, 2026-10-31
+
+New runtime only; no baseline comparison.
+Three rounds, fresh server per workload, rotating workload order.
+wrk -t2 -c128; 1 second warmup and 3 seconds measured per sample.
+RSS sampled every 100 ms. Values below are medians of three samples.
+No builds or other tests ran concurrently. No socket errors or non-2xx responses.
+128 simultaneous valid responses checked before the first hello measurement.
+JIT disabled; standard bkr build.
+
+Runtime revision: d1a9020e20c510ce795fddebdd4dc7b1121f0a56
+Engine revision: a16eda21f664bf1c54cd69cfcb654b495fe8eb68
+Binary SHA-256: 4fbd8999f2dcfc8c916853955b9f6dd0de6c57f1ba4d4050b9dd787944cb1850
+
+workload       req/s       p50 ms     p99 ms     peak RSS MiB
+hello           184,185      0.576      1.540            13.25
+json            210,761      0.581      1.130            14.05
+async           161,898      0.696      1.430            14.94
+timer           111,013      1.090      1.570            14.89
+echo            151,303      0.756      1.710            15.17
+stream           85,723      1.370      2.890            13.69
+file             79,381      1.490      3.290            15.42
+changing        193,867      0.523      1.190            13.31
+
+Throughput samples by round (req/s):
+hello        137,127, 210,195, 184,185
+json         210,761, 210,824, 172,749
+async        172,280, 161,898, 147,843
+timer        114,925, 111,013, 110,367
+echo         157,620, 149,378, 151,303
+stream       87,438, 85,723, 81,840
+file         94,063, 79,381, 67,340
+changing     231,342, 193,867, 155,372
+
+There is substantial run-to-run variation, with several third-round slowdowns.
+These short local measurements describe this run and do not establish a speedup
+or regression from the native API changes. All raw samples and source hashes are
+in native-api-20261031.json.
+
+Reproduce:
+python3 bench/latency-ab.py --binary native="$PWD/out/bkr" --rounds 3 --report bench/native-api-20261031.json
