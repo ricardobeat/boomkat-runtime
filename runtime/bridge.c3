@@ -20,7 +20,7 @@ fn char[] JsArg.bytes(self) {
     TVal tv = self.tv;
     if (tv.is_string()) {
         HString* hs = (HString*)tv.get_heapptr();
-        if (hs.is_ascii()) return hs.get_data();
+        if (hs.is_ascii()) return hs.ascii_bytes();
         return (char[])(self.as_string() ?? "");
     }
     if (!tv.is_object()) return { };
@@ -93,7 +93,7 @@ fn JsValue? bytes_value(char[] owned) {
     return g_runtime.rt.root(tv);
 }
 
-fn void release_string_bytes(char* data, void* user) => free(user ? user : data);
+fn void release_string_bytes(void* user, void* data, usz length) => free(user ? user : data);
 
 // `owned` has a trailing NUL outside its slice. Ownership passes to JS.
 fn JsValue? owned_text_value(char[] owned) {
@@ -104,9 +104,10 @@ fn JsValue? owned_text_value(char[] owned) {
     @pool() {
         String text = utf8_clean(owned, false) ?? "";
         $if $defined(Heap.alloc_external_string):
-            if (owned.len && text.ptr == owned.ptr && !hstring::has_raw_utf8_astral(owned)) {
-                HString* hs = g_runtime.rt.rt.heap.alloc_external_string(owned, &release_string_bytes, base);
+            if (owned.len && text.ptr == owned.ptr && hstring::check_is_ascii(owned)) {
+                HString* hs = g_runtime.rt.rt.heap.alloc_external_string(hstring::narrow_units(owned), &release_string_bytes, base);
                 if (hs != null) {
+                    hs.finish_data();
                     transferred = true;
                     TVal tv;
                     tv.set_string_borrowed(hs);

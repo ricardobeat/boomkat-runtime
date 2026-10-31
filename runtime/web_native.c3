@@ -80,7 +80,7 @@ fn void native_url_construct(BuiltinContext* raw, void* user) {
         return web_initialize(ctx, cls);
     }
     HString* str = input.get_heapptr();
-    long flags   = str.is_ascii() ? url_fast_flags((String)str.get_data()) : -1;
+    long flags   = str.is_ascii() ? url_fast_flags((String)str.ascii_bytes()) : -1;
     if (flags < 0) return web_initialize(ctx, cls);
     TVal parts;
     parts.set_number((double)flags);
@@ -116,7 +116,7 @@ fn void native_url_pathname(BuiltinContext* raw, void* user) {
                 ulong flags = (ulong)number;
                 usz slash   = flags & 0xFFFF;
                 usz query   = (flags >> 16) & 0xFFFF;
-                String text = (String)str.get_data();
+                String text = (String)str.ascii_bytes();
                 if ((double)flags == number && slash <= text.len
                     && (query == 0xFFFF || (query >= slash && query <= text.len))) {
                     if (slash == text.len) return ctx.ret_string("/");
@@ -412,7 +412,7 @@ fn bool web_headers_blob(Heap* h, HObject* obj, builtins::StrBuf* output, bool a
                 fast = false;
                 break;
             }
-            length += ((HString*)key.get_heapptr()).blen + (usz)((HString*)value.get_heapptr()).blen + 2;
+            length += ((HString*)key.get_heapptr()).utf8_len() + ((HString*)value.get_heapptr()).utf8_len() + 2;
         }
     }
     if (!fast) return false;
@@ -424,11 +424,11 @@ fn bool web_headers_blob(Heap* h, HObject* obj, builtins::StrBuf* output, bool a
         if (key.is_deleted()) continue;
         HString* name  = key.get_heapptr();
         HString* value = map.array_part()[i + 1].get().get_heapptr();
-        hstring::copy_short(output.data + output.len, name.get_cstr(), name.blen);
-        output.len += name.blen;
+        name.copy_utf8(output.data + output.len);
+        output.len += name.utf8_len();
         output.data[output.len++] = '\n';
-        hstring::copy_short(output.data + output.len, value.get_cstr(), value.blen);
-        output.len += value.blen;
+        value.copy_utf8(output.data + output.len);
+        output.len += value.utf8_len();
         output.data[output.len++] = '\n';
     }
     return true;
@@ -536,7 +536,7 @@ fn void native_headers_from_blob(BuiltinContext* raw, void* user) {
             headers.map_key,
             raw.heap
         ) && web_can_assign(headers.prototype, headers.cookies_key, raw.heap);
-        char[] bytes               = fast ? ((HString*)input.get_heapptr()).get_data() : (char[]) { };
+        char[] bytes               = fast ? ((HString*)input.get_heapptr()).ascii_bytes() : (char[]) { };
         // Set-Cookie has a separate array and joining policy in the JS class.
         // Preflight before creating any partially populated native object.
         for (usz at = 0; fast && at < bytes.len;) {
@@ -597,7 +597,7 @@ fn void native_headers_from_blob(BuiltinContext* raw, void* user) {
                 joined.init(raw.heap);
                 defer joined.free();
                 if (!joined.append_bytes(
-                    old.get_data()
+                    (char[])boomkat::utf8_of(old, tmem)
                 ) || !joined.append_bytes(
                     ", "
                 ) || !joined.append_bytes(
@@ -768,7 +768,7 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 		for (uint i = 0; i < count; i++)
 		{
 			TVal value;
-			if (!keys[i].is_ascii() || ((String)keys[i].get_data()).compare_to_ignore_case(
+			if (!keys[i].is_ascii() || ((String)keys[i].ascii_bytes()).compare_to_ignore_case(
 				"set-cookie"
 			) == 0 || !web_own_data(
 				record,
@@ -781,7 +781,7 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 		}
 		for (uint i = 0; i < count; i++)
 		{
-			char[] name = keys[i].get_data();
+			char[] name = keys[i].ascii_bytes();
 			bool lower  = true;
 			foreach (c : name) if (c >= 'A' && c <= 'Z')
 			{
@@ -801,7 +801,7 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 			}
 			TVal value;
 			(void)web_own_data(record, keys[i], h, &value);
-			char[] bytes = ((HString*)value.get_heapptr()).get_data();
+			char[] bytes = ((HString*)value.get_heapptr()).ascii_bytes();
 			usz start    = 0;
 			usz end      = bytes.len;
 			while (start < end && web_header_ascii_space(bytes[start])) start++;

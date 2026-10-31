@@ -651,7 +651,7 @@ fn JsArg? sql_column(JsCtx ctx, SqlStatement* stmt, CInt column) {
             // hashing and comparing their entire contents in the intern table.
             // Copy before SQLite advances; retain the normal UTF-8 path otherwise.
             if (len >= 64 && hstring::check_is_ascii(text[:len])) {
-                HString* string = hstring::hstring_alloc(ctx.ctx.heap, text[:len], hstring::HASH_DEFERRED)!;
+                HString* string = hstring::hstring_alloc(ctx.ctx.heap, hstring::narrow_units(text[:len]), hstring::HASH_DEFERRED)!;
                 ctx.ctx.heap.large_string_register(string);
                 JsArg value;
                 value.tv.set_string_borrowed(string);
