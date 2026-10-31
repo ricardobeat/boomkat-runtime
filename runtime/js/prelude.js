@@ -235,7 +235,7 @@ def("clearInterval", bk.clearTimer);
 bk.immediateFire = function () { bk.runImmediates(); };
 def("setImmediate", bk.setImmediate);
 def("clearImmediate", bk.clearImmediate);
-def("queueMicrotask", (fn) => { Promise.resolve().then(fn); });
+def("queueMicrotask", bk.queueMicrotask);
 
 const origin = bk.now();
 def("performance", { now: () => bk.now() - origin, timeOrigin: Date.now() - (bk.now() - origin) });

@@ -121,6 +121,18 @@ fn JsValue? owned_text_value(char[] owned) {
 
 // ---- settling async ops ----
 
+fn void js_queue_microtask(JsCtx ctx, void* user) {
+    if (!builtins::is_callable_tval(ctx.arg(0).tv)) {
+        ctx.throw_error(TYPE, "microtask callback must be callable");
+        return;
+    }
+    g_runtime.rt.@scope() {
+        JsValue? callback = g_runtime.rt.root(ctx.arg(0).tv);
+        if (catch callback) { ctx.throw_error(ERROR, "cannot retain microtask"); return; }
+        if (catch g_runtime.rt.enqueue_job(callback)) ctx.throw_error(ERROR, "cannot enqueue microtask");
+    };
+}
+
 // Async ops own native promise capabilities. IDs are never reused, so a late
 // completion cannot settle a different operation after cancellation.
 fn void js_op(JsCtx ctx, void* user) {

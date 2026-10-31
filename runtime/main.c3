@@ -276,6 +276,7 @@ fn HostPort split_host_port(String s) {
 }
 
 const Native[] CORE_NATIVES = {
+    { "queueMicrotask", &js_queue_microtask, 1 },
     { "op", &js_op, 5 },
     { "immediateArm", &js_immediate_arm, 0 },
     { "now", &js_now, 0 },
