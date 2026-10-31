@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Users/rtomasi/cousas/boomkat-runtime/bench/http-processes.py", line 146, in <module>
+    assert load.returncode == 0, output + error
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: {"complete_requests":110473,"connections":110473,"elapsed_s":3.200677292,"failed_requests":131646,"first_error":"Get \"http://127.0.0.1:57933/hello\": dial tcp 127.0.0.1:57933: socket: no buffer space available","latency_ms":{"50":1.306417,"99":2.617083},"req_s":34515.5071634757,"reset_on_close":true}

@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/Users/rtomasi/cousas/boomkat-runtime/bench/http-processes.py", line 106, in <module>
+    assert "Socket errors" not in warm and "Non-2xx" not in warm, warm
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Running 1s test @ http://127.0.0.1:18149/hello
+  2 threads and 64 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     1.19ms    2.82ms  36.42ms   98.30%
+    Req/Sec    18.05k     2.13k   20.08k    90.91%
+  39556 requests in 1.10s, 5.43MB read
+  Socket errors: connect 0, read 39555, write 0, timeout 0
+Requests/sec:  35940.79
+Transfer/sec:      4.94MB

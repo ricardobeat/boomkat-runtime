@@ -1,0 +1,8 @@
+1 hello direct 37405.11044921869 {'50': 1.50825, '99': 3.662375} 13.75 load 2.34
+Traceback (most recent call last):
+  File "/Users/rtomasi/cousas/boomkat-runtime/bench/http-processes.py", line 127, in <module>
+    warm = subprocess.run(warm_command, capture_output=True, text=True, check=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rtomasi/.local/share/mise/installs/python/3.12/lib/python3.12/subprocess.py", line 573, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/var/folders/_b/jr5sykn55x19ymm8h93kc0kr0000gn/T/bkr-process-bench-j4lfje_a/http-churn', '-url', 'http://127.0.0.1:18149/hello', '-concurrency', '64', '-threads', '2', '-duration', '1s']' returned non-zero exit status 1.

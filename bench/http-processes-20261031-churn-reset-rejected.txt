@@ -1,0 +1,8 @@
+1 hello direct 40754.23513857744 {'50': 1.359458, '99': 3.440375} 14.17 load 3.53
+Traceback (most recent call last):
+  File "/Users/rtomasi/cousas/boomkat-runtime/bench/http-processes.py", line 130, in <module>
+    raise RuntimeError(warm.stdout + warm.stderr + "\nSERVER:\n" + log.read())
+RuntimeError: {"complete_requests":42044,"connections":42045,"elapsed_s":1.000447875,"failed_requests":1,"first_error":"Get \"http://127.0.0.1:18149/hello\": EOF","latency_ms":{"50":1.336833,"99":2.59275},"req_s":42025.17797341515,"reset_on_close":true}
+
+SERVER:
+HTTP processes ready: 2 (port 18149)

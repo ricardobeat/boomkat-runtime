@@ -1,0 +1,133 @@
+{
+  "method": "1 rounds; rotating variant and workload order; fresh server; 1s warmup + 1s measured",
+  "client_threads": 2,
+  "connections": 64,
+  "load_generator": "Go net/http HTTP/1.1",
+  "close_connections": true,
+  "rss": "peak sum of supervisor and descendant processes, sampled every 100ms",
+  "runtime": "84ef96eaf3dce71f2824c9cd5bfa099ddc421071",
+  "engine": "a16eda21f664bf1c54cd69cfcb654b495fe8eb68",
+  "binary_sha256": "80d6e672b81e79b98e1e44a06d6b162062f46d05157486e1e71e9680d5995318",
+  "server": "/Users/rtomasi/cousas/boomkat-runtime/bench/servers/bkr.js",
+  "server_sha256": "d28983fdec9ff3dc4516a2fc57d5cf7cdcb9e66e98e62eec18a753982f1d5d7a",
+  "logical_cpus": 8,
+  "source_sha256": {
+    "runtime/bridge.c3": "c29b2f8f155208f0bdf1ba74590ccb40c97ee5795e5b11870e7646e3a3f3cc7e",
+    "runtime/check.c3": "1152fdbc88de77c7a533cd2dad45ef150a6eb3791a71715815f461108c9861bc",
+    "runtime/compress.c3": "b06377a7707261cbc8390cd1343c06a0b7487b39264898abe79466bef12db8f6",
+    "runtime/crypto.c3": "a1b6e570ca264eac37bc5aa508098848b393562f4225c3a4afbacfc820204ec7",
+    "runtime/file_body.c3": "a0e758b21fbf281f525598f15511d1bc24a98db857390e10861c5c8eb239616d",
+    "runtime/fs.c3": "516f5f0ae075efbe0fcf919b577da96ce79a028e56cbab8c430376f6bbde0152",
+    "runtime/guard.c3": "382a52ef1a2a0edbbe84224043aeca6637f451e393d17e8fb4245aac69f77987",
+    "runtime/http.c3": "fffdaadc050e9fc3fd2abcb24a27aef07e877cea60228fb2acc89e2868352540",
+    "runtime/immediates.c3": "0e275c7ec1073552e2ffafc40c81d10786c2a8fb7f68d19897b54bbba630533b",
+    "runtime/js/crypto.js": "033b959a7ff568622b3294f69dce56e051b8b2c36ec592d7d55717d907924fde",
+    "runtime/js/fetch.js": "37eaa28ea630aef4e8f3ffc5d3ea6d275538079db130f62c2f8dd0647d466f94",
+    "runtime/js/file.js": "a1aae1df9b874dd2f520a359009292e5b1eda1a0c637083a4724c8cb9726f7f3",
+    "runtime/js/http.js": "adead81b6b4906dd613c177272f6d0c1aa03472736917d629b70a6a9b412546e",
+    "runtime/js/net.js": "c6a49d9d3ed49d182d6ace53ab7ba847240908de7b1d63ef93c2d882f3f4eaef",
+    "runtime/js/path.js": "3bfa364d7d5ca3299f409ab8ac412cbab536a614027c0283f64e07eaba53c02e",
+    "runtime/js/permissions.js": "634525378cfefd5513c45f62f5fb0acbcfa6f1c2fbfb3eb7e4dc1ad286ad9748",
+    "runtime/js/prelude.js": "715dd37d3896687a269a58e8aaecbc18daffa1aa1366b2e9fcd7ca163d1a7f17",
+    "runtime/js/process.js": "5054f26ad49570714def62c382444b4898daaf177c5db16dfc4efcdd2b1f51fd",
+    "runtime/js/repl.js": "c64cff0ec30ff658868569b09681dcfba222eee580b8a0c217bf3faf75c0ea82",
+    "runtime/js/sqlite.js": "ad0fce0c6488430f7504d9f7ba0b4a00e12f4679992fc5f5abe32f331ca53232",
+    "runtime/js/test.js": "d714bdb0147d3c095e63d2748a2dd3d31da71ca672be37a561adfd3344893522",
+    "runtime/js/typescript.js": "c01fc95983e0574fe4cbdf5b8c79b272836a6b184b9e0e8e7fc4377b5d19bfab",
+    "runtime/js/websocket.js": "91a1ca905050b7999bbf6baaa01a6146f9e093f19d424bfdd4d4f699ead7f5d3",
+    "runtime/js/worker.js": "5c36937946a2b29501d6bcccd6e579c6945df1599c98f1ac841edff0d683ad21",
+    "runtime/loop.c3": "4f3db0ac28151f0b4e4d2b393f8639f4dbf1e8994c8b2c6412102d9dd9d18bee",
+    "runtime/main.c3": "7040d73e6852e05e4e0f71a8cb382a59982cba9aa2e95d1ad2a923647c12f0eb",
+    "runtime/net.c3": "afe132c203abae3c5f7bf13cf580a845120803cebae04ddd95cef20eb8513582",
+    "runtime/perms.c3": "500acd4d3563fcb1875979aab0cb7921c9f7505d45f4ddd74031b44b07da271e",
+    "runtime/proc.c3": "8e6a630dbb1be548320942f69bd2a287c6a8cbd25e7a662f1bfbf5b78d0396b4",
+    "runtime/repl.c3": "ad98d498f11969af90e8bb61d587d281c948ef059782abbc937eb47dd1b1c6de",
+    "runtime/res.c3": "c25379a0b7dd643a3f2e8761989d7e438cf26109bf3979046055689f53634bd4",
+    "runtime/sandbox.c3": "32df79e1b1a62b838b1025c2c3647ecca407b3baa0dcfc6c9ac32f21d4e31000",
+    "runtime/sqlite.c3": "ece10fa33adf42e54c31d0f20c9b78dd83d8f5e961cd07896e9c5c7d76bd8d54",
+    "runtime/state.c3": "901f31157eed92bdb51ffc79147a67092207989f14c53733132cfd14aeca5cd3",
+    "runtime/stream_sink.c3": "9cf08012adba7ad5dfc42ce2b7733a0c47eb0584f1fa4182caa7269902432c18",
+    "runtime/sys.c3": "37a948cd65b10d1c2ff0dd8426b6d1c8a57bf7a7ad37a1e8c9079f80f4997a3a",
+    "runtime/testcmd.c3": "2bf133c902506cd23df2dda13802a4e615f94360f2a0a0efce6cffaf4da694b9",
+    "runtime/timers.c3": "060d1077b5dcb886ae973a14105e034fa3f6c728268c83d9aad417f2e535bc40",
+    "runtime/tls.c3": "a0dcfa6f503e1ca081f51e5a4c3a8abed304eddcf9979299c33ff320de98e300",
+    "runtime/toml.c3": "f3e0a5598a12f64dcc0ad3bb2901cd60940f030daab8bf70c5de1e792c4f7e9e",
+    "runtime/transpile.c3": "6f70fb60e21ed6b4468a18a9c57e793d6d7efc83fc5173dee01764019b87eaf2",
+    "runtime/web_native.c3": "8a1936a98ecb0e7ce6a8250db0a8f025e4ceaa2a034fa882fe9b488b5feed524",
+    "runtime/workers.c3": "8462b56c1e22f1d0e011a8bdedb0afbb317921f31645b99d4133fc0e20f4aac4",
+    "runtime/ws.c3": "464fe995198ee132ac4cfa77c5910e4d86129141927c7e3e64017ee6ea64f753",
+    "runtime/zlib.c3": "d9ab329fb94898928d45f01c0554d8ab46184758682000efc800bc30038a09b1",
+    "shim/process_pool.cpp": "2db1a1680ff401083db872ce02afdef668bcbd7f0318d0b1f1c3dda551cf749e",
+    "shim/timer_shim.c": "a3772bd26d4dfeadd5c5aff033d5d20a83c557cb1e1887e35a2174c801dc455a",
+    "shim/uws_shim.cpp": "2ae48d7dd6d4ae05c47b923d529586a018a9672a4d725775fe5117e47ba044a9"
+  },
+  "variants": {
+    "direct": [],
+    "processes-2": [
+      "--http-processes=2"
+    ]
+  },
+  "results": {
+    "hello": {
+      "direct": [
+        {
+          "round": 1,
+          "req_s": 34447.90320641979,
+          "latency_ms": {
+            "50": 1.513084,
+            "99": 3.872125
+          },
+          "peak_tree_rss_mib": 13.8125,
+          "host_loadavg": [
+            2.18798828125,
+            3.0390625,
+            4.08203125
+          ],
+          "stderr": "",
+          "churn": {
+            "complete_requests": 34463,
+            "connections": 34463,
+            "elapsed_s": 1.00043825,
+            "failed_requests": 0,
+            "first_error": "",
+            "latency_ms": {
+              "50": 1.513084,
+              "99": 3.872125
+            },
+            "req_s": 34447.90320641979
+          }
+        }
+      ],
+      "processes-2": [
+        {
+          "round": 1,
+          "req_s": 35854.131436553624,
+          "latency_ms": {
+            "50": 1.526167,
+            "99": 3.370042
+          },
+          "peak_tree_rss_mib": 29.484375,
+          "host_loadavg": [
+            2.18798828125,
+            3.0390625,
+            4.08203125
+          ],
+          "stderr": "",
+          "churn": {
+            "complete_requests": 35883,
+            "connections": 35883,
+            "elapsed_s": 1.000805167,
+            "failed_requests": 0,
+            "first_error": "",
+            "latency_ms": {
+              "50": 1.526167,
+              "99": 3.370042
+            },
+            "req_s": 35854.131436553624
+          }
+        }
+      ]
+    }
+  },
+  "churn_client_sha256": "9c9d40dc4aa9195ae9968a76eed7e9e8a5a2feee6a45df600d8948b807fc4d31"
+}

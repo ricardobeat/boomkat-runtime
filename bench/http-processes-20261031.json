@@ -1,0 +1,788 @@
+{
+  "method": "3 rounds; rotating variant and workload order; fresh server; 1s warmup + 5s measured",
+  "client_threads": 4,
+  "connections": 128,
+  "close_connections": false,
+  "rss": "peak sum of supervisor and descendant processes, sampled every 100ms",
+  "runtime": "84ef96eaf3dce71f2824c9cd5bfa099ddc421071",
+  "engine": "a16eda21f664bf1c54cd69cfcb654b495fe8eb68",
+  "binary_sha256": "80d6e672b81e79b98e1e44a06d6b162062f46d05157486e1e71e9680d5995318",
+  "source_sha256": {
+    "runtime/bridge.c3": "c29b2f8f155208f0bdf1ba74590ccb40c97ee5795e5b11870e7646e3a3f3cc7e",
+    "runtime/check.c3": "1152fdbc88de77c7a533cd2dad45ef150a6eb3791a71715815f461108c9861bc",
+    "runtime/compress.c3": "b06377a7707261cbc8390cd1343c06a0b7487b39264898abe79466bef12db8f6",
+    "runtime/crypto.c3": "a1b6e570ca264eac37bc5aa508098848b393562f4225c3a4afbacfc820204ec7",
+    "runtime/file_body.c3": "a0e758b21fbf281f525598f15511d1bc24a98db857390e10861c5c8eb239616d",
+    "runtime/fs.c3": "516f5f0ae075efbe0fcf919b577da96ce79a028e56cbab8c430376f6bbde0152",
+    "runtime/guard.c3": "382a52ef1a2a0edbbe84224043aeca6637f451e393d17e8fb4245aac69f77987",
+    "runtime/http.c3": "fffdaadc050e9fc3fd2abcb24a27aef07e877cea60228fb2acc89e2868352540",
+    "runtime/immediates.c3": "0e275c7ec1073552e2ffafc40c81d10786c2a8fb7f68d19897b54bbba630533b",
+    "runtime/js/crypto.js": "033b959a7ff568622b3294f69dce56e051b8b2c36ec592d7d55717d907924fde",
+    "runtime/js/fetch.js": "37eaa28ea630aef4e8f3ffc5d3ea6d275538079db130f62c2f8dd0647d466f94",
+    "runtime/js/file.js": "a1aae1df9b874dd2f520a359009292e5b1eda1a0c637083a4724c8cb9726f7f3",
+    "runtime/js/http.js": "adead81b6b4906dd613c177272f6d0c1aa03472736917d629b70a6a9b412546e",
+    "runtime/js/net.js": "c6a49d9d3ed49d182d6ace53ab7ba847240908de7b1d63ef93c2d882f3f4eaef",
+    "runtime/js/path.js": "3bfa364d7d5ca3299f409ab8ac412cbab536a614027c0283f64e07eaba53c02e",
+    "runtime/js/permissions.js": "634525378cfefd5513c45f62f5fb0acbcfa6f1c2fbfb3eb7e4dc1ad286ad9748",
+    "runtime/js/prelude.js": "715dd37d3896687a269a58e8aaecbc18daffa1aa1366b2e9fcd7ca163d1a7f17",
+    "runtime/js/process.js": "5054f26ad49570714def62c382444b4898daaf177c5db16dfc4efcdd2b1f51fd",
+    "runtime/js/repl.js": "c64cff0ec30ff658868569b09681dcfba222eee580b8a0c217bf3faf75c0ea82",
+    "runtime/js/sqlite.js": "ad0fce0c6488430f7504d9f7ba0b4a00e12f4679992fc5f5abe32f331ca53232",
+    "runtime/js/test.js": "d714bdb0147d3c095e63d2748a2dd3d31da71ca672be37a561adfd3344893522",
+    "runtime/js/typescript.js": "c01fc95983e0574fe4cbdf5b8c79b272836a6b184b9e0e8e7fc4377b5d19bfab",
+    "runtime/js/websocket.js": "91a1ca905050b7999bbf6baaa01a6146f9e093f19d424bfdd4d4f699ead7f5d3",
+    "runtime/js/worker.js": "5c36937946a2b29501d6bcccd6e579c6945df1599c98f1ac841edff0d683ad21",
+    "runtime/loop.c3": "4f3db0ac28151f0b4e4d2b393f8639f4dbf1e8994c8b2c6412102d9dd9d18bee",
+    "runtime/main.c3": "7040d73e6852e05e4e0f71a8cb382a59982cba9aa2e95d1ad2a923647c12f0eb",
+    "runtime/net.c3": "afe132c203abae3c5f7bf13cf580a845120803cebae04ddd95cef20eb8513582",
+    "runtime/perms.c3": "500acd4d3563fcb1875979aab0cb7921c9f7505d45f4ddd74031b44b07da271e",
+    "runtime/proc.c3": "8e6a630dbb1be548320942f69bd2a287c6a8cbd25e7a662f1bfbf5b78d0396b4",
+    "runtime/repl.c3": "ad98d498f11969af90e8bb61d587d281c948ef059782abbc937eb47dd1b1c6de",
+    "runtime/res.c3": "c25379a0b7dd643a3f2e8761989d7e438cf26109bf3979046055689f53634bd4",
+    "runtime/sandbox.c3": "32df79e1b1a62b838b1025c2c3647ecca407b3baa0dcfc6c9ac32f21d4e31000",
+    "runtime/sqlite.c3": "ece10fa33adf42e54c31d0f20c9b78dd83d8f5e961cd07896e9c5c7d76bd8d54",
+    "runtime/state.c3": "901f31157eed92bdb51ffc79147a67092207989f14c53733132cfd14aeca5cd3",
+    "runtime/stream_sink.c3": "9cf08012adba7ad5dfc42ce2b7733a0c47eb0584f1fa4182caa7269902432c18",
+    "runtime/sys.c3": "37a948cd65b10d1c2ff0dd8426b6d1c8a57bf7a7ad37a1e8c9079f80f4997a3a",
+    "runtime/testcmd.c3": "2bf133c902506cd23df2dda13802a4e615f94360f2a0a0efce6cffaf4da694b9",
+    "runtime/timers.c3": "060d1077b5dcb886ae973a14105e034fa3f6c728268c83d9aad417f2e535bc40",
+    "runtime/tls.c3": "a0dcfa6f503e1ca081f51e5a4c3a8abed304eddcf9979299c33ff320de98e300",
+    "runtime/toml.c3": "f3e0a5598a12f64dcc0ad3bb2901cd60940f030daab8bf70c5de1e792c4f7e9e",
+    "runtime/transpile.c3": "6f70fb60e21ed6b4468a18a9c57e793d6d7efc83fc5173dee01764019b87eaf2",
+    "runtime/web_native.c3": "8a1936a98ecb0e7ce6a8250db0a8f025e4ceaa2a034fa882fe9b488b5feed524",
+    "runtime/workers.c3": "8462b56c1e22f1d0e011a8bdedb0afbb317921f31645b99d4133fc0e20f4aac4",
+    "runtime/ws.c3": "464fe995198ee132ac4cfa77c5910e4d86129141927c7e3e64017ee6ea64f753",
+    "runtime/zlib.c3": "d9ab329fb94898928d45f01c0554d8ab46184758682000efc800bc30038a09b1",
+    "shim/process_pool.cpp": "2db1a1680ff401083db872ce02afdef668bcbd7f0318d0b1f1c3dda551cf749e",
+    "shim/timer_shim.c": "a3772bd26d4dfeadd5c5aff033d5d20a83c557cb1e1887e35a2174c801dc455a",
+    "shim/uws_shim.cpp": "2ae48d7dd6d4ae05c47b923d529586a018a9672a4d725775fe5117e47ba044a9"
+  },
+  "variants": {
+    "direct": [],
+    "processes-1": [
+      "--http-processes=1"
+    ],
+    "processes-2": [
+      "--http-processes=2"
+    ],
+    "processes-4": [
+      "--http-processes=4"
+    ],
+    "threads-4": [
+      "--http-workers=4"
+    ]
+  },
+  "results": {
+    "hello": {
+      "direct": [
+        {
+          "round": 1,
+          "req_s": 235627.36,
+          "latency_ms": {
+            "50": 0.497,
+            "99": 1.12
+          },
+          "peak_tree_rss_mib": 12.921875,
+          "host_loadavg": [
+            2.47119140625,
+            2.70166015625,
+            3.10107421875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   536.40us  121.20us   2.80ms   93.38%\n    Req/Sec    59.24k     5.29k   65.38k    74.02%\n  Latency Distribution\n     50%  497.00us\n     75%  552.00us\n     90%  602.00us\n     99%    1.12ms\n  1201917 requests in 5.10s, 165.06MB read\nRequests/sec: 235627.36\nTransfer/sec:     32.36MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 230470.74,
+          "latency_ms": {
+            "50": 0.529,
+            "99": 1.09
+          },
+          "peak_tree_rss_mib": 12.78125,
+          "host_loadavg": [
+            9.55810546875,
+            5.4404296875,
+            4.13818359375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   551.71us   92.29us   1.50ms   95.12%\n    Req/Sec    57.94k     1.16k   61.79k    72.06%\n  Latency Distribution\n     50%  529.00us\n     75%  558.00us\n     90%  605.00us\n     99%    1.09ms\n  1175652 requests in 5.10s, 161.45MB read\nRequests/sec: 230470.74\nTransfer/sec:     31.65MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 228481.04,
+          "latency_ms": {
+            "50": 0.532,
+            "99": 1.08
+          },
+          "peak_tree_rss_mib": 12.96875,
+          "host_loadavg": [
+            13.619140625,
+            7.3857421875,
+            4.94970703125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   553.93us   98.82us   1.95ms   94.41%\n    Req/Sec    57.44k     1.89k   61.41k    65.69%\n  Latency Distribution\n     50%  532.00us\n     75%  559.00us\n     90%  604.00us\n     99%    1.08ms\n  1165445 requests in 5.10s, 160.05MB read\nRequests/sec: 228481.04\nTransfer/sec:     31.38MB\n"
+        }
+      ],
+      "processes-1": [
+        {
+          "round": 1,
+          "req_s": 219253.67,
+          "latency_ms": {
+            "50": 0.524,
+            "99": 1.16
+          },
+          "peak_tree_rss_mib": 15.234375,
+          "host_loadavg": [
+            2.59326171875,
+            2.72314453125,
+            3.10595703125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   567.24us  155.58us   1.82ms   89.91%\n    Req/Sec    55.12k     5.62k   65.44k    53.43%\n  Latency Distribution\n     50%  524.00us\n     75%  577.00us\n     90%  681.00us\n     99%    1.16ms\n  1118420 requests in 5.10s, 153.59MB read\nRequests/sec: 219253.67\nTransfer/sec:     30.11MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 220924.22,
+          "latency_ms": {
+            "50": 0.539,
+            "99": 1.2
+          },
+          "peak_tree_rss_mib": 15.375,
+          "host_loadavg": [
+            7.6201171875,
+            4.77587890625,
+            3.87451171875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   574.39us  119.86us   2.80ms   93.50%\n    Req/Sec    55.52k     4.37k   60.80k    78.43%\n  Latency Distribution\n     50%  539.00us\n     75%  589.00us\n     90%  648.00us\n     99%    1.20ms\n  1126837 requests in 5.10s, 154.75MB read\nRequests/sec: 220924.22\nTransfer/sec:     30.34MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 194004.99,
+          "latency_ms": {
+            "50": 0.584,
+            "99": 1.43
+          },
+          "peak_tree_rss_mib": 15.90625,
+          "host_loadavg": [
+            13.0888671875,
+            7.37890625,
+            4.96142578125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   642.38us  202.54us   3.49ms   89.80%\n    Req/Sec    48.76k     6.06k   60.47k    67.65%\n  Latency Distribution\n     50%  584.00us\n     75%  655.00us\n     90%  802.00us\n     99%    1.43ms\n  989842 requests in 5.10s, 135.93MB read\nRequests/sec: 194004.99\nTransfer/sec:     26.64MB\n"
+        }
+      ],
+      "processes-2": [
+        {
+          "round": 1,
+          "req_s": 215236.57,
+          "latency_ms": {
+            "50": 0.47600000000000003,
+            "99": 1.34
+          },
+          "peak_tree_rss_mib": 29.625,
+          "host_loadavg": [
+            3.0556640625,
+            2.81494140625,
+            3.13330078125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   543.71us  239.27us   3.18ms   73.71%\n    Req/Sec    54.09k     2.07k   60.07k    68.14%\n  Latency Distribution\n     50%  476.00us\n     75%  661.00us\n     90%    0.89ms\n     99%    1.34ms\n  1097869 requests in 5.10s, 150.77MB read\nRequests/sec: 215236.57\nTransfer/sec:     29.56MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 219789.12,
+          "latency_ms": {
+            "50": 0.457,
+            "99": 1.02
+          },
+          "peak_tree_rss_mib": 28.6875,
+          "host_loadavg": [
+            7.650390625,
+            4.8291015625,
+            3.8984375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   519.91us  205.16us   3.83ms   68.21%\n    Req/Sec    55.24k     1.32k   58.58k    66.18%\n  Latency Distribution\n     50%  457.00us\n     75%  673.00us\n     90%  829.00us\n     99%    1.02ms\n  1121123 requests in 5.10s, 153.96MB read\nRequests/sec: 219789.12\nTransfer/sec:     30.18MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 181529.32,
+          "latency_ms": {
+            "50": 0.5740000000000001,
+            "99": 1.71
+          },
+          "peak_tree_rss_mib": 29.890625,
+          "host_loadavg": [
+            13.67626953125,
+            6.9638671875,
+            4.7470703125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   643.31us  447.30us  15.88ms   89.22%\n    Req/Sec    45.63k     3.03k   52.70k    74.02%\n  Latency Distribution\n     50%  574.00us\n     75%  796.00us\n     90%    1.03ms\n     99%    1.71ms\n  926021 requests in 5.10s, 127.17MB read\nRequests/sec: 181529.32\nTransfer/sec:     24.93MB\n"
+        }
+      ],
+      "processes-4": [
+        {
+          "round": 1,
+          "req_s": 210306.98,
+          "latency_ms": {
+            "50": 0.353,
+            "99": 7.4
+          },
+          "peak_tree_rss_mib": 58.46875,
+          "host_loadavg": [
+            3.611328125,
+            2.93408203125,
+            3.17333984375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   715.53us    1.73ms  43.29ms   95.77%\n    Req/Sec    53.36k     9.37k  117.38k    82.67%\n  Latency Distribution\n     50%  353.00us\n     75%  617.00us\n     90%    1.14ms\n     99%    7.40ms\n  1073382 requests in 5.10s, 147.41MB read\nRequests/sec: 210306.98\nTransfer/sec:     28.88MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 208969.97,
+          "latency_ms": {
+            "50": 0.404,
+            "99": 2.39
+          },
+          "peak_tree_rss_mib": 57.953125,
+          "host_loadavg": [
+            7.67822265625,
+            4.88134765625,
+            3.92236328125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   529.07us  472.44us  11.25ms   91.29%\n    Req/Sec    52.53k     3.32k   63.92k    75.00%\n  Latency Distribution\n     50%  404.00us\n     75%  619.00us\n     90%    0.94ms\n     99%    2.39ms\n  1066887 requests in 5.11s, 146.51MB read\nRequests/sec: 208969.97\nTransfer/sec:     28.70MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 206047.49,
+          "latency_ms": {
+            "50": 0.4,
+            "99": 3.81
+          },
+          "peak_tree_rss_mib": 59.046875,
+          "host_loadavg": [
+            13.81201171875,
+            7.2119140625,
+            4.86083984375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   579.44us  772.58us  17.75ms   94.58%\n    Req/Sec    52.28k     6.65k  109.20k    92.57%\n  Latency Distribution\n     50%  400.00us\n     75%  627.00us\n     90%    0.99ms\n     99%    3.81ms\n  1051081 requests in 5.10s, 144.34MB read\nRequests/sec: 206047.49\nTransfer/sec:     28.30MB\n"
+        }
+      ],
+      "threads-4": [
+        {
+          "round": 1,
+          "req_s": 212077.61,
+          "latency_ms": {
+            "50": 0.404,
+            "99": 2.11
+          },
+          "peak_tree_rss_mib": 36.796875,
+          "host_loadavg": [
+            4.28271484375,
+            3.08447265625,
+            3.224609375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   515.63us  423.50us  10.27ms   89.87%\n    Req/Sec    53.29k     2.88k   64.53k    74.02%\n  Latency Distribution\n     50%  404.00us\n     75%  619.00us\n     90%    0.92ms\n     99%    2.11ms\n  1081866 requests in 5.10s, 148.57MB read\nRequests/sec: 212077.61\nTransfer/sec:     29.12MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 210583.88,
+          "latency_ms": {
+            "50": 0.388,
+            "99": 2.48
+          },
+          "peak_tree_rss_mib": 37.4375,
+          "host_loadavg": [
+            7.70361328125,
+            4.93310546875,
+            3.94580078125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   544.49us  760.70us  31.50ms   94.58%\n    Req/Sec    53.68k    14.36k  249.89k    99.00%\n  Latency Distribution\n     50%  388.00us\n     75%  639.00us\n     90%    1.01ms\n     99%    2.48ms\n  1074046 requests in 5.10s, 147.50MB read\nRequests/sec: 210583.88\nTransfer/sec:     28.92MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 206651.48,
+          "latency_ms": {
+            "50": 0.38,
+            "99": 10.6
+          },
+          "peak_tree_rss_mib": 37.6875,
+          "host_loadavg": [
+            13.58642578125,
+            7.2744140625,
+            4.896484375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/hello\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   821.04us    2.12ms  46.07ms   95.94%\n    Req/Sec    52.41k     7.77k  101.61k    80.20%\n  Latency Distribution\n     50%  380.00us\n     75%  656.00us\n     90%    1.19ms\n     99%   10.60ms\n  1055291 requests in 5.11s, 144.92MB read\nRequests/sec: 206651.48\nTransfer/sec:     28.38MB\n"
+        }
+      ]
+    },
+    "async": {
+      "direct": [
+        {
+          "round": 1,
+          "req_s": 165834.47,
+          "latency_ms": {
+            "50": 0.729,
+            "99": 1.31
+          },
+          "peak_tree_rss_mib": 14.5,
+          "host_loadavg": [
+            4.740234375,
+            3.19921875,
+            3.26416015625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   725.76us  228.93us   2.14ms   66.73%\n    Req/Sec    41.69k     1.77k   46.44k    77.45%\n  Latency Distribution\n     50%  729.00us\n     75%    0.87ms\n     90%    1.01ms\n     99%    1.31ms\n  845811 requests in 5.10s, 109.70MB read\nRequests/sec: 165834.47\nTransfer/sec:     21.51MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 164703.56,
+          "latency_ms": {
+            "50": 0.733,
+            "99": 1.32
+          },
+          "peak_tree_rss_mib": 14.59375,
+          "host_loadavg": [
+            7.509765625,
+            4.3798828125,
+            3.70166015625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   729.77us  231.76us   2.50ms   66.65%\n    Req/Sec    41.40k     1.82k   46.98k    80.88%\n  Latency Distribution\n     50%  733.00us\n     75%    0.88ms\n     90%    1.02ms\n     99%    1.32ms\n  840101 requests in 5.10s, 108.96MB read\nRequests/sec: 164703.56\nTransfer/sec:     21.36MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 138453.43,
+          "latency_ms": {
+            "50": 0.86,
+            "99": 1.56
+          },
+          "peak_tree_rss_mib": 14.5625,
+          "host_loadavg": [
+            13.04052734375,
+            7.7900390625,
+            5.17724609375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.86ms  272.62us   2.87ms   65.56%\n    Req/Sec    34.81k     1.31k   42.28k    92.16%\n  Latency Distribution\n     50%    0.86ms\n     75%    1.02ms\n     90%    1.22ms\n     99%    1.56ms\n  706186 requests in 5.10s, 91.59MB read\nRequests/sec: 138453.43\nTransfer/sec:     17.96MB\n"
+        }
+      ],
+      "processes-1": [
+        {
+          "round": 1,
+          "req_s": 157987.78,
+          "latency_ms": {
+            "50": 0.758,
+            "99": 1.38
+          },
+          "peak_tree_rss_mib": 16.96875,
+          "host_loadavg": [
+            4.77978515625,
+            3.25830078125,
+            3.28369140625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   754.83us  240.70us   2.90ms   66.70%\n    Req/Sec    39.71k     2.74k   45.61k    58.33%\n  Latency Distribution\n     50%  758.00us\n     75%    0.90ms\n     90%    1.07ms\n     99%    1.38ms\n  805938 requests in 5.10s, 104.53MB read\nRequests/sec: 157987.78\nTransfer/sec:     20.49MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 140154.3,
+          "latency_ms": {
+            "50": 0.846,
+            "99": 1.52
+          },
+          "peak_tree_rss_mib": 16.953125,
+          "host_loadavg": [
+            6.48974609375,
+            3.955078125,
+            3.5380859375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   843.60us  262.05us   2.28ms   65.73%\n    Req/Sec    35.23k   747.47    36.79k    67.16%\n  Latency Distribution\n     50%  846.00us\n     75%    1.00ms\n     90%    1.19ms\n     99%    1.52ms\n  714924 requests in 5.10s, 92.73MB read\nRequests/sec: 140154.30\nTransfer/sec:     18.18MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 152216.02,
+          "latency_ms": {
+            "50": 0.782,
+            "99": 1.5
+          },
+          "peak_tree_rss_mib": 17.96875,
+          "host_loadavg": [
+            11.71728515625,
+            7.68115234375,
+            5.16845703125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   785.71us  266.18us   3.54ms   67.80%\n    Req/Sec    38.27k     3.86k   43.85k    67.65%\n  Latency Distribution\n     50%  782.00us\n     75%    0.93ms\n     90%    1.13ms\n     99%    1.50ms\n  776490 requests in 5.10s, 100.71MB read\nRequests/sec: 152216.02\nTransfer/sec:     19.74MB\n"
+        }
+      ],
+      "processes-2": [
+        {
+          "round": 1,
+          "req_s": 195901.61,
+          "latency_ms": {
+            "50": 0.561,
+            "99": 1.35
+          },
+          "peak_tree_rss_mib": 33.890625,
+          "host_loadavg": [
+            4.79736328125,
+            3.287109375,
+            3.29345703125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   584.77us  214.11us   3.59ms   77.48%\n    Req/Sec    49.24k     1.31k   51.81k    80.39%\n  Latency Distribution\n     50%  561.00us\n     75%  664.00us\n     90%  815.00us\n     99%    1.35ms\n  999252 requests in 5.10s, 129.60MB read\nRequests/sec: 195901.61\nTransfer/sec:     25.41MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 190874.21,
+          "latency_ms": {
+            "50": 0.582,
+            "99": 1.32
+          },
+          "peak_tree_rss_mib": 33.421875,
+          "host_loadavg": [
+            6.4501953125,
+            3.98876953125,
+            3.55224609375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   601.57us  208.23us   3.04ms   76.32%\n    Req/Sec    47.97k     1.03k   50.19k    66.67%\n  Latency Distribution\n     50%  582.00us\n     75%  686.00us\n     90%  828.00us\n     99%    1.32ms\n  973548 requests in 5.10s, 126.27MB read\nRequests/sec: 190874.21\nTransfer/sec:     24.76MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 174938.44,
+          "latency_ms": {
+            "50": 0.637,
+            "99": 1.48
+          },
+          "peak_tree_rss_mib": 33.5,
+          "host_loadavg": [
+            12.0849609375,
+            7.35009765625,
+            4.97900390625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   666.06us  241.74us   3.50ms   76.40%\n    Req/Sec    43.96k     1.37k   47.34k    73.04%\n  Latency Distribution\n     50%  637.00us\n     75%  763.00us\n     90%    0.94ms\n     99%    1.48ms\n  892397 requests in 5.10s, 115.74MB read\nRequests/sec: 174938.44\nTransfer/sec:     22.69MB\n"
+        }
+      ],
+      "processes-4": [
+        {
+          "round": 1,
+          "req_s": 200558.32,
+          "latency_ms": {
+            "50": 0.47100000000000003,
+            "99": 3.67
+          },
+          "peak_tree_rss_mib": 68.34375,
+          "host_loadavg": [
+            5.0537109375,
+            3.365234375,
+            3.32080078125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   612.70us  738.15us  19.71ms   94.47%\n    Req/Sec    50.67k     5.88k   69.46k    80.30%\n  Latency Distribution\n     50%  471.00us\n     75%  684.00us\n     90%    1.01ms\n     99%    3.67ms\n  1023197 requests in 5.10s, 132.71MB read\nRequests/sec: 200558.32\nTransfer/sec:     26.01MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 200406.77,
+          "latency_ms": {
+            "50": 0.455,
+            "99": 4.38
+          },
+          "peak_tree_rss_mib": 66.078125,
+          "host_loadavg": [
+            6.7744140625,
+            4.13720703125,
+            3.60986328125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   647.85us  793.81us  13.40ms   93.22%\n    Req/Sec    50.41k     6.34k   70.86k    79.41%\n  Latency Distribution\n     50%  455.00us\n     75%  710.00us\n     90%    1.15ms\n     99%    4.38ms\n  1023578 requests in 5.11s, 132.76MB read\nRequests/sec: 200406.77\nTransfer/sec:     25.99MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 179267.64,
+          "latency_ms": {
+            "50": 0.531,
+            "99": 9.27
+          },
+          "peak_tree_rss_mib": 67.234375,
+          "host_loadavg": [
+            11.7578125,
+            7.36083984375,
+            4.99658203125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.94ms    1.96ms  54.70ms   95.28%\n    Req/Sec    45.73k    10.51k  153.88k    90.05%\n  Latency Distribution\n     50%  531.00us\n     75%    0.85ms\n     90%    1.56ms\n     99%    9.27ms\n  914410 requests in 5.10s, 118.60MB read\nRequests/sec: 179267.64\nTransfer/sec:     23.25MB\n"
+        }
+      ],
+      "threads-4": [
+        {
+          "round": 1,
+          "req_s": 200119.05,
+          "latency_ms": {
+            "50": 0.454,
+            "99": 4.95
+          },
+          "peak_tree_rss_mib": 42.953125,
+          "host_loadavg": [
+            5.52978515625,
+            3.49169921875,
+            3.36572265625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   663.71us    0.92ms  23.49ms   94.15%\n    Req/Sec    50.77k     7.88k  105.10k    83.66%\n  Latency Distribution\n     50%  454.00us\n     75%  712.00us\n     90%    1.14ms\n     99%    4.95ms\n  1020712 requests in 5.10s, 132.39MB read\nRequests/sec: 200119.05\nTransfer/sec:     25.96MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 201378.95,
+          "latency_ms": {
+            "50": 0.461,
+            "99": 1.48
+          },
+          "peak_tree_rss_mib": 42.796875,
+          "host_loadavg": [
+            7.0322265625,
+            4.234375,
+            3.64697265625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   520.29us  298.58us   6.12ms   78.27%\n    Req/Sec    51.11k     6.44k  112.68k    97.52%\n  Latency Distribution\n     50%  461.00us\n     75%  658.00us\n     90%    0.87ms\n     99%    1.48ms\n  1027087 requests in 5.10s, 133.21MB read\nRequests/sec: 201378.95\nTransfer/sec:     26.12MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 193217.89,
+          "latency_ms": {
+            "50": 0.492,
+            "99": 3.76
+          },
+          "peak_tree_rss_mib": 44.359375,
+          "host_loadavg": [
+            13.21826171875,
+            7.736328125,
+            5.14306640625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/async\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   641.32us  722.19us  14.13ms   93.98%\n    Req/Sec    48.57k     3.71k   66.44k    78.92%\n  Latency Distribution\n     50%  492.00us\n     75%  730.00us\n     90%    1.07ms\n     99%    3.76ms\n  986176 requests in 5.10s, 127.91MB read\nRequests/sec: 193217.89\nTransfer/sec:     25.06MB\n"
+        }
+      ]
+    },
+    "echo": {
+      "direct": [
+        {
+          "round": 1,
+          "req_s": 153836.62,
+          "latency_ms": {
+            "50": 0.773,
+            "99": 1.57
+          },
+          "peak_tree_rss_mib": 14.578125,
+          "host_loadavg": [
+            5.50244140625,
+            3.556640625,
+            3.39013671875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   828.75us  174.32us   2.64ms   86.71%\n    Req/Sec    38.67k     2.13k   42.87k    60.78%\n  Latency Distribution\n     50%  773.00us\n     75%  830.00us\n     90%    1.08ms\n     99%    1.57ms\n  784714 requests in 5.10s, 837.42MB read\nRequests/sec: 153836.62\nTransfer/sec:    164.17MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 146215.55,
+          "latency_ms": {
+            "50": 0.801,
+            "99": 1.69
+          },
+          "peak_tree_rss_mib": 14.65625,
+          "host_loadavg": [
+            7.7177734375,
+            4.69970703125,
+            3.83837890625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.87ms  188.41us   2.54ms   86.70%\n    Req/Sec    36.76k     0.96k   38.68k    62.25%\n  Latency Distribution\n     50%  801.00us\n     75%    0.87ms\n     90%    1.17ms\n     99%    1.69ms\n  745892 requests in 5.10s, 795.99MB read\nRequests/sec: 146215.55\nTransfer/sec:    156.04MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 159754.28,
+          "latency_ms": {
+            "50": 0.742,
+            "99": 1.47
+          },
+          "peak_tree_rss_mib": 14.734375,
+          "host_loadavg": [
+            15.2529296875,
+            7.03125,
+            4.744140625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   791.31us  169.77us   4.20ms   85.37%\n    Req/Sec    40.54k     4.12k   81.22k    98.51%\n  Latency Distribution\n     50%  742.00us\n     75%  779.00us\n     90%    1.07ms\n     99%    1.47ms\n  814735 requests in 5.10s, 869.45MB read\nRequests/sec: 159754.28\nTransfer/sec:    170.48MB\n"
+        }
+      ],
+      "processes-1": [
+        {
+          "round": 1,
+          "req_s": 146945.51,
+          "latency_ms": {
+            "50": 0.804,
+            "99": 1.68
+          },
+          "peak_tree_rss_mib": 17.140625,
+          "host_loadavg": [
+            5.3818359375,
+            3.56396484375,
+            3.3935546875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.87ms  181.68us   2.83ms   86.82%\n    Req/Sec    36.94k     0.89k   39.25k    67.16%\n  Latency Distribution\n     50%  804.00us\n     75%    0.87ms\n     90%    1.13ms\n     99%    1.68ms\n  749490 requests in 5.10s, 799.83MB read\nRequests/sec: 146945.51\nTransfer/sec:    156.81MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 159965.12,
+          "latency_ms": {
+            "50": 0.735,
+            "99": 1.46
+          },
+          "peak_tree_rss_mib": 17.421875,
+          "host_loadavg": [
+            7.30859375,
+            4.39013671875,
+            3.708984375
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   798.85us  170.80us   5.34ms   86.76%\n    Req/Sec    40.20k     2.48k   43.31k    71.57%\n  Latency Distribution\n     50%  735.00us\n     75%  802.00us\n     90%    1.06ms\n     99%    1.46ms\n  815984 requests in 5.10s, 0.85GB read\nRequests/sec: 159965.12\nTransfer/sec:    170.71MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 133137.89,
+          "latency_ms": {
+            "50": 0.87,
+            "99": 1.97
+          },
+          "peak_tree_rss_mib": 17.4375,
+          "host_loadavg": [
+            14.431640625,
+            6.9970703125,
+            4.74560546875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency     0.94ms  252.02us   4.11ms   84.48%\n    Req/Sec    33.79k     3.61k   65.37k    84.65%\n  Latency Distribution\n     50%    0.87ms\n     75%    0.98ms\n     90%    1.25ms\n     99%    1.97ms\n  679032 requests in 5.10s, 724.64MB read\nRequests/sec: 133137.89\nTransfer/sec:    142.08MB\n"
+        }
+      ],
+      "processes-2": [
+        {
+          "round": 1,
+          "req_s": 194414.9,
+          "latency_ms": {
+            "50": 0.545,
+            "99": 1.47
+          },
+          "peak_tree_rss_mib": 33.703125,
+          "host_loadavg": [
+            5.35107421875,
+            3.58740234375,
+            3.40283203125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   627.01us  252.82us   4.46ms   77.96%\n    Req/Sec    48.87k     3.00k   55.75k    70.59%\n  Latency Distribution\n     50%  545.00us\n     75%  682.00us\n     90%    1.01ms\n     99%    1.47ms\n  991654 requests in 5.10s, 1.03GB read\nRequests/sec: 194414.90\nTransfer/sec:    207.47MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 209196.4,
+          "latency_ms": {
+            "50": 0.503,
+            "99": 1.25
+          },
+          "peak_tree_rss_mib": 32.453125,
+          "host_loadavg": [
+            6.96630859375,
+            4.41015625,
+            3.7236328125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   569.67us  215.80us   3.08ms   75.46%\n    Req/Sec    52.57k     2.18k   57.06k    75.49%\n  Latency Distribution\n     50%  503.00us\n     75%  625.00us\n     90%    0.92ms\n     99%    1.25ms\n  1067110 requests in 5.10s, 1.11GB read\nRequests/sec: 209196.40\nTransfer/sec:    223.25MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 207927.42,
+          "latency_ms": {
+            "50": 0.507,
+            "99": 1.26
+          },
+          "peak_tree_rss_mib": 32.109375,
+          "host_loadavg": [
+            9.03271484375,
+            5.39990234375,
+            4.13134765625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   577.40us  210.79us   2.34ms   76.39%\n    Req/Sec    52.26k     1.86k   56.84k    70.59%\n  Latency Distribution\n     50%  507.00us\n     75%  610.00us\n     90%    0.93ms\n     99%    1.26ms\n  1060633 requests in 5.10s, 1.11GB read\nRequests/sec: 207927.42\nTransfer/sec:    221.89MB\n"
+        }
+      ],
+      "processes-4": [
+        {
+          "round": 1,
+          "req_s": 201802.2,
+          "latency_ms": {
+            "50": 0.453,
+            "99": 7.25
+          },
+          "peak_tree_rss_mib": 68.265625,
+          "host_loadavg": [
+            5.56298828125,
+            3.66064453125,
+            3.4296875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   769.38us    1.55ms  41.45ms   95.53%\n    Req/Sec    51.44k    11.78k  176.33k    92.04%\n  Latency Distribution\n     50%  453.00us\n     75%  738.00us\n     90%    1.26ms\n     99%    7.25ms\n  1029258 requests in 5.10s, 1.07GB read\nRequests/sec: 201802.20\nTransfer/sec:    215.36MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 202613.91,
+          "latency_ms": {
+            "50": 0.441,
+            "99": 2.79
+          },
+          "peak_tree_rss_mib": 67.71875,
+          "host_loadavg": [
+            7.208984375,
+            4.5029296875,
+            3.76025390625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   634.95us    1.76ms  63.64ms   98.76%\n    Req/Sec    51.16k     6.43k   65.76k    82.27%\n  Latency Distribution\n     50%  441.00us\n     75%  692.00us\n     90%    1.01ms\n     99%    2.79ms\n  1033909 requests in 5.10s, 1.08GB read\nRequests/sec: 202613.91\nTransfer/sec:    216.22MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 200435.96,
+          "latency_ms": {
+            "50": 0.439,
+            "99": 2.48
+          },
+          "peak_tree_rss_mib": 68.09375,
+          "host_loadavg": [
+            8.86962890625,
+            5.42626953125,
+            4.14794921875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   580.09us  569.30us  17.81ms   91.57%\n    Req/Sec    50.65k     3.68k   69.18k    75.86%\n  Latency Distribution\n     50%  439.00us\n     75%  710.00us\n     90%    1.08ms\n     99%    2.48ms\n  1022582 requests in 5.10s, 1.07GB read\nRequests/sec: 200435.96\nTransfer/sec:    213.90MB\n"
+        }
+      ],
+      "threads-4": [
+        {
+          "round": 1,
+          "req_s": 196504.5,
+          "latency_ms": {
+            "50": 0.514,
+            "99": 5.61
+          },
+          "peak_tree_rss_mib": 44.46875,
+          "host_loadavg": [
+            6.09716796875,
+            3.83642578125,
+            3.494140625
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   727.63us    1.05ms  21.10ms   94.75%\n    Req/Sec    49.63k     5.48k   66.76k    75.86%\n  Latency Distribution\n     50%  514.00us\n     75%  772.00us\n     90%    1.24ms\n     99%    5.61ms\n  1002553 requests in 5.10s, 1.04GB read\nRequests/sec: 196504.50\nTransfer/sec:    209.70MB\n"
+        },
+        {
+          "round": 2,
+          "req_s": 192386.42,
+          "latency_ms": {
+            "50": 0.528,
+            "99": 5.57
+          },
+          "peak_tree_rss_mib": 45.015625,
+          "host_loadavg": [
+            7.43212890625,
+            4.59375,
+            3.79638671875
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   746.18us    1.19ms  42.64ms   95.46%\n    Req/Sec    48.55k     6.22k   64.97k    83.25%\n  Latency Distribution\n     50%  528.00us\n     75%  783.00us\n     90%    1.24ms\n     99%    5.57ms\n  981336 requests in 5.10s, 1.02GB read\nRequests/sec: 192386.42\nTransfer/sec:    205.31MB\n"
+        },
+        {
+          "round": 3,
+          "req_s": 203852.17,
+          "latency_ms": {
+            "50": 0.425,
+            "99": 2.5
+          },
+          "peak_tree_rss_mib": 45.921875,
+          "host_loadavg": [
+            15.44921875,
+            6.9306640625,
+            4.69580078125
+          ],
+          "wrk": "Running 5s test @ http://127.0.0.1:18149/echo\n  4 threads and 128 connections\n  Thread Stats   Avg      Stdev     Max   +/- Stdev\n    Latency   565.69us  518.09us  11.85ms   90.40%\n    Req/Sec    51.47k     5.43k   74.95k    85.22%\n  Latency Distribution\n     50%  425.00us\n     75%  701.00us\n     90%    1.06ms\n     99%    2.50ms\n  1039748 requests in 5.10s, 1.08GB read\nRequests/sec: 203852.17\nTransfer/sec:    217.54MB\n"
+        }
+      ]
+    }
+  }
+}

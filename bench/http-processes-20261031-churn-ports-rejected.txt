@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Users/rtomasi/cousas/boomkat-runtime/bench/http-processes.py", line 139, in <module>
+    assert load.returncode == 0, output + error
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: {"complete_requests":82482,"connections":82482,"elapsed_s":3.151042458,"failed_requests":83,"first_error":"Get \"http://127.0.0.1:18149/hello\": dial tcp 127.0.0.1:18149: connect: can't assign requested address","latency_ms":{"50":1.55275,"99":3.596375},"req_s":26176.099211418496}
