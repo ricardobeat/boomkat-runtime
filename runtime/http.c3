@@ -535,27 +535,7 @@ fn bool subscribe_response(JsValue result, ulong id) {
     if (catch fulfilled) return false;
     JsValue? rejected = response_callback(g_runtime.http_rejected, id);
     if (catch rejected) return false;
-    TVal f, r, downstream;
-    g_runtime.rt.load(fulfilled, &f);
-    g_runtime.rt.load(rejected, &r);
-    downstream.set_undefined();
-    uint state = builtins::promise_get_state(promise, builtins::PROMISE_PENDING);
-    if (state == builtins::PROMISE_PENDING) {
-        HObject*? reaction = builtins::promise_create_reaction(h);
-        if (catch reaction) return false;
-        builtins::reaction_set(reaction, 0, f, h);
-        builtins::reaction_set(reaction, 1, r, h);
-        builtins::promise_add_reaction(promise, reaction, h);
-    } else {
-        builtins::promise_mark_handled(promise, h);
-        builtins::promise_enqueue_reaction(
-            h,
-            state,
-            state == builtins::PROMISE_FULFILLED ? f : r,
-            builtins::promise_get_result(promise),
-            downstream
-        );
-    }
+    if (catch g_runtime.rt.observe_promise(result, fulfilled, rejected)) return false;
     return true;
 }
 
