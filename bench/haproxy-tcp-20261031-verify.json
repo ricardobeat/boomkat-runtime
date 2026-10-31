@@ -1,0 +1,462 @@
+{
+  "method": "Rotating case and workload order; fresh services per sample; HTTP/1.1 keep-alive; 1s warmup",
+  "seconds": 5,
+  "rounds": 3,
+  "connections": 128,
+  "client_threads": 2,
+  "binary": "/Users/rtomasi/cousas/boomkat-runtime/out/bkr",
+  "binary_sha256": "80d6e672b81e79b98e1e44a06d6b162062f46d05157486e1e71e9680d5995318",
+  "haproxy": "/opt/homebrew/Cellar/haproxy/3.4.7/bin/haproxy",
+  "haproxy_sha256": "b640e9807a9bb8b12d8fc12b40e256e92fd8afb06e294a505156c1653453041a",
+  "haproxy_version": "HAProxy version 3.4.7-8872a26 2026/10/14 - https://haproxy.org/\nStatus: long-term supported branch - will stop receiving fixes around Q2 2031.\nKnown bugs: http://www.haproxy.org/bugs/bugs-3.4.7.html\nRunning on: Darwin 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 22:06:24 PDT 2026; root:xnu-13432.1.9~3/RELEASE_ARM64_T8122 arm64\nBuild options : \n  TARGET  = osx\n  CC      = cc\n  CFLAGS  = -O2 -g -fwrapv\n  OPTIONS = USE_OPENSSL=1 USE_ZLIB=1 USE_QUIC=1 USE_PROMEX=1 USE_PCRE2=1 USE_PCRE2_JIT=1\n  DEBUG   = \n\nFeature list : -51DEGREES -ACCEPT4 +ACME -BACKTRACE -CLOSEFROM +CPU_AFFINITY -CRYPT_H -DEVICEATLAS -DL -ECH -ENGINE -EPOLL -EVPORTS +GETADDRINFO +KQUEUE -KTLS -LIBATOMIC +LIBCRYPT -LINUX_CAP -LINUX_SPLICE -LINUX_TPROXY -LUA -MATH -MEMORY_PROFILING -NETFILTER -NS -OBSOLETE_LINKER +OPENSSL -OPENSSL_AWSLC -OPENSSL_WOLFSSL -OT -PCRE +PCRE2 +PCRE2_JIT -PCRE_JIT +POLL -PRCTL -PROCCTL +PROMEX -PTHREAD_EMULATION +QUIC -QUIC_OPENSSL_COMPAT -RT -SHM_OPEN -SLZ +SSL -STATIC_PCRE -STATIC_PCRE2 -TFO +THREAD -THREAD_DUMP +TPROXY +TRACE -WURFL +ZLIB\nDetected feature list :\n\nDefault settings :\n  bufsize = 16384, maxrewrite = 1024, maxpollevents = 200\n\nBuilt with multi-threading support (MAX_TGROUPS=32, MAX_THREADS=1024, default=8).\nBuilt with SSL library version : OpenSSL 4.0.3 29 Sep 2026\nRunning on SSL library version : OpenSSL 4.0.3 29 Sep 2026\nSSL library supports TLS extensions : yes\nSSL library supports SNI : yes\nSSL library default verify directory : /opt/homebrew/etc/openssl@4/certs\nSSL library supports : SSLv3 TLSv1.0 TLSv1.1 TLSv1.2 TLSv1.3\nOpenSSL providers loaded : default\nQUIC: connection sock-per-conn mode support : no\nQUIC: GSO emission support : no\nBuilt with the Prometheus exporter as a service\nBuilt with zlib version : 1.2.12\nRunning on zlib version : 1.2.12\nCompression algorithms supported : identity(\"identity\"), deflate(\"deflate\"), raw-deflate(\"deflate\"), gzip(\"gzip\")\nBuilt with transparent proxy support using:\nBuilt with PCRE2 version : 10.49 2026-09-28\nPCRE2 library supports JIT : yes\nEncrypted password support via crypt(3): yes\nBuilt with clang compiler version 21.0.0 (clang-2100.3.34.2)\n\nAvailable polling systems :\n     kqueue : pref=300,  test result OK\n       poll : pref=200,  test result OK\n     select : pref=150,  test result OK\nTotal: 3 (3 usable), will use kqueue.\n\nAvailable multiplexer protocols :\n(protocols marked as <default> cannot be specified using 'proto' keyword)\n       quic : mode=HTTP  side=FE|BE  mux=QUIC  flags=HTX|NO_UPG|FRAMED\n       qmux : mode=HTTP  side=FE|BE  mux=QMUX  flags=HTX|NO_UPG\n         h2 : mode=HTTP  side=FE|BE  mux=H2    flags=HTX|HOL_RISK|NO_UPG\n         h1 : mode=HTTP  side=FE|BE  mux=H1    flags=HTX|NO_UPG\n  <default> : mode=HTTP  side=FE|BE  mux=H1    flags=HTX\n       fcgi : mode=HTTP  side=BE     mux=FCGI  flags=HTX|HOL_RISK|NO_UPG\n       spop : mode=SPOP  side=BE     mux=SPOP  flags=HOL_RISK|NO_UPG\n  <default> : mode=SPOP  side=BE     mux=SPOP  flags=HOL_RISK|NO_UPG\n       none : mode=TCP   side=FE|BE  mux=PASS  flags=NO_UPG\n  <default> : mode=TCP   side=FE|BE  mux=PASS  flags=\n\nAvailable services : prometheus-exporter\nAvailable filters :\n\t[BWLIM] bwlim-in\n\t[BWLIM] bwlim-out\n\t[CACHE] cache\n\t[COMP] comp-req\n\t[COMP] comp-res\n\t[COMP] compression\n\t[FCGI] fcgi-app\n\t[SPOE] spoe\n\t[TRACE] trace\n\n",
+  "runtime_head": "6eb078e92f8edb218d0ec6e9ec22bf9406c38b7e",
+  "engine_head": "a16eda21f664bf1c54cd69cfcb654b495fe8eb68",
+  "hardware": "hw.physicalcpu: 8\nhw.perflevel0.physicalcpu: 4\nhw.perflevel1.physicalcpu: 4\nmachdep.cpu.brand_string: Apple M3\n",
+  "os": "macOS-27.0-arm64-arm-64bit",
+  "cases": [
+    {
+      "label": "direct",
+      "mode": "direct",
+      "workers": 1,
+      "threads": 0
+    },
+    {
+      "label": "dispatch-1",
+      "mode": "dispatch",
+      "workers": 1,
+      "threads": 1
+    },
+    {
+      "label": "haproxy-1-t2",
+      "mode": "haproxy",
+      "workers": 1,
+      "threads": 2
+    },
+    {
+      "label": "dispatch-2",
+      "mode": "dispatch",
+      "workers": 2,
+      "threads": 1
+    },
+    {
+      "label": "haproxy-2-t2",
+      "mode": "haproxy",
+      "workers": 2,
+      "threads": 2
+    },
+    {
+      "label": "dispatch-4",
+      "mode": "dispatch",
+      "workers": 4,
+      "threads": 1
+    },
+    {
+      "label": "haproxy-4-t2",
+      "mode": "haproxy",
+      "workers": 4,
+      "threads": 2
+    }
+  ],
+  "verify_only": true,
+  "results": {
+    "hello": {
+      "direct": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64695
+        }
+      ],
+      "dispatch-1": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64709
+        }
+      ],
+      "haproxy-1-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "8",
+              "stot": "10"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:64722\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:64723\n",
+          "frontend_port": 64722
+        }
+      ],
+      "dispatch-2": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64749
+        }
+      ],
+      "haproxy-2-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:64765\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:64766\n    server worker2 127.0.0.1:64767\n",
+          "frontend_port": 64765
+        }
+      ],
+      "dispatch-4": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64797
+        }
+      ],
+      "haproxy-4-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker3",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker4",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:64824\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:64825\n    server worker2 127.0.0.1:64826\n    server worker3 127.0.0.1:64827\n    server worker4 127.0.0.1:64828\n",
+          "frontend_port": 64824
+        }
+      ]
+    },
+    "async": {
+      "direct": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64883
+        }
+      ],
+      "dispatch-1": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64896
+        }
+      ],
+      "haproxy-1-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "8",
+              "stot": "10"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:64909\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:64910\n",
+          "frontend_port": 64909
+        }
+      ],
+      "dispatch-2": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64936
+        }
+      ],
+      "haproxy-2-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:64951\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:64952\n    server worker2 127.0.0.1:64953\n",
+          "frontend_port": 64951
+        }
+      ],
+      "dispatch-4": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 64983
+        }
+      ],
+      "haproxy-4-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker3",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker4",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65010\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65011\n    server worker2 127.0.0.1:65012\n    server worker3 127.0.0.1:65013\n    server worker4 127.0.0.1:65014\n",
+          "frontend_port": 65010
+        }
+      ]
+    },
+    "echo": {
+      "direct": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65068
+        }
+      ],
+      "dispatch-1": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65081
+        }
+      ],
+      "haproxy-1-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "8",
+              "stot": "10"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65094\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65095\n",
+          "frontend_port": 65094
+        }
+      ],
+      "dispatch-2": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65121
+        }
+      ],
+      "haproxy-2-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65136\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65137\n    server worker2 127.0.0.1:65138\n",
+          "frontend_port": 65136
+        }
+      ],
+      "dispatch-4": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65168
+        }
+      ],
+      "haproxy-4-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker3",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker4",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65195\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65196\n    server worker2 127.0.0.1:65197\n    server worker3 127.0.0.1:65198\n    server worker4 127.0.0.1:65199\n",
+          "frontend_port": 65195
+        }
+      ]
+    },
+    "cpu": {
+      "direct": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65253
+        }
+      ],
+      "dispatch-1": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65266
+        }
+      ],
+      "haproxy-1-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "8",
+              "stot": "10"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65279\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65280\n",
+          "frontend_port": 65279
+        }
+      ],
+      "dispatch-2": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65306
+        }
+      ],
+      "haproxy-2-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65321\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65322\n    server worker2 127.0.0.1:65323\n",
+          "frontend_port": 65321
+        }
+      ],
+      "dispatch-4": [
+        {
+          "verified": true,
+          "backend_connections": null,
+          "haproxy_config": null,
+          "frontend_port": 65353
+        }
+      ],
+      "haproxy-4-t2": [
+        {
+          "verified": true,
+          "backend_connections": [
+            {
+              "svname": "worker1",
+              "scur": "4",
+              "stot": "6"
+            },
+            {
+              "svname": "worker2",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker3",
+              "scur": "4",
+              "stot": "5"
+            },
+            {
+              "svname": "worker4",
+              "scur": "4",
+              "stot": "5"
+            }
+          ],
+          "haproxy_config": "global\n    nbthread 2\n    maxconn 4096\n    stats socket /tmp/bkr-haproxy-jqas1c9_/stats.sock mode 600 level admin\n\ndefaults\n    mode tcp\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n\nfrontend incoming\n    bind 127.0.0.1:65380\n    default_backend bkr\n\nbackend bkr\n    balance roundrobin\n    server worker1 127.0.0.1:65381\n    server worker2 127.0.0.1:65382\n    server worker3 127.0.0.1:65383\n    server worker4 127.0.0.1:65384\n",
+          "frontend_port": 65380
+        }
+      ]
+    }
+  },
+  "failures": [],
+  "server_sha256": {
+    "bkr.js": "d28983fdec9ff3dc4516a2fc57d5cf7cdcb9e66e98e62eec18a753982f1d5d7a",
+    "process-cpu.js": "c3d9d33e53ebcb21d81dcd8bff76cb6d501e7437c05233d1012b116010c43a7d"
+  },
+  "cpu_units": "percent of one logical CPU, summed per role; service CPU sampled with ps time deltas",
+  "rss_units": "peak summed process RSS MiB per role; total includes frontend and every backend/descendant",
+  "argv": [
+    "bench/haproxy-tcp.py",
+    "--verify-only",
+    "--workloads",
+    "hello,async,echo,cpu",
+    "--report",
+    "bench/haproxy-tcp-20261031-verify.json"
+  ]
+}

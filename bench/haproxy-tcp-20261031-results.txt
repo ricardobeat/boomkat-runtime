@@ -1,0 +1,126 @@
+HAProxy TCP comparison — 2026-10-31
+
+Conclusion: HAProxy did not improve throughput over native FD dispatch on this Mac.
+The fresh repeat confirms the direction on every workload. This is a same-host
+comparison under variable background load, not a production capacity estimate.
+
+Environment
+hw.physicalcpu: 8
+hw.perflevel0.physicalcpu: 4
+hw.perflevel1.physicalcpu: 4
+machdep.cpu.brand_string: Apple M3
+macOS-27.0-arm64-arm-64bit
+HAProxy version 3.4.7-8872a26 2026/10/14 - https://haproxy.org/
+HAProxy uses kqueue on this build; Linux splice is unavailable.
+Runtime commit: 6eb078e92f8edb218d0ec6e9ec22bf9406c38b7e
+Engine commit: a16eda21f664bf1c54cd69cfcb654b495fe8eb68
+bkr SHA256: 80d6e672b81e79b98e1e44a06d6b162062f46d05157486e1e71e9680d5995318
+
+Method
+Same frozen bkr binary, route fixtures, HTTP/1.1 keep-alive, 128 connections,
+wrk 2 client threads, 1s warmup then 5s measured. Three rounds per comparison,
+rotating both route and case order, fresh services per sample. No runtime rebuild.
+Direct = one bkr. dispatch-N = native supervisor plus N bkr workers.
+haproxy-N-t1 = one HAProxy thread in TCP roundrobin mode plus N standalone bkr.
+HAProxy forwards all traffic; native dispatch hands off FDs at connection setup.
+HAProxy configured with maxconn 4096 and 5s connect / 30s client/server timeouts.
+No TLS, HTTP parsing, health checks, or logging. Exact configs and argv in JSON.
+bkr runs with --no-sandbox --no-prompt --allow-net=127.0.0.1 and bench read access.
+Routes: hello=11-byte response, async=setImmediate then JSON, echo=1KiB POST,
+cpu=10,000 synchronous JS integer-mixing iterations then JSON.
+
+Checks
+28 route/case correctness checks passed: exact status/body, repeated requests
+on persistent connections, and HAProxy stats confirm all configured backends
+have active connections. All 126 measured samples (6 screen + 84 main + 36 repeat)
+and their warmups completed without wrk socket errors or non-2xx responses.
+Binary hashes matched across all runs and were checked again after each run.
+
+Thread screen (4 backends, hello, two samples per setting)
+Threads   Median req/s   Median p99 ms
+haproxy-4-t1         148,290      1.235
+haproxy-4-t2         125,079      1.610
+haproxy-4-t4         117,140      7.555
+One thread was fastest in this screen and was selected for the matrix.
+This screen covered hello only; it is not exhaustive HAProxy tuning.
+
+Full matrix
+Each row reports three samples. CPU is % of one logical CPU, summed per role.
+p99 is the median of per-run p99 values. RSS is median of per-run peak summed
+process RSS, including frontend and all backends (shared pages may be counted twice).
+
+Route  Case                Median/s       Min/s       Max/s   p99 ms   RSS MiB   CPU front/back/client
+hello  direct                237,793     236,168     240,949    1.030      12.9   0.0/96.9/108.8
+hello  dispatch-1            236,297      97,915     237,937    1.030      15.3   0.0/94.2/107.3
+hello  haproxy-1-t1          110,364      60,973     150,063    2.040      34.1   95.7/79.8/89.4
+hello  dispatch-2            203,269     197,196     263,681    1.300      29.8   0.0/186.2/193.5
+hello  haproxy-2-t1          107,423     106,794     111,446    1.450      48.7   95.6/125.7/119.8
+hello  dispatch-4            204,092     201,465     212,869    0.960      57.5   0.0/343.7/197.3
+hello  haproxy-4-t1          104,863     103,543     142,495    1.490      75.5   95.9/139.9/111.4
+async  direct                165,011     155,323     169,180    1.400      14.5   0.0/97.0/93.3
+async  dispatch-1            159,245     146,391     168,910    1.410      17.0   0.0/96.9/99.2
+async  haproxy-1-t1          103,323      97,512     137,640    2.080      36.7   94.0/91.9/141.8
+async  dispatch-2            166,083     152,707     175,372    1.340      33.6   0.0/183.4/184.5
+async  haproxy-2-t1           96,281      90,532      99,109    1.750      53.0   94.5/146.1/128.0
+async  dispatch-4            185,099     174,623     188,810    1.170      64.0   0.0/329.2/191.6
+async  haproxy-4-t1          100,179      95,136     123,491    1.590      83.5   95.0/163.8/106.5
+echo   direct                136,352     122,791     163,974    1.880      15.1   0.0/95.2/92.2
+echo   dispatch-1            152,281     147,702     160,439    1.630      17.2   0.0/96.5/97.1
+echo   haproxy-1-t1          105,518     102,700     134,572    2.190      36.3   94.6/92.5/130.4
+echo   dispatch-2            212,777     170,473     215,433    1.240      33.3   0.0/188.3/193.3
+echo   haproxy-2-t1          100,428      97,316     124,640    1.700      52.7   95.4/147.3/123.7
+echo   dispatch-4            195,861     192,019     199,567    1.340      67.2   0.0/349.8/191.2
+echo   haproxy-4-t1          100,014      91,345     101,438    1.600      83.2   95.0/182.5/120.0
+cpu    direct                  4,026       3,216       4,304   33.330      12.9   0.0/98.2/4.1
+cpu    dispatch-1              4,117       4,105       4,222   32.150      15.3   0.0/98.2/4.1
+cpu    haproxy-1-t1            4,087       3,442       4,158   33.180      34.1   8.3/98.1/3.5
+cpu    dispatch-2              7,543       6,175       7,715   19.390      28.4   0.0/193.9/9.8
+cpu    haproxy-2-t1            7,300       5,676       8,058   20.080      46.8   11.5/193.7/7.4
+cpu    dispatch-4             11,669       8,338      12,677   16.790      54.9   0.0/379.6/18.6
+cpu    haproxy-4-t1           11,282       7,877      11,426   17.710      72.9   30.4/372.2/15.9
+
+Fresh repeat after noisy samples
+Each row reports three samples. CPU is % of one logical CPU, summed per role.
+p99 is the median of per-run p99 values. RSS is median of per-run peak summed
+process RSS, including frontend and all backends (shared pages may be counted twice).
+
+Route  Case                Median/s       Min/s       Max/s   p99 ms   RSS MiB   CPU front/back/client
+hello  direct                196,586     186,963     227,869    1.270      12.9   0.0/96.3/148.4
+hello  dispatch-4            207,681     198,783     237,522    1.020      57.3   0.0/340.9/197.5
+hello  haproxy-4-t1          106,088      99,532     138,372    1.420      75.4   95.8/148.7/115.9
+async  direct                151,198     142,125     154,969    1.430      14.7   0.0/96.6/113.5
+async  dispatch-4            185,891     180,961     204,882    1.180      65.2   0.0/338.4/192.5
+async  haproxy-4-t1           94,606      94,025     137,422    1.620      81.2   96.4/178.9/116.7
+echo   direct                157,829     140,965     164,466    1.500      14.8   0.0/96.3/92.2
+echo   dispatch-4            211,452     208,584     213,991    1.270      67.5   0.0/373.8/195.5
+echo   haproxy-4-t1          111,691      93,551     120,311    1.500      82.9   94.8/164.2/104.9
+cpu    direct                  4,086       4,026       4,346   32.930      12.9   0.0/97.3/3.9
+cpu    dispatch-4             10,893      10,055      11,658   18.000      54.8   0.0/381.8/18.4
+cpu    haproxy-4-t1           10,179       9,554      10,856   18.790      73.4   30.2/377.8/15.3
+
+Interpretation and limitations
+HAProxy frontend CPU is approximately one full core on the lightweight routes,
+while the native supervisor is effectively idle after persistent connections
+are assigned. The CPU-heavy workload spends most time in the JS backends, so
+HAProxy overhead is proportionally smaller. These are measured associations,
+not an isolated proof of which kernel or HAProxy operation limits throughput.
+Native-dispatch wrk CPU approaches 200% on several lightweight routes: the
+2-thread load generator can limit scaling. Four backends also compete with
+wrk, HAProxy, and other applications on 4 performance + 4 efficiency cores.
+Throughput and tail latency varied substantially between samples.
+All samples are retained. The original direct echo run had p99 34.53ms;
+other samples returned to normal. A whole fresh 3-round direct/4-backend
+comparison was run for all routes, rather than deleting unfavorable samples.
+No unrelated user processes were stopped. CPU and host load averages are in JSON.
+No claim of linear scaling, connection-churn capacity, Linux performance, or
+HAProxy production suitability follows from this keep-alive loopback benchmark.
+
+Reproduce
+python3 bench/haproxy-tcp.py --verify-only --report /tmp/verify.json
+python3 bench/haproxy-tcp.py --strategies haproxy --workers 4 --haproxy-threads 1,2,4 --workloads hello --rounds 2 --report /tmp/screen.json
+python3 bench/haproxy-tcp.py --haproxy-threads 1 --report /tmp/matrix.json
+python3 bench/haproxy-tcp.py --workers 4 --haproxy-threads 1 --report /tmp/repeat.json
+
+Raw data: bench/haproxy-tcp-20261031{,-repeat,-thread-screen,-verify}.json
+Every report includes tool/build metadata, binary and fixture hashes, configs,
+per-sample wrk output, process CPU windows/RSS, backend stats and any failures.
