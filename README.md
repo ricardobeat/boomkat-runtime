@@ -488,6 +488,4 @@ Node precomputes its JSON body; Node/Bun async handlers also await
 direct HTTP writes, while Boomkat and Bun use Web `ReadableStream`. Bun serves
 files with `Bun.file`, and Boomkat uses native `file.body`.
 
-The [engine update and disposal measurements](bench/disposal-results.txt) compare
-`using` / `await using` with SQLite `try/finally` handlers and cached statements.
 Run `python3 tests/run_disposal.py` to check the runtime disposal hooks.
