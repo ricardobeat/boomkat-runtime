@@ -340,6 +340,10 @@ fn void dns_done(Task* t) {
 }
 
 fn void start_connect(uint op, String host, String ip, int port, CInt ssl) {
+    if (ssl && !tls_available()) {
+        reject(op, "TLS_UNAVAILABLE", "https needs OpenSSL 3; install it with: brew install openssl@3");
+        return;
+    }
     if (!g_runtime.client_ctx[ssl]) {
         UsContextOptions opts;
         UsContext* ctx = us_create_socket_context(ssl, g_runtime.loop, 0, opts);

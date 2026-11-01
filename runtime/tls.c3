@@ -4,6 +4,11 @@ module bkr;
 
 import std::thread;
 
+extern fn CInt bkr_openssl_available() @cname("bkr_openssl_available");
+
+// False when OpenSSL 3 is not installed; TLS then fails with an error.
+fn bool tls_available() => bkr_openssl_available() != 0;
+
 extern fn CInt ssl_ctx_set_default_verify_paths(void* ctx) @cname("SSL_CTX_set_default_verify_paths");
 extern fn void ssl_ctx_set_verify(void* ctx, CInt mode, void* cb) @cname("SSL_CTX_set_verify");
 extern fn long ssl_ctrl(void* ssl, CInt cmd, long larg, void* parg) @cname("SSL_ctrl");

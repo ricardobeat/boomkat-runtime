@@ -111,6 +111,10 @@ PY
 # OpenSSL for TLS sockets (fetch, net); no zlib, since permessage-deflate
 # is never negotiated.
 SSL=$(brew --prefix openssl@3)
+if [ ! -f "$SSL/lib/libssl.3.dylib" ]; then
+    echo "openssl@3 is missing; install it with: brew install openssl@3" >&2
+    exit 1
+fi
 # Read the shared deployment target rather than defaulting to the host OS.
 DEPLOYMENT_TARGET=$(python3 - <<'PY'
 import re
@@ -137,6 +141,7 @@ clang++ "${CXXFLAGS[@]}" -c "$UWS/uSockets/src/crypto/sni_tree.cpp" -o "$OBJ/sni
 clang++ "${CXXFLAGS[@]}" -c shim/uws_shim.cpp -o "$OBJ/uws_shim.o"
 clang++ "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
 clang "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
+clang "${CFLAGS[@]}" -c shim/tls_probe.c -o "$OBJ/tls_probe.o"
 
 rm -f "$OUT"
 ar rcs "$OUT" "$OBJ"/*.o

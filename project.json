@@ -59,7 +59,7 @@
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
     "bkr-opprof-th": {
@@ -74,7 +74,7 @@
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE", "THREADED_DISPATCH" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
     "bkr": {
@@ -89,7 +89,7 @@
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-dead_strip", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-dead_strip", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
     "bkr-perf": {
@@ -104,7 +104,7 @@
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
     "bkr-perf-asan": {
@@ -120,7 +120,7 @@
       "debug-info": "full",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
     "bkr-perf-prof": {
@@ -136,7 +136,7 @@
       // Opcode counters run in switch dispatch; threading bypasses them.
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
       "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "/opt/homebrew/opt/openssl@3/lib/libssl.a", "/opt/homebrew/opt/openssl@3/lib/libcrypto.a" ]
+      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     }
   }
 }

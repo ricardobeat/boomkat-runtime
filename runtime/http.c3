@@ -1204,6 +1204,9 @@ fn void js_serve(JsCtx ctx, void* udata) {
         if (use_tls && (parent || g_runtime.http_workers > 1 || g_runtime.http_processes)) {
             return ctx.throw_error(TYPE, "TLS serve() runs on a single HTTP thread only");
         }
+        if (use_tls && !tls_available()) {
+            return ctx.throw_error(TYPE, "TLS serve() needs OpenSSL 3; install it with: brew install openssl@3");
+        }
         if (!check_net(host, port)) {
             ctx.throw_coded(
                 "PERMISSION_DENIED",
