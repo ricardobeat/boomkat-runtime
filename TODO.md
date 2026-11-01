@@ -24,9 +24,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 - [x] Native `file.readText` with owned external strings in the `boomkat-perf` worktree; UTF-8 decoding fallback for the main engine.
 - [ ] Merge external-string support from `boomkat-perf` into the engine after reviewing the performance branch. HTTP URL/header buffers and mutable `Uint8Array` storage still require copies.
 
-- [x] `Array.prototype.sort` freeing strings it still needed: fixed on engine main (`7ea3ba21`, `e0530118`). `toSorted` has the same bug, see below.
-- [ ] Engine: `Array.prototype.toSorted` borrows its elements like `sort` did, and a comparefn that shrinks the array frees them: `var a = ["b"+1, "a"+1]; a.toSorted((x, y) => { a.length = 0; return x < y ? -1 : 1 })` returns `[ Symbol(), 'b1' ]`, and the same with 300 elements crashes (SIGBUS). The elements need the rooted holder `sort` got in `7ea3ba21`.
-- [ ] Engine: `toSorted` is a bubble sort, so 20000 elements take 6.9 s where `sort` takes 10 ms. It should reuse the merge sort from `sort`.
+- [x] `Array.prototype.sort` and `toSorted` freed strings they still needed, and `toSorted` was O(n^2): fixed on engine main (`7ea3ba21`, `e0530118`, `c497f9ae`).
 - [ ] Close the gap to node/bun on json, echo, stream and file: the cost is interpreted JS per request (`new Request`, header blobs, promise hops) and `open` on the pool; a per-thread JS worker model (`SO_REUSEPORT`) would multiply throughput past the single-thread ceiling.
 - [x] TLS server in `serve` (`tls: { cert, key }`, single HTTP thread). Still open: HTTP/2, SNI with several certificates, and TLS under `--http-workers`/`--http-processes`.
 - [ ] Remote imports (gated under `import`), `ffi`, `sys`.
