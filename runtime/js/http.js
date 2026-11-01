@@ -104,6 +104,7 @@ export function serve(opts, fetch) {
         port: bound,
         url: new URL(`http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${bound}/`),
         finished,
+        async [Symbol.asyncDispose]() { await server.stop(); },
         get workers() { return bk.httpPoolCount(index); },
         stop(force = false) {
             bk.stop(index, force);

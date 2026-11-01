@@ -155,6 +155,8 @@ fn void SourceWriter.var_decl(&self, uint n) {
         case ast::VAR_KIND_VAR: self.text("var ");
         case ast::VAR_KIND_LET: self.text("let ");
         case ast::VAR_KIND_CONST: self.text("const ");
+        case ast::VAR_KIND_USING: self.text("using ");
+        case ast::VAR_KIND_AWAIT_USING: self.text("await using ");
         default: self.failed = true;
     }
     self.list(self.ast.lhs[n]);

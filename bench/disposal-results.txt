@@ -1,0 +1,75 @@
+Runtime update and explicit resource management, 2026-10-21
+
+Updated out/bkr from a frozen copy of local ~/cousas/boomkat at 535eaba59df2a28c9272c1fec019ba4b197044c5.
+The engine had become clean at snapshot time; its latest commit is 535eaba5.
+Every tracked src/vendor file in the snapshot matches that commit. File hashes are
+retained in engine-update-20261021-source.json.
+The normal project still builds against the sibling engine; the frozen build used
+a separate project file in the temporary snapshot, without changing that configuration.
+Baseline: the existing out/bkr saved before this task (Oct 20 binary). Its original
+engine revision/build provenance is not known; this is a before/after runtime comparison,
+not an isolated engine-commit experiment. Both binary hashes are in the raw JSON.
+
+Changes: updated regexp/unicode build paths; SQLite Database/Statement Symbol.dispose;
+HTTP server Symbol.asyncDispose awaits stop(); TS emitter preserves using/await using.
+
+Method: wrk -t2 -c128, fresh process for each sample, 1s warmup + 3s measured,
+loopback HTTP; p50/p99 latency and peak sampled RSS retained. Three before/after
+rounds alternate binary order; five disposal rounds rotate workload order.
+Earlier loaded-machine samples were replaced after the user reported the machine free.
+No tests/builds ran concurrently with the final benchmarks. Final samples still show
+drift/outliers, including a slowdown across every disposal variant in round five.
+All samples are retained, no HTTP/socket errors. These short local runs do not establish
+small universal speedups or the absence of tail-latency regressions.
+
+Before/after HTTP throughput (req/s, medians):
+workload       before       latest   median paired change   RSS MiB before/latest
+hello          202,764      224,373           -0.07%        12.20/11.50
+json           167,565      190,872           +4.03%        12.17/11.41
+async          160,649      147,431           +0.11%        12.67/11.95
+timer          114,405      113,753           +0.04%        12.58/11.84
+echo           144,132      139,313           -1.48%        13.23/12.66
+stream          72,148       72,403           +1.54%        12.22/11.47
+file            93,825       95,189           +0.26%        13.25/12.52
+changing       214,421      214,297           -0.14%        12.23/11.59
+
+Paired changes are computed within each round before taking the median. They can
+differ substantially from ratios of aggregate medians when the machine drifts.
+Most paired changes are small; JSON is +4.0%. RSS falls about 0.6–0.8 MiB.
+Hello pair ratios span approximately -20% to +31%, illustrating the noise.
+
+SQLite request handlers, same updated binary, SELECT 42 AS n -> JSON:
+variant          req/s median   p99 ms median   peak RSS MiB median
+manual              103,402            4.31                249.94
+using                97,027            4.32                298.38
+finallyasync         85,359            8.86                311.77
+awaitusing           58,201           14.20                253.20
+cached              173,157            1.40                 11.44
+
+using vs manual try/finally: -6.2% throughput.
+awaitusing vs finallyasync: -31.8% throughput.
+cached vs manual per-request prepare/finalize: +67.5% throughput.
+
+manual and using both prepare one statement per request, execute it once and finalize.
+finallyasync is an async function with await stmt.finalize() in finally.
+awaitusing is an async function using the synchronous Symbol.dispose fallback.
+cached reuses a statement prepared once at startup; it changes resource lifetime.
+These are whole HTTP workloads, not the nanosecond cost of disposal syntax. All
+prepare-per-request variants show much higher RSS than the cached case; sampled RSS
+does not establish a leak or retained-memory bound. No allocation profile was taken.
+
+Use synchronous using for scope-bound SQLite resources where guaranteed cleanup is
+valuable. Keep reusable hot-path statements alive across requests. await using works
+for real async lifetimes such as HTTP servers; its one-time lifecycle cost is separate
+from per-request throughput. A returned response stream may outlive its handler scope,
+so resources needed by that stream must be disposed when stream consumption finishes.
+
+Raw samples: engine-update-20261021.json, disposal-20261021.json.
+Reproduce:
+python3 bench/latency-ab.py --binary before=/private/tmp/bkr-before-engine-update --binary latest="$PWD/out/bkr" --rounds 3 --report bench/engine-update-20261021.json
+python3 bench/latency-ab.py --binary latest="$PWD/out/bkr" --rounds 5 --server bench/servers/disposal.js --workloads manual,using,finallyasync,awaitusing,cached --report bench/disposal-20261021.json
+
+Validation: tests/run_sqlite.py, tests/run_transpile.py, tests/run_modules.py,
+tests/run_workers.py, tests/run_disposal.py and tests/run_http.py on the frozen build.
+Build succeeded; linker reported existing OpenSSL archives built for macOS 27 while
+the project targets macOS 26. That deployment compatibility was not validated here.

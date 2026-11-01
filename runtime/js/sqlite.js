@@ -59,6 +59,7 @@ export class Statement {
     all(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 0); }
     get(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 1); }
     run(...args) { const s = statementState(this); return bk.sqliteQuery(s.id, bindings(s.names, args), 2); }
+    [Symbol.dispose]() { this.finalize(); }
     finalize() {
         const s = statements.get(this);
         if (!s || s.finalized) return;
@@ -85,6 +86,7 @@ export class Database {
     exec(sql) { bk.sqliteExec(databaseState(this).id, String(sql)); }
     prepare(sql) { return new Statement(internal, this, bk.sqlitePrepare(databaseState(this).id, String(sql))); }
     query(sql) { return this.prepare(sql); }
+    [Symbol.dispose]() { this.close(); }
     close() {
         const s = databases.get(this);
         if (!s || s.closed) return;

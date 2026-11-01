@@ -1,0 +1,38 @@
+{
+  "engine_base": "535eaba59df2a28c9272c1fec019ba4b197044c5",
+  "branch": "perf/using-disposal",
+  "worktree": "/private/tmp/boomkat-using-perf",
+  "files": {
+    "docs/architecture.md": "3d601ee38b602f2cee42585dd434b61b40c9695539c1d02f7e2c6223f6a974c5",
+    "src/builtins/builtin_handlers.c3": "f8d8ae516e14d43bdaff575f4a7a826280444c111babb172e6fa1b16c50f99c6",
+    "src/builtins/core.c3": "6dd4342963cbb90af953d7de046c5fd44001e82e4837b221f44920215052165b",
+    "src/builtins/disposable.c3": "ed428ac43dbdfa7687f5e98e9a685c00c3b19f8d128dde3909a87ead0400b3dc",
+    "src/compiler/context.c3": "271f3dd724d3d7d5510f7ebaed0b8516d4418f8dcdfd2dcddfd57535879a5d4a",
+    "src/compiler/dispose.c3": "43c5bd503f20469a09bd714c933ae81f73b1f53ae6e929de9d623ae16b8def17",
+    "src/compiler/gen.c3": "6ffee8d3ac15d8929b60252462fbd9c048e706e296f22074886569bdac1d6e53",
+    "src/compiler/statements.c3": "1c6180abfc5150e2cb5bc27a450857e9e77139b762f2556688778b0e68b62981",
+    "test/modules/run.sh": "f714a21b959a7b127ed1219ede9c23a2d1e8ba73c8a3ac6590cb83f8a10eebf1",
+    "test/using_single_resource.js": "12bdb881d10a6df91297da538e41df72c9f9632bff148d7dc670967d7fecd1c9",
+    "test/modules/t32_disposal_storage/main.js": "6b57b2fe80af2d378dcf3de4581dc9334ec1d00fd517f04bb52ae472275c2ef6"
+  },
+  "patch_sha256": "e0acdf6858e2f8181bf23624ba1c937b9cda80f042877cbf41630a22f891c740",
+  "binaries": {
+    "baseline": {
+      "path": "/private/tmp/bkr-using-baseline",
+      "sha256": "1928dcc96b3cb51f070fea7baba11921c4ecc5eb42cc2da0ddd95c4d6744e0d9"
+    },
+    "single": {
+      "path": "/private/tmp/bkr-using-single",
+      "sha256": "4f675c09575aa99db304b4396e9434238444009087e01e26ac3081bb9e5db5de"
+    },
+    "dense": {
+      "path": "/private/tmp/bkr-using-dense",
+      "sha256": "ad17d4d8e82e111f60670eefd1c8f98c2cb73123e5b278ebe03919ae22703370"
+    },
+    "optimized": {
+      "path": "/private/tmp/bkr-using-optimized",
+      "sha256": "5e56d09c90df6953bfaf60a002304108351bdd4e6b26e7d621ffb0deba376980"
+    }
+  },
+  "c3c_version": "C3 Compiler Version:       0.8.5\nInstalled directory:       /opt/homebrew/Cellar/c3c/0.8.5/libexec\nGit Hash:                  unknown\nBackends:                  LLVM\nLLVM version:              23.1.3\nLLVM default target:       arm64-apple-darwin27.0.0"
+}

@@ -38,6 +38,11 @@ built-in or an error, and remote imports are not supported.
 | `typescript` | `transpile(source, options)`; native TS type erasure and JSX lowering to JavaScript source |
 | `test` | `test`, `describe`, hooks and assertions for `bkr test` |
 
+HTTP servers implement `Symbol.asyncDispose`: inside an async scope,
+`await using server = serve(options)` calls and awaits `server.stop()` at scope exit.
+Keep that scope alive for the intended server lifetime. Request-scoped resources
+must stay alive until their consumers finish, especially streamed response bodies.
+
 ### Serving TypeScript and JSX
 
 The `typescript` module uses Boomkat's parser to erase types, lower JSX, validate
@@ -312,6 +317,11 @@ range become BigInts, including `lastInsertRowid`.
 Use `statement.finalize()` to release a statement. Closing a database finalizes its
 outstanding statements; process shutdown closes remaining databases. There is no
 implicit GC finalization or statement cache. Both close and finalize are idempotent.
+Databases and statements implement `Symbol.dispose`, so `using db = new Database()`
+and `using stmt = db.prepare(sql)` release them at scope exit, including throws
+and early returns. Keep frequently used statements outside request scopes to reuse
+them; `using` does not eliminate preparation costs. Prefer synchronous `using` for
+SQLite; `await using` also works through the synchronous disposer fallback.
 `db.transaction(fn)` returns a synchronous wrapper using savepoints, including nested
 transactions. Exceptions roll back; promise-returning callbacks are rejected.
 
@@ -477,3 +487,7 @@ Node precomputes its JSON body; Node/Bun async handlers also await
 `Promise.resolve`, while Boomkat uses `.then` after the yield. Node streams use
 direct HTTP writes, while Boomkat and Bun use Web `ReadableStream`. Bun serves
 files with `Bun.file`, and Boomkat uses native `file.body`.
+
+The [engine update and disposal measurements](bench/disposal-results.txt) compare
+`using` / `await using` with SQLite `try/finally` handlers and cached statements.
+Run `python3 tests/run_disposal.py` to check the runtime disposal hooks.
