@@ -20,6 +20,23 @@ sets that deployment target for C3 and C sources; `scripts/build_uws.sh`
 uses the same target for the native shim. After changing the target, rebuild
 the shim with `bash scripts/build_uws.sh` before building the runtime.
 
+On Linux, install `c3c`, a C/C++ compiler, and the OpenSSL, zlib and (optionally,
+at run time) SQLite development packages (`libssl-dev zlib1g-dev g++` on Debian),
+then:
+
+```sh
+git clone --depth 1 --branch v20.80.0 --recurse-submodules \
+    https://github.com/uNetworking/uWebSockets.git vendor/uWebSockets
+bash scripts/build_uws.sh      # writes vendor/libuws_shim-linux.a
+c3c build bkr-linux
+./out/bkr-linux --allow-net hello.js
+```
+
+`bkr-linux` needs `libssl.so.3` to start. It has no OS sandbox yet, so it prints a
+warning and enforces permissions in the runtime only (`--no-sandbox` silences it).
+`file` opens refuse a symlink as the last path component, where macOS refuses one
+anywhere in the path. Verified on aarch64 Debian 13; x86-64 is untested.
+
 There is no Node compatibility layer and no npm: a bare specifier is either a
 built-in or an error, and remote imports are not supported.
 
@@ -446,7 +463,7 @@ cannot turn `example.com` into the local network. Paths are canonicalized
 before matching, so symlinks do not escape a grant.
 
 When prompting is off the grants are fixed for the run, and bkr also applies a
-Seatbelt sandbox (macOS) that denies the network, exec and writes the grants do
+Seatbelt sandbox (macOS only) that denies the network, exec and writes the grants do
 not cover (`--no-sandbox` turns that off).
 
 `--time-limit=ms` interrupts JavaScript that runs longer than the limit; a

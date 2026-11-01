@@ -26,7 +26,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 
 - [x] `Array.prototype.sort` freeing strings it still needed: fixed on engine main (`7ea3ba21`, `e0530118`). Still check `toSorted` for the same borrowing.
 - [ ] Close the gap to node/bun on json, echo, stream and file: the cost is interpreted JS per request (`new Request`, header blobs, promise hops) and `open` on the pool; a per-thread JS worker model (`SO_REUSEPORT`) would multiply throughput past the single-thread ceiling.
-- [ ] TLS server in `serve` (cert/key options) and HTTP/2.
+- [x] TLS server in `serve` (`tls: { cert, key }`, single HTTP thread). Still open: HTTP/2, SNI with several certificates, and TLS under `--http-workers`/`--http-processes`.
 - [ ] Remote imports (gated under `import`), `ffi`, `sys`.
 - [ ] Linux sandbox (Landlock + seccomp) beside Seatbelt.
 - [x] `console` printed builtin-created arrays (`split`, `match`, `Object.entries`) with a `length:` entry: the engine wrote their `length` as enumerable (fixed in boomkat `635d8971`).
@@ -37,7 +37,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 npm and Node compatibility are a non-goal: bare specifiers stay reserved for built-ins.
 
 Blockers:
-- [ ] Linux build: `project.json` targets macOS 26 and Homebrew OpenSSL archives only.
+- [x] Linux build: `c3c build bkr-linux` after `scripts/build_uws.sh` (aarch64 Debian 13 verified; x86-64 untested). Open: CI for it, a Linux install of SQLite/zlib checks, `O_NOFOLLOW_ANY` equivalent (`openat2` with `RESOLVE_NO_SYMLINKS`), and the sandbox below.
 - [ ] Third-party code without npm: URL imports with a lockfile (see remote imports above).
 
 Web APIs:
