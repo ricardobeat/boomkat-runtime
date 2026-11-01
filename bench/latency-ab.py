@@ -15,6 +15,8 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--binary", action="append", required=True, help="label=/absolute/path")
+parser.add_argument("--binary-arg", action="append", default=[], help="label=argument (repeatable)")
+parser.add_argument("--engine-revision", action="append", default=[], help="label=engine-revision")
 parser.add_argument("--rounds", type=int, default=3)
 parser.add_argument("--report", type=Path, required=True)
 parser.add_argument("--workloads", default="hello,json,async,timer,echo,stream,file,changing")
@@ -22,12 +24,16 @@ parser.add_argument("--server", type=Path, default=ROOT / "bench/servers/bkr.js"
 parser.add_argument("--bun", action="store_true", help="Include the established Bun server")
 opts = parser.parse_args()
 binaries = {label: Path(path) for label, path in (arg.split("=", 1) for arg in opts.binary)}
+binary_args = {label: [] for label in binaries}
+for arg in opts.binary_arg:
+    label, value = arg.split("=", 1)
+    binary_args[label].append(value)
 if opts.bun:
     binaries["bun"] = Path(shutil.which("bun"))
 def command(label):
     if label == "bun" and opts.bun:
         return [str(binaries[label]), str(ROOT / "bench/servers/bun.js"), "18149", str(ROOT / "bench/payload.txt")]
-    return [str(binaries[label]), "--no-sandbox", "--allow-net", f"--allow-read={ROOT / 'bench'}",
+    return [str(binaries[label]), *binary_args[label], "--no-sandbox", "--allow-net", f"--allow-read={ROOT / 'bench'}",
             str(opts.server.resolve()), "18149", str(ROOT / "bench/payload.txt")]
 results = {}
 metadata = {
@@ -37,6 +43,8 @@ metadata = {
     "runtime": subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip(),
     "sha256": {label: hashlib.sha256(path.read_bytes()).hexdigest() for label, path in binaries.items()},
     "results": results,
+    "binary_args": binary_args,
+    "engine_revisions": dict(arg.split("=", 1) for arg in opts.engine_revision),
     "candidate_source_sha256": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                                 for path in sorted((ROOT / "runtime").rglob("*")) if path.suffix in [".c3", ".js"]},
     "connection_checks": {},
@@ -56,11 +64,12 @@ end
 ''')
     labels = list(binaries)
     for round_index in range(opts.rounds):
-        # Rotate the starting binary and alternate direction to distribute drift.
+        # Rotate the starting binary to distribute drift. Reversing a two-label
+        # rotation would accidentally restore the same order every round.
         order = labels[round_index % len(labels):] + labels[:round_index % len(labels)]
-        if round_index % 2:
-            order.reverse()
-        for workload in opts.workloads.split(","):
+        workloads = opts.workloads.split(",")
+        workloads = workloads[round_index % len(workloads):] + workloads[:round_index % len(workloads)]
+        for workload in workloads:
             for label in order:
                 with tempfile.TemporaryFile() as log:
                     server = subprocess.Popen(command(label), stdout=log, stderr=log)
