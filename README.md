@@ -27,7 +27,7 @@ built-in or an error, and remote imports are not supported.
 
 | module | surface |
 |---|---|
-| `http` | `serve({ port, hostname, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }`; `upgradeWebSocket(req)` |
+| `http` | `serve({ port, hostname, tls, routes, fetch, error, onListen })` -> `{ port, finished, stop(force) }`; `upgradeWebSocket(req)` |
 | `net` | `connect({ hostname, port, tls })`, `listen({ hostname, port })`, `resolve(host)`; connections expose `read`, `write`, `closeWrite`, `close`, `readable`, `writable` |
 | `file` | `body`, `read`, `readText`, `write`, `writeText`, `open`, `stat`, `list`, `mkdir`, `remove`, `rename`, `copy`, `exists` |
 | `process` | `args`, `pid`, `execPath`, `exit`, `env`, `stdin`/`stdout`/`stderr`, `spawn`, `run` |
@@ -101,6 +101,32 @@ limit, automatic pings, a 120 s idle timeout, and no compression. Open sockets
 keep the process alive.
 
 Validation: `bkr --no-sandbox -A tests/websocket.js`.
+
+### HTTPS
+
+`serve({ tls: { cert, key } })` serves HTTPS. `cert` and `key` are paths to
+PEM files, and both are required:
+
+```js
+serve({
+    port: 8443,
+    tls: { cert: "./cert.pem", key: "./key.pem" },
+    fetch: () => new Response("secure"),
+});
+```
+
+`server.url` uses `https:`. Routes, streaming, static responses and
+`upgradeWebSocket` (clients connect with `wss:`) work as they do over plain
+HTTP. The files are read with the usual read check, so under `--allow-read`
+they must be inside the grant. Bad paths or a malformed pair make `serve`
+throw.
+
+TLS needs OpenSSL 3 at run time. `bkr` links it weakly and starts without it;
+plain HTTP is unaffected, and `serve({ tls })` throws with an install hint.
+TLS runs on a single HTTP thread, so `serve({ tls })` is rejected with
+`--http-workers` and `--http-processes`: terminate TLS in front of those modes.
+There is no HTTP/2, no SNI with several certificates, and no client
+certificates yet.
 
 ### Testing
 
