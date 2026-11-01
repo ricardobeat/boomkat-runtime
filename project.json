@@ -6,10 +6,10 @@
   // native C3 binding links engine internals, so there is no prebuilt lib).
   // Paths are absolute because the engine lives outside this project.
   "c-sources": [
-    "/Users/rtomasi/cousas/boomkat/libregexp/libregexp.c",
-    "/Users/rtomasi/cousas/boomkat/libregexp/libunicode.c",
-    "/Users/rtomasi/cousas/boomkat/libregexp/re_wrapper.c",
-    "/Users/rtomasi/cousas/boomkat/libregexp/unicode_wrapper.c",
+    "/Users/rtomasi/cousas/boomkat/vendor/libregexp/libregexp.c",
+    "/Users/rtomasi/cousas/boomkat/vendor/libunicode/libunicode.c",
+    "/Users/rtomasi/cousas/boomkat/src/re_wrapper.c",
+    "/Users/rtomasi/cousas/boomkat/src/unicode_wrapper.c",
     "/Users/rtomasi/cousas/boomkat/vendor/dtoa/cutils.c",
     "/Users/rtomasi/cousas/boomkat/vendor/dtoa/dtoa.c",
     "/Users/rtomasi/cousas/boomkat/src/dtoa_wrapper.c",
@@ -23,7 +23,9 @@
   "cflags": "-O2 -mmacosx-version-min=26.0",
   "c-include-dirs": [
     "/Users/rtomasi/cousas/boomkat/vendor/dtoa",
-    "/Users/rtomasi/cousas/boomkat/libregexp"
+    "/Users/rtomasi/cousas/boomkat/vendor/libregexp",
+    "/Users/rtomasi/cousas/boomkat/vendor/libunicode",
+    "/Users/rtomasi/cousas/boomkat/src"
   ],
 
   "dependency-search-paths": [ "vendor" ],
