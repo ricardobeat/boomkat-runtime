@@ -9,8 +9,7 @@ vendor/uWebSockets/
 vendor/lws-src/
 
 # Built by scripts/build_uws.sh
-vendor/libuws_shim.a
-vendor/libuws_shim-linux.a
+vendor/uws.c3l/*/
 
 # Vendored C3 binding for libwebsockets. Excluded because it carries its own
 # .git and would commit as a gitlink -- a clone would get an empty directory.

@@ -1,0 +1,45 @@
+{
+  "provides": "uws",
+  "targets": {
+    "macos-aarch64": {
+      "linked-libraries": [
+        "uws"
+      ],
+      "link-args": [
+        "-lc++",
+        "-dead_strip",
+        "-L/opt/homebrew/opt/openssl@3/lib",
+        "-weak-lssl",
+        "-weak-lcrypto"
+      ]
+    },
+    "macos-x64": {
+      "linked-libraries": [
+        "uws"
+      ],
+      "link-args": [
+        "-lc++",
+        "-dead_strip",
+        "-L/usr/local/opt/openssl@3/lib",
+        "-weak-lssl",
+        "-weak-lcrypto"
+      ]
+    },
+    "linux-aarch64": {
+      "linked-libraries": [
+        "uws",
+        "stdc++",
+        "ssl",
+        "crypto"
+      ]
+    },
+    "linux-x64": {
+      "linked-libraries": [
+        "uws",
+        "stdc++",
+        "ssl",
+        "crypto"
+      ]
+    }
+  }
+}

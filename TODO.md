@@ -37,7 +37,7 @@ Runtime build order from PLAN.md, tracked here as it lands.
 npm and Node compatibility are a non-goal: bare specifiers stay reserved for built-ins.
 
 Blockers:
-- [x] Linux build: `c3c build bkr-linux` after `scripts/build_uws.sh` (aarch64 Debian 13 verified; x86-64 untested). Open: CI for it, a Linux install of SQLite/zlib checks, `O_NOFOLLOW_ANY` equivalent (`openat2` with `RESOLVE_NO_SYMLINKS`), and the sandbox below.
+- [x] Linux build: `c3c build` after `scripts/build_uws.sh`, from the same `project.json` as macOS (per-platform linking lives in `vendor/uws.c3l/manifest.json`) (aarch64 Debian 13 verified; x86-64 untested). Open: CI for it, a Linux install of SQLite/zlib checks, `O_NOFOLLOW_ANY` equivalent (`openat2` with `RESOLVE_NO_SYMLINKS`), and the sandbox below.
 - [ ] Third-party code without npm: URL imports with a lockfile (see remote imports above).
 
 Web APIs:

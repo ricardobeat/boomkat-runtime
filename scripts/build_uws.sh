@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds vendor/libuws_shim.a: the uSockets C library plus the C++ shim that
-# gives it an extern "C" surface C3 can bind.
+# Builds vendor/uws.c3l/<platform>/libuws.a: the uSockets C library plus the
+# C++ shim that gives it an extern "C" surface C3 can bind.
 #
 # Kept out of project.json because c3c's c-sources drive a C compiler, and the
 # shim needs a C++ one. Run this before `c3c build bkr`.
@@ -8,22 +8,28 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 UWS=vendor/uWebSockets
+# The archive goes into the uws.c3l library, in the directory c3c names
+# after the platform it builds for (macos-aarch64, linux-x64, ...).
+case "$(uname -m)" in
+    arm64|aarch64) ARCH=aarch64 ;;
+    x86_64|amd64) ARCH=x64 ;;
+    *) echo "unsupported architecture $(uname -m)" >&2; exit 1 ;;
+esac
 if [[ "$(uname -s)" == Darwin ]]; then
-    OBJ=build/uws-obj
-    OUT=vendor/libuws_shim.a
+    PLATFORM=macos-$ARCH
     CC=${CC:-clang}
     CXX=${CXX:-clang++}
 else
-    # A separate archive, so a checkout shared with a macOS host keeps both.
-    OBJ=build/uws-obj-linux
-    OUT=vendor/libuws_shim-linux.a
+    PLATFORM=linux-$ARCH
     CC=${CC:-cc}
     CXX=${CXX:-c++}
 fi
+OBJ=build/uws-obj-$PLATFORM
+OUT=vendor/uws.c3l/$PLATFORM/libuws.a
 
 [[ -d "$UWS/uSockets/src" ]] || { echo "missing $UWS -- clone it with --recurse-submodules" >&2; exit 1; }
 
-mkdir -p "$OBJ"
+mkdir -p "$OBJ" "$(dirname "$OUT")"
 
 # Static responses serialize their immutable headers once. This writes only
 # that block; uWS still owns status, Date, framing and socket lifecycle.

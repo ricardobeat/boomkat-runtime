@@ -17,11 +17,12 @@
     "../boomkat/src/native_stack.c",
     "../boomkat/src/sysmem.c"
   ],
-  // Homebrew's linked OpenSSL archives require macOS 26. Keep C3, the C
-  // sources, and scripts/build_uws.sh on the same deployment target. The
-  // bkr-linux target overrides the flags that only make sense on macOS.
+  // Homebrew's linked OpenSSL archives require macOS 26; scripts/build_uws.sh
+  // reads this for the native shim. Per-platform linking (the C++ runtime,
+  // OpenSSL, the shim archive) lives in vendor/uws.c3l/manifest.json, so
+  // the same targets build on macOS and Linux.
   "macos-min-version": "26.0",
-  "cflags": "-O2 -mmacosx-version-min=26.0",
+  "cflags": "-O2",
   "c-include-dirs": [
     "../boomkat/vendor/dtoa",
     "../boomkat/vendor/libregexp",
@@ -32,6 +33,20 @@
   "dependency-search-paths": [ "vendor" ],
 
   "targets": {
+    "bkr": {
+      "type": "executable",
+      "sources": [
+        "../boomkat/src",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
+      "dependencies": [ "uws" ]
+    },
+
     "test-server": {
       "type": "executable",
       "sources": [
@@ -59,8 +74,7 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
+      "dependencies": [ "uws" ]
     },
 
     "bkr-opprof-th": {
@@ -74,39 +88,7 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE", "THREADED_DISPATCH" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
-    },
-
-    "bkr-linux": {
-      "type": "executable",
-      "sources": [
-        "../boomkat/src",
-        "runtime/**"
-      ],
-      "opt": "O3",
-      "single-module": true,
-      "fp-math": "relaxed",
-      "debug-info": "none",
-      "cflags-override": "-O2",
-      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
-      "linked-libraries": [ "vendor/libuws_shim-linux.a", "stdc++", "ssl", "crypto" ],
-      "link-args-override": [ "-Wl,--gc-sections" ]
-    },
-
-    "bkr": {
-      "type": "executable",
-      "sources": [
-        "../boomkat/src",
-        "runtime/**"
-      ],
-      "opt": "O3",
-      "single-module": true,
-      "fp-math": "relaxed",
-      "debug-info": "none",
-      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-dead_strip", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
+      "dependencies": [ "uws" ]
     },
 
     "bkr-perf": {
@@ -120,8 +102,7 @@
       "fp-math": "relaxed",
       "debug-info": "none",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
+      "dependencies": [ "uws" ]
     },
 
     "bkr-perf-asan": {
@@ -136,8 +117,7 @@
       "fp-math": "relaxed",
       "debug-info": "full",
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
+      "dependencies": [ "uws" ]
     },
 
     "bkr-perf-prof": {
@@ -152,8 +132,7 @@
       "debug-info": "none",
       // Opcode counters run in switch dispatch; threading bypasses them.
       "features": [ "ARGON2_FORCE_SEQUENTIAL", "CONSOLE", "OP_PROFILE" ],
-      "linked-libraries": [ "vendor/libuws_shim.a" ],
-      "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
+      "dependencies": [ "uws" ]
     }
   }
 }
