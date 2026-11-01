@@ -117,9 +117,7 @@ serve({
 
 `server.url` uses `https:`. Routes, streaming, static responses and
 `upgradeWebSocket` (clients connect with `wss:`) work as they do over plain
-HTTP. The files are read with the usual read check, so under `--allow-read`
-they must be inside the grant. Bad paths or a malformed pair make `serve`
-throw.
+HTTP. The certificate and key files need read permission.
 
 TLS needs OpenSSL 3 at run time. `bkr` links it weakly and starts without it;
 plain HTTP is unaffected, and `serve({ tls })` throws with an install hint.
