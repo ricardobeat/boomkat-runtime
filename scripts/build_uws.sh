@@ -8,8 +8,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 UWS=vendor/uWebSockets
-OBJ=build/uws-obj
-OUT=vendor/libuws_shim.a
+if [[ "$(uname -s)" == Darwin ]]; then
+    OBJ=build/uws-obj
+    OUT=vendor/libuws_shim.a
+    CC=${CC:-clang}
+    CXX=${CXX:-clang++}
+else
+    # A separate archive, so a checkout shared with a macOS host keeps both.
+    OBJ=build/uws-obj-linux
+    OUT=vendor/libuws_shim-linux.a
+    CC=${CC:-cc}
+    CXX=${CXX:-c++}
+fi
 
 [[ -d "$UWS/uSockets/src" ]] || { echo "missing $UWS -- clone it with --recurse-submodules" >&2; exit 1; }
 
@@ -59,7 +69,16 @@ PY
 
 # macOS coalesces kqueue timers armed with the default leeway, so a 1 ms timer
 # often fires a millisecond late. Arm them in microseconds as critical.
-sed -i '' 's/EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), 0, ms, internal_cb);/EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), NOTE_USECONDS | NOTE_CRITICAL, (int64_t) ms * 1000, internal_cb);/' "$UWS/uSockets/src/eventing/epoll_kqueue.c"
+python3 - "$UWS/uSockets/src/eventing/epoll_kqueue.c" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+s = p.read_text()
+s = s.replace(
+    'EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), 0, ms, internal_cb);',
+    'EV_ADD | (repeat_ms ? 0 : EV_ONESHOT), NOTE_USECONDS | NOTE_CRITICAL, (int64_t) ms * 1000, internal_cb);')
+p.write_text(s)
+PY
 
 # A TLS peer that sends close_notify right behind its last records made
 # uSockets drop the data decoded in that same call. Emit it before closing.
@@ -108,15 +127,16 @@ s = s[:start] + new_dh + s[end:]
 open(p, "w").write(s)
 PY
 
-# OpenSSL for TLS sockets (fetch, net); no zlib, since permessage-deflate
+# OpenSSL for TLS sockets (fetch, net, serve); no zlib, since permessage-deflate
 # is never negotiated.
-SSL=$(brew --prefix openssl@3)
-if [ ! -f "$SSL/lib/libssl.3.dylib" ]; then
-    echo "openssl@3 is missing; install it with: brew install openssl@3" >&2
-    exit 1
-fi
-# Read the shared deployment target rather than defaulting to the host OS.
-DEPLOYMENT_TARGET=$(python3 - <<'PY'
+if [[ "$(uname -s)" == Darwin ]]; then
+    SSL=$(brew --prefix openssl@3)
+    if [ ! -f "$SSL/lib/libssl.3.dylib" ]; then
+        echo "openssl@3 is missing; install it with: brew install openssl@3" >&2
+        exit 1
+    fi
+    # Read the shared deployment target rather than defaulting to the host OS.
+    DEPLOYMENT_TARGET=$(python3 - <<'PY'
 import re
 from pathlib import Path
 match = re.search(r'"macos-min-version"\s*:\s*"([0-9.]+)"', Path('project.json').read_text())
@@ -125,23 +145,31 @@ if not match:
 print(match[1])
 PY
 )
-CFLAGS=(-O3 -mmacosx-version-min="$DEPLOYMENT_TARGET" -std=c11 -DLIBUS_USE_OPENSSL -I"$SSL/include" -I"$UWS/uSockets/src")
-CXXFLAGS=(-O3 -mmacosx-version-min="$DEPLOYMENT_TARGET" -std=c++20 -DUWS_NO_ZLIB -DLIBUS_USE_OPENSSL -I"$SSL/include"
+    PLATFORM_FLAGS=(-mmacosx-version-min="$DEPLOYMENT_TARGET" -I"$SSL/include")
+else
+    if [ ! -f /usr/include/openssl/ssl.h ]; then
+        echo "OpenSSL headers are missing; install libssl-dev (Debian) or openssl-devel (Fedora)" >&2
+        exit 1
+    fi
+    PLATFORM_FLAGS=(-fPIC)
+fi
+CFLAGS=(-O3 "${PLATFORM_FLAGS[@]}" -std=c11 -DLIBUS_USE_OPENSSL -I"$UWS/uSockets/src")
+CXXFLAGS=(-O3 "${PLATFORM_FLAGS[@]}" -std=c++20 -DUWS_NO_ZLIB -DLIBUS_USE_OPENSSL
           -I"$UWS/src" -I"$UWS/uSockets/src")
 
 # epoll_kqueue.c covers kqueue on macOS and epoll on Linux; the libuv, gcd,
 # io_uring and quic backends are not compiled in.
 for f in bsd context loop socket udp; do
-    clang "${CFLAGS[@]}" -c "$UWS/uSockets/src/$f.c" -o "$OBJ/$f.o"
+    "$CC" "${CFLAGS[@]}" -c "$UWS/uSockets/src/$f.c" -o "$OBJ/$f.o"
 done
-clang "${CFLAGS[@]}" -c "$UWS/uSockets/src/eventing/epoll_kqueue.c" -o "$OBJ/epoll_kqueue.o"
-clang "${CFLAGS[@]}" -c "$UWS/uSockets/src/crypto/openssl.c" -o "$OBJ/openssl.o"
-clang++ "${CXXFLAGS[@]}" -c "$UWS/uSockets/src/crypto/sni_tree.cpp" -o "$OBJ/sni_tree.o"
+"$CC" "${CFLAGS[@]}" -c "$UWS/uSockets/src/eventing/epoll_kqueue.c" -o "$OBJ/epoll_kqueue.o"
+"$CC" "${CFLAGS[@]}" -c "$UWS/uSockets/src/crypto/openssl.c" -o "$OBJ/openssl.o"
+"$CXX" "${CXXFLAGS[@]}" -c "$UWS/uSockets/src/crypto/sni_tree.cpp" -o "$OBJ/sni_tree.o"
 
-clang++ "${CXXFLAGS[@]}" -c shim/uws_shim.cpp -o "$OBJ/uws_shim.o"
-clang++ "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
-clang "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
-clang "${CFLAGS[@]}" -c shim/tls_probe.c -o "$OBJ/tls_probe.o"
+"$CXX" "${CXXFLAGS[@]}" -c shim/uws_shim.cpp -o "$OBJ/uws_shim.o"
+"$CXX" "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
+"$CC" "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
+"$CC" "${CFLAGS[@]}" -c shim/tls_probe.c -o "$OBJ/tls_probe.o"
 
 rm -f "$OUT"
 ar rcs "$OUT" "$OBJ"/*.o

@@ -4,28 +4,29 @@
 
   // The boomkat engine is compiled from source alongside our own code (the
   // native C3 binding links engine internals, so there is no prebuilt lib).
-  // Paths are absolute because the engine lives outside this project.
+  // The engine is expected beside this project, in ../boomkat.
   "c-sources": [
-    "/Users/rtomasi/cousas/boomkat/vendor/libregexp/libregexp.c",
-    "/Users/rtomasi/cousas/boomkat/vendor/libunicode/libunicode.c",
-    "/Users/rtomasi/cousas/boomkat/src/re_wrapper.c",
-    "/Users/rtomasi/cousas/boomkat/src/unicode_wrapper.c",
-    "/Users/rtomasi/cousas/boomkat/vendor/dtoa/cutils.c",
-    "/Users/rtomasi/cousas/boomkat/vendor/dtoa/dtoa.c",
-    "/Users/rtomasi/cousas/boomkat/src/dtoa_wrapper.c",
-    "/Users/rtomasi/cousas/boomkat/src/date_math.c",
-    "/Users/rtomasi/cousas/boomkat/src/native_stack.c",
-    "/Users/rtomasi/cousas/boomkat/src/sysmem.c"
+    "../boomkat/vendor/libregexp/libregexp.c",
+    "../boomkat/vendor/libunicode/libunicode.c",
+    "../boomkat/src/re_wrapper.c",
+    "../boomkat/src/unicode_wrapper.c",
+    "../boomkat/vendor/dtoa/cutils.c",
+    "../boomkat/vendor/dtoa/dtoa.c",
+    "../boomkat/src/dtoa_wrapper.c",
+    "../boomkat/src/date_math.c",
+    "../boomkat/src/native_stack.c",
+    "../boomkat/src/sysmem.c"
   ],
   // Homebrew's linked OpenSSL archives require macOS 26. Keep C3, the C
-  // sources, and scripts/build_uws.sh on the same deployment target.
+  // sources, and scripts/build_uws.sh on the same deployment target. The
+  // bkr-linux target overrides the flags that only make sense on macOS.
   "macos-min-version": "26.0",
   "cflags": "-O2 -mmacosx-version-min=26.0",
   "c-include-dirs": [
-    "/Users/rtomasi/cousas/boomkat/vendor/dtoa",
-    "/Users/rtomasi/cousas/boomkat/vendor/libregexp",
-    "/Users/rtomasi/cousas/boomkat/vendor/libunicode",
-    "/Users/rtomasi/cousas/boomkat/src"
+    "../boomkat/vendor/dtoa",
+    "../boomkat/vendor/libregexp",
+    "../boomkat/vendor/libunicode",
+    "../boomkat/src"
   ],
 
   "dependency-search-paths": [ "vendor" ],
@@ -34,7 +35,7 @@
     "test-server": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat/src",
+        "../boomkat/src",
         "src/**"
       ],
       "opt": "O3",
@@ -50,7 +51,7 @@
     "bkr-opprof": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat/src",
+        "../boomkat/src",
         "runtime/**"
       ],
       "opt": "O3",
@@ -65,7 +66,7 @@
     "bkr-opprof-th": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat/src",
+        "../boomkat/src",
         "runtime/**"
       ],
       "opt": "O3",
@@ -77,10 +78,26 @@
       "link-args": [ "-lc++", "-L/opt/homebrew/opt/openssl@3/lib", "-weak-lssl", "-weak-lcrypto" ]
     },
 
+    "bkr-linux": {
+      "type": "executable",
+      "sources": [
+        "../boomkat/src",
+        "runtime/**"
+      ],
+      "opt": "O3",
+      "single-module": true,
+      "fp-math": "relaxed",
+      "debug-info": "none",
+      "cflags-override": "-O2",
+      "features": [ "ARGON2_FORCE_SEQUENTIAL", "THREADED_DISPATCH", "CONSOLE" ],
+      "linked-libraries": [ "vendor/libuws_shim-linux.a", "stdc++", "ssl", "crypto" ],
+      "link-args-override": [ "-Wl,--gc-sections" ]
+    },
+
     "bkr": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat/src",
+        "../boomkat/src",
         "runtime/**"
       ],
       "opt": "O3",
@@ -95,7 +112,7 @@
     "bkr-perf": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat-perf/src",
+        "../boomkat-perf/src",
         "runtime/**"
       ],
       "opt": "O3",
@@ -110,7 +127,7 @@
     "bkr-perf-asan": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat-perf/src",
+        "../boomkat-perf/src",
         "runtime/**"
       ],
       "opt": "O0",
@@ -126,7 +143,7 @@
     "bkr-perf-prof": {
       "type": "executable",
       "sources": [
-        "/Users/rtomasi/cousas/boomkat-perf/src",
+        "../boomkat-perf/src",
         "runtime/**"
       ],
       "opt": "O3",
