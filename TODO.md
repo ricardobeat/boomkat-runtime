@@ -49,7 +49,7 @@ Web APIs:
 - [x] Source maps for TypeScript stacks: not needed. The engine parses TS and TSX natively, so stack positions are already in the original source. Uncaught errors now print their stack.
 - [ ] Engine: a module's SyntaxError has no file, line or stack (`SyntaxError: unexpected token` only). The engine records line/col (`err_line`/`err_col`) but neither the error object nor the embedding API carries the file.
 - [ ] `typescript.transpile()` source maps for browser devtools: needs position tracking in the engine's printer.
-- [ ] `crypto.subtle`.
+- [x] `crypto.subtle`: digest, HMAC, AES-GCM/CBC/CTR, PBKDF2, HKDF with raw and JWK secret keys. Open: RSA, ECDSA, ECDH, Ed25519, X25519, AES-KW, `wrapKey`/`unwrapKey`, `spki`/`pkcs8`, and global `CryptoKey`/`SubtleCrypto`.
 - [ ] Confirm `Intl` coverage from the engine.
 - [ ] TypeScript enums and other syntax needing runtime transforms.
 

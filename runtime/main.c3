@@ -274,7 +274,7 @@ fn HostPort split_host_port(String s) {
 
 const Native[] CORE_NATIVES = {
     { "queueMicrotask", &js_queue_microtask, 1 },
-    { "op", &js_op, 5 },
+    { "op", &js_op, 9 },
     { "immediateArm", &js_immediate_arm, 0 },
     { "now", &js_now, 0 },
     { "urlFast", &js_url_fast, 1 },
@@ -318,6 +318,7 @@ fn void? boot() {
     install_natives(IMMEDIATE_NATIVES)!;
     install_natives(TRANSPILE_NATIVES)!;
     install_natives(CRYPTO_NATIVES)!;
+    install_natives(SUBTLE_NATIVES)!;
     install_natives(WORKER_NATIVES)!;
     install_natives(WS_NATIVES)!;
     install_natives(ZLIB_NATIVES)!;

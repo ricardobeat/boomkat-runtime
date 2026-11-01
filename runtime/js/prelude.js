@@ -242,7 +242,10 @@ def("performance", { now: () => bk.now() - origin, timeOrigin: Date.now() - (bk.
 
 // ---- crypto ----
 
+// crypto.subtle is parsed on first use, from runtime/js/subtle.js.
+let subtle;
 def("crypto", {
+    get subtle() { return subtle ??= bk.internal("subtle")(bk); },
     getRandomValues(a) {
         if (!ArrayBuffer.isView(a) || a instanceof Float32Array || a instanceof Float64Array) throw new TypeError("expected an integer TypedArray");
         if (a.byteLength > 65536) throw new DOMException("quota exceeded", "QuotaExceededError");

@@ -51,7 +51,7 @@ built-in or an error, and remote imports are not supported.
 | `path` | `join`, `resolve`, `relative`, `dirname`, `basename`, `extname`, `parse`, `format`, `toFileUrl`, `fromFileUrl` |
 | `permissions` | `query`, `request`, `revoke` |
 | `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |
-| `crypto` | `randomBytes`, `sha256`, `hex`, `timingSafeEqual`, async `hashPassword` / `verifyPassword` |
+| `crypto` | `randomBytes`, `sha256`, `hex`, `timingSafeEqual`, async `hashPassword` / `verifyPassword`, `subtle` |
 | `typescript` | `transpile(source, options)`; native TS type erasure and JSX lowering to JavaScript source |
 | `test` | `test`, `describe`, hooks and assertions for `bkr test` |
 
@@ -278,6 +278,30 @@ jobs in flight; additional requests reject with `code: "BUSY"`. The native
 password copy and intermediate digest are wiped after use. This is a password
 hashing API, separate from the global Web Crypto random helpers.
 
+### crypto.subtle
+
+`crypto.subtle` (also exported as `subtle` from `crypto`) implements the Web
+Crypto operations `digest`, `generateKey`, `importKey`, `exportKey`, `encrypt`,
+`decrypt`, `sign`, `verify`, `deriveBits` and `deriveKey` for:
+
+| Operation | Algorithms |
+| --- | --- |
+| digest | SHA-1, SHA-256, SHA-384, SHA-512 |
+| sign, verify | HMAC with any of those hashes |
+| encrypt, decrypt | AES-GCM (any tag length and IV), AES-CBC, AES-CTR |
+| deriveBits, deriveKey | PBKDF2, HKDF |
+
+Keys are `raw` or `jwk` (`oct`) secret keys. Anything else (RSA, ECDSA, ECDH,
+Ed25519, X25519, AES-KW, `wrapKey`, `unwrapKey`, `spki`, `pkcs8`) rejects with
+`NotSupportedError`. Errors are `DOMException`s with the names the spec uses.
+Operations run on the thread pool over OpenSSL 3, so `crypto.subtle` needs
+libcrypto at run time (the same requirement as TLS). PBKDF2 is limited to 20
+million iterations. The module is parsed on first use, so scripts that never
+touch it pay nothing. There is no global `CryptoKey` or `SubtleCrypto` yet.
+
+Validation: `bkr test tests/subtle.test.js` checks results against vectors
+generated with Node's Web Crypto, including AES-CTR counter wraparound.
+
 Validation: `python3 tests/run_transpile.py`, `python3 tests/run_crypto.py`, and
 `python3 tests/run_taskboard.py`. The crypto check compares Argon2id output
 against OpenSSL when its ARGON2ID KDF is available.
@@ -481,6 +505,7 @@ runtime/fs.c3        files                        runtime/proc.c3 env, spawn
 runtime/res.c3       resource table (stdio, files, sockets, pipes)
 runtime/perms.c3     permission model             runtime/sandbox.c3
 runtime/js/*.js      the prelude and the built-in modules
+runtime/subtle.c3    crypto.subtle natives (shim/subtle.c, OpenSSL EVP)
 runtime/shim/        C++ shim over uWebSockets
 bench/               workloads and the wrk driver
 ```

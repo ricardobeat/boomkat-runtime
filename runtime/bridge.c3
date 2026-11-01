@@ -157,7 +157,10 @@ fn void js_op(JsCtx ctx, void* user) {
             return;
         }
         g_runtime.pending_ops.set(id, op);
-        JsArg[5] args = { ctx.number(id), ctx.arg(1), ctx.arg(2), ctx.arg(3), ctx.arg(4) };
+        JsArg[9] args = {
+            ctx.number(id), ctx.arg(1), ctx.arg(2), ctx.arg(3), ctx.arg(4),
+            ctx.arg(5), ctx.arg(6), ctx.arg(7), ctx.arg(8),
+        };
         if (catch ctx.call(ctx.arg(0), args[..])) {
             if (try pending = g_runtime.pending_ops.get(id)) {
                 g_runtime.pending_ops.remove(id);

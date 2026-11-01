@@ -176,6 +176,7 @@ done
 "$CXX" "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
 "$CC" "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
 "$CC" "${CFLAGS[@]}" -c shim/tls_probe.c -o "$OBJ/tls_probe.o"
+"$CC" "${CFLAGS[@]}" -c shim/subtle.c -o "$OBJ/subtle.o"
 
 rm -f "$OUT"
 ar rcs "$OUT" "$OBJ"/*.o
