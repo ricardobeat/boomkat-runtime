@@ -64,9 +64,20 @@ clears and bypasses stored snapshots during transactions. SQLite builds without
 JSON functions use the ordinary row path. Cached results must be reported as a
 separate workload; the default load benchmark remains uncached.
 
+To listen on another interface, pass `--hostname=ADDRESS` after the origin.
+For example:
+
+```sh
+./out/bkr --allow-net=100.90.61.42:8080 \
+  --allow-read=examples/taskboard \
+  --allow-write=examples/taskboard/data \
+  examples/taskboard/server.ts 8080 examples/taskboard/data \
+  http://100.90.61.42:8080 --hostname=100.90.61.42
+```
+
 System SQLite 3.31+ must be available. Grant read and write permissions for
 the database **directory**, including its WAL/SHM sidecars. The default
-`examples/taskboard/data/` is gitignored. This sample binds only to loopback.
+`examples/taskboard/data/` is gitignored. This sample binds to loopback by default.
 When using a local reverse proxy, pass its public origin as the third
 argument; an HTTPS origin also enables the session cookie's `Secure` flag.
 
