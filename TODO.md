@@ -46,7 +46,7 @@ Web APIs:
 - [ ] Automatic response compression in `serve` (opt-in, negotiating `accept-encoding`).
 - [x] Source maps for TypeScript stacks: not needed. The engine parses TS and TSX natively, so stack positions are already in the original source. Uncaught errors now print their stack.
 - [x] A module's SyntaxError now carries file, line and column (`at file.js:2:11`), for static and dynamic imports: fixed on engine main (`7533520f`).
-- [ ] `typescript.transpile()` source maps for browser devtools: needs position tracking in the engine's printer.
+- [ ] `typescript.transpile()` source maps for browser devtools. No engine change needed: every node has `main_tok`/`end_tok` byte offsets (`ast.tok(n)`) and `Ast.position(offset)` gives a 1-based line and column. `SourceWriter` in `runtime/transpile.c3` has to track its output line and column, record a mapping before each identifier, statement and call, and encode a v3 map (base64 VLQ). `position` counts columns in bytes and source maps count UTF-16 units, so lines with non-ASCII text need converting from `ast.source`.
 - [x] `crypto.subtle`: digest, HMAC, AES-GCM/CBC/CTR, PBKDF2, HKDF with raw and JWK secret keys. Open: RSA, ECDSA, ECDH, Ed25519, X25519, AES-KW, `wrapKey`/`unwrapKey`, `spki`/`pkcs8`, and global `CryptoKey`/`SubtleCrypto`.
 - [ ] Confirm `Intl` coverage from the engine.
 - [ ] TypeScript enums and other syntax needing runtime transforms.
