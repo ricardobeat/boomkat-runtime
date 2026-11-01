@@ -62,10 +62,7 @@ fn void js_immediate_arm(JsCtx ctx, void* udata) {
     uws_loop_defer(g_runtime.loop, &on_immediates, null);
 }
 
-extern fn ulong clock_gettime_nsec_np(CInt clock);
-const CInt CLOCK_MONOTONIC_RAW = 4;
-
-fn void js_now(JsCtx ctx, void* udata) => ctx.ret_number((double)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) / 1e6);
+fn void js_now(JsCtx ctx, void* udata) => ctx.ret_number((double)monotonic_ns() / 1e6);
 
 fn bool url_char(char c) {
     if (c.is_alnum()) return true;

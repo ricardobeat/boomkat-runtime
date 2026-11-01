@@ -106,7 +106,7 @@ fn void stop_watchdog() {
     g_runtime.watchdog_state = null;
 }
 
-fn ulong now_ns() => clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+fn ulong now_ns() => monotonic_ns();
 
 // ---- entering JS ----
 

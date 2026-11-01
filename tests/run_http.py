@@ -7,6 +7,7 @@ from pathlib import Path
 import socket
 import subprocess
 import tempfile
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -110,7 +111,8 @@ with tempfile.TemporaryDirectory(prefix="bkr-http-") as temp:
             for path, expected in [("/file", data), ("/stream-large", b"x" * (8 * 1024 * 1024))]:
                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
                 conn.connect()
-                conn.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8192)
+                # Linux stalls a receiver whose window is under one loopback MSS.
+                conn.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8192 if sys.platform == "darwin" else 32768)
                 conn.request("GET", path)
                 time.sleep(.1)
                 response = conn.getresponse()

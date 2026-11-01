@@ -5,14 +5,14 @@ module bkr;
 
 import std::io;
 
-extern fn CInt sandbox_init(ZString profile, ulong flags, char** error);
-extern fn void sandbox_free_error(char* error);
+extern fn CInt sandbox_init(ZString profile, ulong flags, char** error) @if(env::DARWIN);
+extern fn void sandbox_free_error(char* error) @if(env::DARWIN);
 
 bool g_sandbox = true;
 
 fn bool any_grant(Perm p) => grant(p).all || grant(p).allow.len() > 0;
 
-fn String sandbox_profile() {
+fn String sandbox_profile() @if(env::DARWIN) {
     DString s = dstring::temp();
     s.append("(version 1)(allow default)");
     if (!any_grant(NET)) s.append("(deny network*)");
@@ -27,9 +27,13 @@ fn String sandbox_profile() {
 
 fn void apply_sandbox() {
     if (!g_sandbox || g_runtime.perms.prompt) return;
-    char* err;
-    if (sandbox_init(sandbox_profile().zstr_tcopy(), 0, &err) != 0) {
-        io::eprintfn("warning: sandbox unavailable: %s", ((ZString)err).str_view());
-        sandbox_free_error(err);
-    }
+    $if env::DARWIN:
+        char* err;
+        if (sandbox_init(sandbox_profile().zstr_tcopy(), 0, &err) != 0) {
+            io::eprintfn("warning: sandbox unavailable: %s", ((ZString)err).str_view());
+            sandbox_free_error(err);
+        }
+    $else
+        io::eprintfn("warning: no OS sandbox on this platform; permissions are enforced by the runtime only");
+    $endif
 }

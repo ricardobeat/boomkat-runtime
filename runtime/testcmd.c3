@@ -44,10 +44,10 @@ fn void find_tests(String path, List{String}* out, bool every) {
     if (!dir) return;
     defer closedir(dir);
     for (Dirent* e = readdir(dir); e; e = readdir(dir)) {
-        String name = ((ZString)&e.name).str_view();
+        String name = dirent_name(e);
         if (name.starts_with(".") || name == "node_modules") continue;
         String child = string::tformat("%s/%s", path, name);
-        if (e.type == DT_DIR) {
+        if (dirent_type(e) == DT_DIR) {
             find_tests(child, out, every);
         } else if (every || is_test_file(name)) {
             out.push(child.copy(mem));
@@ -114,8 +114,8 @@ fn ulong watch_stamp(String[] paths) {
             Stat st;
             if (libc::stat(f.zstr_tcopy(), &st) != 0) continue;
             hash = (hash ^ (ulong)st.st_size) * 1099511628211;
-            hash = (hash ^ (ulong)st.st_mtimespec.s) * 1099511628211;
-            hash = (hash ^ (ulong)st.st_mtimespec.ns) * 1099511628211;
+            hash = (hash ^ (ulong)mtime_seconds(&st)) * 1099511628211;
+            hash = (hash ^ (ulong)mtime_nanos(&st)) * 1099511628211;
         }
         return hash;
     };

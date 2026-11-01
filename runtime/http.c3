@@ -1205,7 +1205,7 @@ fn void js_serve(JsCtx ctx, void* udata) {
             return ctx.throw_error(TYPE, "TLS serve() runs on a single HTTP thread only");
         }
         if (use_tls && !tls_available()) {
-            return ctx.throw_error(TYPE, "TLS serve() needs OpenSSL 3; install it with: brew install openssl@3");
+            return ctx.throw_error(TYPE, string::tformat("TLS serve() needs OpenSSL 3; install it with: %s", OPENSSL_HINT));
         }
         if (!check_net(host, port)) {
             ctx.throw_coded(

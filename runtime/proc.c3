@@ -16,10 +16,7 @@ extern fn CInt posix_spawn_file_actions_addchdir_np(void** actions, ZString path
 extern fn CInt posix_spawnp(CInt* pid, ZString file, void** actions, void* attr, ZString* argv, ZString* envp);
 extern fn CInt waitpid(CInt pid, CInt* status, CInt options);
 extern fn CInt kill(CInt pid, CInt sig);
-extern fn ZString** ns_environ() @cname("_NSGetEnviron");
 extern fn CInt getpid();
-
-fn ZString* environ() => *ns_environ();
 
 const CInt F_SETFD    = 2;
 const CInt FD_CLOEXEC = 1;
@@ -78,7 +75,7 @@ fn void js_env_all(JsCtx ctx, void* udata) {
             return;
         }
         DString out = dstring::temp();
-        for (ZString* e = environ(); *e; e++) out.appendf("%s\n", *e);
+        for (ZString* e = environment(); *e; e++) out.appendf("%s\n", *e);
         ctx.ret_string(out.str_view());
     };
 }
@@ -151,7 +148,7 @@ fn void run_inherit(String[] argv) {
         posix_spawn_file_actions_init(&actions);
         defer posix_spawn_file_actions_destroy(&actions);
         CInt pid;
-        if (posix_spawnp(&pid, argv[0].zstr_tcopy(), &actions, null, list.entries, environ())) {
+        if (posix_spawnp(&pid, argv[0].zstr_tcopy(), &actions, null, list.entries, environment())) {
             io::eprintfn("error: cannot run %s", argv[0]);
             return;
         }
@@ -240,7 +237,7 @@ fn void js_spawn(JsCtx ctx, void* udata) {
             &actions,
             null,
             argv.entries,
-            env.len ? envp.entries : environ()
+            env.len ? envp.entries : environment()
         );
         for (int i = 0; i < 3; i++) {
             if (child[i] >= 0) libc::close(child[i]);

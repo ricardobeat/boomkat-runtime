@@ -8,14 +8,17 @@ import std::io;
 import libc;
 import std::collections::list;
 
+// struct dirent: Darwin puts a 16-bit name length before the type byte, Linux
+// does not, so the fields after reclen are read through the accessors.
 struct Dirent {
     ulong ino;
     ulong seekoff;
     ushort reclen;
-    ushort namlen;
-    char type;
-    char[1024] name;
+    char[1027] tail;
 }
+
+fn char dirent_type(Dirent* e) => e.tail[env::DARWIN ? 2 : 0];
+fn String dirent_name(Dirent* e) => ((ZString)&e.tail[env::DARWIN ? 3 : 1]).str_view();
 
 extern fn CInt fstat(CInt fd, Stat* st) @cname("fstat64");
 extern fn CInt open(ZString path, CInt flags, ...);
@@ -29,12 +32,6 @@ extern fn CInt closedir(void* dir);
 const CInt O_RDONLY       = 0;
 const CInt O_WRONLY       = 1;
 const CInt O_RDWR         = 2;
-const CInt O_APPEND       = 0x8;
-const CInt O_CREAT        = 0x200;
-const CInt O_TRUNC        = 0x400;
-const CInt O_EXCL         = 0x800;
-const CInt O_NOFOLLOW_ANY = 0x20000000;
-const CInt O_CLOEXEC      = 0x1000000;
 const char DT_DIR         = 4;
 const char DT_LNK         = 10;
 
@@ -152,7 +149,7 @@ fn void stat_path(FsTask* f) {
         "%s %d %d %d",
         kind_name(st.st_mode),
         (long)st.st_size,
-        (long)st.st_mtimespec.s * 1000 + (long)st.st_mtimespec.ns / 1000000,
+        mtime_seconds(&st) * 1000 + mtime_nanos(&st) / 1000000,
         st.st_mode & 0o7777
     );
 }
@@ -167,9 +164,9 @@ fn void list_dir(FsTask* f) {
     DString out;
     out.init(mem);
     for (Dirent* e = readdir(dir); e; e = readdir(dir)) {
-        String name = ((ZString)&e.name).str_view();
+        String name = dirent_name(e);
         if (name == "." || name == "..") continue;
-        out.appendf("%s %s\n", e.type == DT_DIR ? "dir" : e.type == DT_LNK ? "symlink" : "file", name);
+        out.appendf("%s %s\n", dirent_type(e) == DT_DIR ? "dir" : dirent_type(e) == DT_LNK ? "symlink" : "file", name);
     }
     f.text = out.copy_str(mem);
     out.free();
@@ -200,7 +197,7 @@ fn CInt remove_all(String path, bool recursive) {
         List{String} names;
         names.init(mem);
         for (Dirent* e = readdir(dir); e; e = readdir(dir)) {
-            String name = ((ZString)&e.name).str_view();
+            String name = dirent_name(e);
             if (name != "." && name != "..") names.push(name.copy(mem));
         }
         closedir(dir);

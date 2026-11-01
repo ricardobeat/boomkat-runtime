@@ -283,7 +283,7 @@ fn String canonical_cached(String abs) {
     if (slash <= 0) return "";
     String dir  = abs[:slash];
     String leaf = abs[slash + 1..];
-    ulong now   = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+    ulong now   = monotonic_ns();
     foreach (&e : g_runtime.dirs) {
         if (!e.dir.len || e.dir != dir || now - e.stamp > DIR_TTL_NS) continue;
         String full = e.real == dir ? abs : string::tformat("%s/%s", e.real, leaf);
@@ -300,7 +300,7 @@ fn void remember_dir(String dir, String real) {
         free(e.dir.ptr);
         free(e.real.ptr);
     }
-    *e = { dir.copy(mem), real.copy(mem), clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) };
+    *e = { dir.copy(mem), real.copy(mem), monotonic_ns() };
 }
 
 fn String canonical_slow(String abs) {

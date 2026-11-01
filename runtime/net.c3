@@ -257,10 +257,13 @@ struct AddrInfo {
     CInt ai_socktype;
     CInt ai_protocol;
     uint ai_addrlen;
-    ZString ai_canonname;
-    SockAddrIn* ai_addr;
+    // ai_canonname and ai_addr, in the order the platform declares them.
+    void* ai_first;
+    void* ai_second;
     AddrInfo* ai_next;
 }
+
+fn SockAddrIn* addr_of(AddrInfo* a) => (SockAddrIn*)(env::DARWIN ? a.ai_second : a.ai_first);
 
 struct SockAddrIn {
     char sin_len;
@@ -274,8 +277,6 @@ extern fn void freeaddrinfo(AddrInfo* ai);
 extern fn ZString inet_ntop(CInt af, void* src, char* dst, uint size);
 extern fn ZString gai_strerror(CInt err);
 
-const CInt AF_INET     = 2;
-const CInt AF_INET6    = 30;
 const CInt SOCK_STREAM = 1;
 
 fn void dns_work(Task* t) {
@@ -288,7 +289,8 @@ fn void dns_work(Task* t) {
     defer freeaddrinfo(res);
     for (AddrInfo* a = res; a; a = a.ai_next) {
         char[64] buf;
-        void* src = a.ai_family == AF_INET ? (void*)&a.ai_addr.data[0] : (void*)&a.ai_addr.data[4];
+        SockAddrIn* sa = addr_of(a);
+        void* src = a.ai_family == AF_INET ? (void*)&sa.data[0] : (void*)&sa.data[4];
         if (a.ai_family != AF_INET && a.ai_family != AF_INET6) continue;
         if (!inet_ntop(a.ai_family, src, &buf, 64)) continue;
         String ip = ((ZString)&buf).str_view().copy(mem);
@@ -341,7 +343,7 @@ fn void dns_done(Task* t) {
 
 fn void start_connect(uint op, String host, String ip, int port, CInt ssl) {
     if (ssl && !tls_available()) {
-        reject(op, "TLS_UNAVAILABLE", "https needs OpenSSL 3; install it with: brew install openssl@3");
+        reject(op, "TLS_UNAVAILABLE", string::tformat("https needs OpenSSL 3; install it with: %s", OPENSSL_HINT));
         return;
     }
     if (!g_runtime.client_ctx[ssl]) {
