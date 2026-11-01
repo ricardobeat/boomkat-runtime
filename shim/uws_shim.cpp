@@ -1,6 +1,9 @@
 // extern "C" pass-throughs over the parts of uWebSockets C3 cannot reach:
 // the templated App, HttpRequest and HttpResponse. Loops, timers, polls and
 // raw sockets are plain uSockets and are bound from C3 directly.
+//
+// An App serves plain HTTP or TLS, chosen when it is created. Responses and
+// WebSockets exist in both forms, so their handles carry the transport in bit 0.
 #include "App.h"
 
 #include <cstddef>
@@ -26,13 +29,64 @@ void bkr_process_stop(void *app);
 }
 
 using Req = uWS::HttpRequest;
-using Res = uWS::HttpResponse<false>;
 
 namespace {
 
 struct App;
 struct WsData;
-using Ws = uWS::WebSocket<false, true, WsData>;
+template <bool SSL> using Res = uWS::HttpResponse<SSL>;
+template <bool SSL> using Ws = uWS::WebSocket<SSL, true, WsData>;
+
+// Handles carry the transport in bit 0, 1 for TLS. Sockets are at least
+// 8-byte aligned, so the bit is free.
+const uintptr_t TLS_BIT = 1;
+
+uintptr_t handle_of(Res<false> *res) { return (uintptr_t)res; }
+uintptr_t handle_of(Res<true> *res) { return (uintptr_t)res | TLS_BIT; }
+uintptr_t handle_of(Ws<false> *ws) { return (uintptr_t)ws; }
+uintptr_t handle_of(Ws<true> *ws) { return (uintptr_t)ws | TLS_BIT; }
+
+us_socket_t *socket_of(uintptr_t handle) { return (us_socket_t *)(handle & ~TLS_BIT); }
+
+// Calls f with the response or WebSocket that `handle` names, in its own type.
+template <class F> auto visit_res(uintptr_t handle, F &&f) {
+    if (handle & TLS_BIT) return f((Res<true> *)(handle & ~TLS_BIT));
+    return f((Res<false> *)handle);
+}
+
+template <class F> auto visit_ws(uintptr_t handle, F &&f) {
+    if (handle & TLS_BIT) return f((Ws<true> *)(handle & ~TLS_BIT));
+    return f((Ws<false> *)handle);
+}
+
+// A response is busy until it has answered and its buffer has drained.
+template <bool SSL> bool response_busy(uintptr_t handle) {
+    auto *res = (Res<SSL> *)(handle & ~TLS_BIT);
+    auto *data = (uWS::HttpResponseData<SSL> *)us_socket_ext(0, (us_socket_t *)res);
+    return !res->hasResponded() || data->buffer.length();
+}
+
+struct Endpoint;
+struct Dispatch;
+struct App {
+    std::unique_ptr<uWS::App> plain;
+    std::unique_ptr<uWS::SSLApp> tls;
+    us_listen_socket_t *listener = nullptr;
+    std::shared_ptr<Dispatch> dispatch;
+    std::shared_ptr<Endpoint> endpoint;
+    bool dispatch_owner = false;
+    us_socket_context_t *dispatch_context = nullptr;
+    std::unordered_set<uintptr_t> connections; // response handles, owned by this app's loop
+    std::unordered_set<uintptr_t> websockets;
+    std::unordered_set<std::string> ws_paths;
+
+    // Runs f with this app's uWebSockets instance, plain or TLS.
+    template <class F> void with(F &&f) {
+        if (tls) f(*tls);
+        else f(*plain);
+    }
+};
+
 struct Endpoint {
     App *app;
     uWS::Loop *loop;
@@ -43,17 +97,6 @@ struct Dispatch {
     std::vector<std::shared_ptr<Endpoint>> endpoints;
     size_t next = 0;
     bool stopped = false;
-};
-struct App {
-    uWS::App app;
-    us_listen_socket_t *listener = nullptr;
-    std::shared_ptr<Dispatch> dispatch;
-    std::shared_ptr<Endpoint> endpoint;
-    bool dispatch_owner = false;
-    us_socket_context_t *dispatch_context = nullptr;
-    std::unordered_set<Res *> connections; // owned by this app's loop
-    std::unordered_set<Ws *> websockets;
-    std::unordered_set<std::string> ws_paths;
 };
 
 // A server WebSocket carries the runtime's id for it.
@@ -110,7 +153,7 @@ LIBUS_SOCKET_DESCRIPTOR dispatch_connection(us_socket_context_t *context, LIBUS_
         // Adoption and stop both run on this endpoint's execution thread.
         int fd = accepted->fd;
         accepted->fd = -1;
-        target->app->app.adoptSocket(fd, accepted->ip);
+        target->app->with([&](auto &ua) { ua.adoptSocket(fd, accepted->ip); });
     });
     return fd + 1;
 }
@@ -126,12 +169,15 @@ void detach_dispatch(App *app) {
 }
 
 void track_connections(App *app) {
-    app->app.filter([app](Res *res, int change) {
-        if (change > 0) {
-            tracked_contexts[us_socket_context(0, (us_socket_t *)res)] = app;
-            app->connections.insert(res);
-        }
-        else app->connections.erase(res);
+    app->with([app](auto &ua) {
+        ua.filter([app](auto *res, int change) {
+            uintptr_t handle = handle_of(res);
+            if (change > 0) {
+                tracked_contexts[us_socket_context(0, (us_socket_t *)res)] = app;
+                app->connections.insert(handle);
+            }
+            else app->connections.erase(handle);
+        });
     });
 }
 
@@ -161,39 +207,61 @@ void uws_ws_callbacks(uws_ws_open_cb open, uws_ws_message_cb message, uws_ws_clo
 // The upgrade runs the ordinary request callback with its context set.
 static void add_ws_route(App *a, const char *path, uws_req_cb cb, void *user) {
     if (!a->ws_paths.insert(path).second) return;
-    a->app.ws<WsData>(path, {
-        .compression = uWS::DISABLED,
-        .maxPayloadLength = 16 * 1024 * 1024,
-        .idleTimeout = 120,
-        .maxBackpressure = 16 * 1024 * 1024,
-        .closeOnBackpressureLimit = false,
-        .resetIdleTimeoutOnSend = true,
-        .sendPingsAutomatically = true,
-        .upgrade = [cb, user](auto *res, auto *req, auto *context) {
-            upgrade_context = context;
-            cb(user, (uws_req *)req, (uws_res *)res);
-            upgrade_context = nullptr;
-        },
-        .open = [](Ws *ws) {
-            if (auto *owner = ws->getUserData()->owner) owner->websockets.insert(ws);
-            ws_callbacks.open(ws->getUserData()->id, ws);
-        },
-        .message = [](Ws *ws, std::string_view message, uWS::OpCode op) {
-            ws_callbacks.message(ws->getUserData()->id, message.data(), message.size(), op == uWS::OpCode::BINARY);
-        },
-        .drain = [](Ws *ws) { ws_callbacks.drain(ws->getUserData()->id); },
-        .close = [](Ws *ws, int code, std::string_view reason) {
-            if (auto *owner = ws->getUserData()->owner) owner->websockets.erase(ws);
-            ws_callbacks.close(ws->getUserData()->id, code, reason.data(), reason.size());
-        },
+    a->with([&](auto &ua) {
+        ua.template ws<WsData>(path, {
+            .compression = uWS::DISABLED,
+            .maxPayloadLength = 16 * 1024 * 1024,
+            .idleTimeout = 120,
+            .maxBackpressure = 16 * 1024 * 1024,
+            .closeOnBackpressureLimit = false,
+            .resetIdleTimeoutOnSend = true,
+            .sendPingsAutomatically = true,
+            .upgrade = [cb, user](auto *res, auto *req, auto *context) {
+                upgrade_context = context;
+                cb(user, (uws_req *)req, (uws_res *)handle_of(res));
+                upgrade_context = nullptr;
+            },
+            .open = [](auto *ws) {
+                if (auto *owner = ws->getUserData()->owner) owner->websockets.insert(handle_of(ws));
+                ws_callbacks.open(ws->getUserData()->id, (void *)handle_of(ws));
+            },
+            .message = [](auto *ws, std::string_view message, uWS::OpCode op) {
+                ws_callbacks.message(ws->getUserData()->id, message.data(), message.size(), op == uWS::OpCode::BINARY);
+            },
+            .drain = [](auto *ws) { ws_callbacks.drain(ws->getUserData()->id); },
+            .close = [](auto *ws, int code, std::string_view reason) {
+                if (auto *owner = ws->getUserData()->owner) owner->websockets.erase(handle_of(ws));
+                ws_callbacks.close(ws->getUserData()->id, code, reason.data(), reason.size());
+            },
+        });
     });
 }
 
-uws_app *uws_app_new(uws_req_cb cb, void *user) {
+// A TLS app is created with its certificate and key; cert is null for plain HTTP.
+// Null when the certificate or key does not load.
+static App *new_app(uws_req_cb cb, void *user, const char *cert, const char *key) {
     App *a = new App();
-    a->app.any("/*", [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)res); });
+    if (cert) {
+        a->tls = std::make_unique<uWS::SSLApp>(uWS::SocketContextOptions{ .key_file_name = key, .cert_file_name = cert });
+        if (a->tls->constructorFailed()) {
+            delete a;
+            return nullptr;
+        }
+    }
+    else a->plain = std::make_unique<uWS::App>();
+    a->with([&](auto &ua) {
+        ua.any("/*", [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)handle_of(res)); });
+    });
     add_ws_route(a, "/*", cb, user);
-    return (uws_app *)a;
+    return a;
+}
+
+uws_app *uws_app_new(uws_req_cb cb, void *user) {
+    return (uws_app *)new_app(cb, user, nullptr, nullptr);
+}
+
+uws_app *uws_app_new_tls(uws_req_cb cb, void *user, const char *cert, const char *key) {
+    return (uws_app *)new_app(cb, user, cert, key);
 }
 
 void *uws_req_upgrade_context(void) { return upgrade_context; }
@@ -203,44 +271,51 @@ void *uws_req_upgrade_context(void) { return upgrade_context; }
 void uws_res_upgrade(uws_res *res, uint64_t id, const char *key, size_t key_len, const char *protocol,
                      size_t protocol_len, const char *extensions, size_t extensions_len, void *context) {
     App *owner = nullptr;
-    auto found = tracked_contexts.find(us_socket_context(0, (us_socket_t *)res));
+    uintptr_t handle = (uintptr_t)res;
+    auto found = tracked_contexts.find(us_socket_context(0, socket_of(handle)));
     if (found != tracked_contexts.end()) {
         owner = found->second;
         // Upgrade can realloc the socket. Retire the HTTP pointer before it
         // moves; the WebSocket open/close callbacks track its new lifetime.
-        owner->connections.erase((Res *)res);
+        owner->connections.erase(handle);
     }
-    ((Res *)res)->template upgrade<WsData>({ id, owner }, std::string_view(key, key_len), std::string_view(protocol, protocol_len),
-        std::string_view(extensions, extensions_len), (us_socket_context_t *)context);
+    visit_res(handle, [&](auto *r) {
+        r->template upgrade<WsData>({ id, owner }, std::string_view(key, key_len), std::string_view(protocol, protocol_len),
+            std::string_view(extensions, extensions_len), (us_socket_context_t *)context);
+    });
 }
 
 // 0 sent, 1 buffered under backpressure, 2 dropped.
 int uws_ws_send(void *ws, const char *data, size_t len, int binary) {
-    return (int)((Ws *)ws)->send(std::string_view(data, len), binary ? uWS::OpCode::BINARY : uWS::OpCode::TEXT);
+    return visit_ws((uintptr_t)ws, [&](auto *w) {
+        return (int)w->send(std::string_view(data, len), binary ? uWS::OpCode::BINARY : uWS::OpCode::TEXT);
+    });
 }
 
 void uws_ws_end(void *ws, int code, const char *reason, size_t len) {
-    ((Ws *)ws)->end(code, std::string_view(reason, len));
+    visit_ws((uintptr_t)ws, [&](auto *w) { w->end(code, std::string_view(reason, len)); });
 }
 
-void uws_ws_terminate(void *ws) { ((Ws *)ws)->close(); }
+void uws_ws_terminate(void *ws) { visit_ws((uintptr_t)ws, [](auto *w) { w->close(); }); }
 
-size_t uws_ws_buffered(void *ws) { return ((Ws *)ws)->getBufferedAmount(); }
+size_t uws_ws_buffered(void *ws) { return visit_ws((uintptr_t)ws, [](auto *w) { return w->getBufferedAmount(); }); }
 
 void uws_app_route(uws_app *app, const char *method, const char *path, uws_req_cb cb, void *user) {
     App *a = (App *)app;
-    auto handler = [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)res); };
+    auto handler = [cb, user](auto *res, auto *req) { cb(user, (uws_req *)req, (uws_res *)handle_of(res)); };
     std::string m(method);
-    if (m == "GET") a->app.get(path, std::move(handler));
-    else if (m == "HEAD") a->app.head(path, std::move(handler));
-    else if (m == "POST") a->app.post(path, std::move(handler));
-    else if (m == "PUT") a->app.put(path, std::move(handler));
-    else if (m == "PATCH") a->app.patch(path, std::move(handler));
-    else if (m == "DELETE") a->app.del(path, std::move(handler));
-    else if (m == "OPTIONS") a->app.options(path, std::move(handler));
-    else if (m == "TRACE") a->app.trace(path, std::move(handler));
-    else if (m == "CONNECT") a->app.connect(path, std::move(handler));
-    else a->app.any(path, std::move(handler));
+    a->with([&](auto &ua) {
+        if (m == "GET") ua.get(path, handler);
+        else if (m == "HEAD") ua.head(path, handler);
+        else if (m == "POST") ua.post(path, handler);
+        else if (m == "PUT") ua.put(path, handler);
+        else if (m == "PATCH") ua.patch(path, handler);
+        else if (m == "DELETE") ua.del(path, handler);
+        else if (m == "OPTIONS") ua.options(path, handler);
+        else if (m == "TRACE") ua.trace(path, handler);
+        else if (m == "CONNECT") ua.connect(path, handler);
+        else ua.any(path, handler);
+    });
     if (m == "GET" || m == "*") add_ws_route(a, path, cb, user);
 }
 
@@ -253,15 +328,20 @@ size_t uws_req_parameter(uws_req *req, unsigned short index, const char **out) {
 // The bound port, or -1.
 int uws_app_listen(uws_app *app, const char *host, int port) {
     App *a = (App *)app;
-    int process_port = bkr_process_listen(a, host, port, uWS::Loop::get(),
-        [](void *app, int fd, const char *ip, int length) {
-            ((App *)app)->app.adoptSocket(fd, std::string_view(ip, length));
-        });
-    if (process_port != -2) {
-        if (process_port >= 0) track_connections(a);
-        return process_port;
+    // Process workers adopt plain sockets only, so a TLS app listens itself.
+    if (!a->tls) {
+        int process_port = bkr_process_listen(a, host, port, uWS::Loop::get(),
+            [](void *app, int fd, const char *ip, int length) {
+                ((App *)app)->with([&](auto &ua) { ua.adoptSocket(fd, std::string_view(ip, length)); });
+            });
+        if (process_port != -2) {
+            if (process_port >= 0) track_connections(a);
+            return process_port;
+        }
     }
-    a->app.listen(std::string(host), port, [a](auto *token) { a->listener = token; });
+    a->with([a, host, port](auto &ua) {
+        ua.listen(std::string(host), port, [a](auto *token) { a->listener = token; });
+    });
     if (!a->listener) return -1;
     return us_socket_local_port(0, (us_socket_t *)a->listener);
 }
@@ -280,7 +360,7 @@ void uws_app_pool_init(uws_app *app) {
         std::lock_guard<std::mutex> guard(dispatch_registry_lock);
         dispatch_registry[a->dispatch_context] = a->dispatch;
     }
-    a->app.preOpen(dispatch_connection);
+    a->with([](auto &ua) { ua.preOpen(dispatch_connection); });
 }
 
 int uws_app_pool_join(uws_app *app, uws_app *parent) {
@@ -307,9 +387,9 @@ int uws_app_pool_count(uws_app *app) {
 int uws_app_pool_idle(uws_app *app) {
     auto *a = (App *)app;
     if (!a->websockets.empty()) return 0;
-    for (auto *res : a->connections) {
-        auto *data = (uWS::HttpResponseData<false> *)us_socket_ext(0, (us_socket_t *)res);
-        if (!res->hasResponded() || data->buffer.length()) return 0;
+    for (auto handle : a->connections) {
+        bool busy = (handle & TLS_BIT) ? response_busy<true>(handle) : response_busy<false>(handle);
+        if (busy) return 0;
     }
     return 1;
 }
@@ -320,7 +400,7 @@ void uws_app_stop(uws_app *app, int force) {
     detach_dispatch(a);
     if (a->listener) us_listen_socket_close(0, a->listener);
     a->listener = nullptr;
-    if (force) a->app.close();
+    if (force) a->with([](auto &ua) { ua.close(); });
 }
 
 void uws_app_free(uws_app *app) {
@@ -366,62 +446,69 @@ int uws_req_headers(uws_req *req, uws_header *out, int cap) {
 }
 
 size_t uws_res_remote(uws_res *res, const char **out) {
-    std::string_view v = ((Res *)res)->getRemoteAddressAsText();
+    std::string_view v = visit_res((uintptr_t)res, [](auto *r) { return r->getRemoteAddressAsText(); });
     *out = v.data();
     return v.size();
 }
 
 void uws_res_on_data(uws_res *res, uws_data_cb cb, void *user) {
-    ((Res *)res)->onData([cb, user](std::string_view chunk, bool last) {
-        cb(user, chunk.data(), chunk.size(), last ? 1 : 0);
+    visit_res((uintptr_t)res, [&](auto *r) {
+        r->onData([cb, user](std::string_view chunk, bool last) {
+            cb(user, chunk.data(), chunk.size(), last ? 1 : 0);
+        });
     });
 }
 
 void uws_res_on_aborted(uws_res *res, void (*cb)(void *), void *user) {
-    ((Res *)res)->onAborted([cb, user]() { cb(user); });
+    visit_res((uintptr_t)res, [&](auto *r) { r->onAborted([cb, user]() { cb(user); }); });
 }
 
 void uws_res_on_writable(uws_res *res, uws_writable_cb cb, void *user) {
-    ((Res *)res)->onWritable([cb, user](uintmax_t off) { return cb(user, off) != 0; });
+    visit_res((uintptr_t)res, [&](auto *r) {
+        r->onWritable([cb, user](uintmax_t off) { return cb(user, off) != 0; });
+    });
 }
 
 void uws_res_write_status(uws_res *res, const char *status, size_t len) {
-    ((Res *)res)->writeStatus(std::string_view(status, len));
+    visit_res((uintptr_t)res, [&](auto *r) { r->writeStatus(std::string_view(status, len)); });
 }
 
 void uws_res_write_header(uws_res *res, const char *key, size_t key_len,
                           const char *val, size_t val_len) {
-    ((Res *)res)->writeHeader(std::string_view(key, key_len), std::string_view(val, val_len));
+    visit_res((uintptr_t)res, [&](auto *r) {
+        r->writeHeader(std::string_view(key, key_len), std::string_view(val, val_len));
+    });
 }
 
 // Chunked write; 0 when the socket buffer is full and the caller should
 // wait for on_writable.
 int uws_res_write(uws_res *res, const char *data, size_t len) {
-    return ((Res *)res)->write(std::string_view(data, len)) ? 1 : 0;
+    return visit_res((uintptr_t)res, [&](auto *r) { return r->write(std::string_view(data, len)) ? 1 : 0; });
 }
 
 void uws_res_end(uws_res *res, const char *body, size_t len) {
-    ((Res *)res)->end(std::string_view(body, len));
+    visit_res((uintptr_t)res, [&](auto *r) { r->end(std::string_view(body, len)); });
 }
 
 void uws_res_end_empty(uws_res *res) {
-    ((Res *)res)->endWithoutBody(std::nullopt);
+    visit_res((uintptr_t)res, [](auto *r) { r->endWithoutBody(std::nullopt); });
 }
 
 void uws_res_end_static(uws_res *res, const char *status, size_t status_len,
                         const char *headers, size_t headers_len,
                         const char *body, size_t body_len, bool empty) {
-    auto *response = (Res *)res;
-    if (status_len) response->writeStatus(std::string_view(status, status_len));
-    if (headers_len) response->writeHeaders(std::string_view(headers, headers_len));
-    if (empty) response->endWithoutBody(std::nullopt);
-    else response->end(std::string_view(body, body_len));
+    visit_res((uintptr_t)res, [&](auto *r) {
+        if (status_len) r->writeStatus(std::string_view(status, status_len));
+        if (headers_len) r->writeHeaders(std::string_view(headers, headers_len));
+        if (empty) r->endWithoutBody(std::nullopt);
+        else r->end(std::string_view(body, body_len));
+    });
 }
 
 void uws_res_cork(uws_res *res, void (*cb)(void *), void *user) {
-    ((Res *)res)->cork([cb, user]() { cb(user); });
+    visit_res((uintptr_t)res, [&](auto *r) { r->cork([cb, user]() { cb(user); }); });
 }
 
-void uws_res_close(uws_res *res) { ((Res *)res)->close(); }
+void uws_res_close(uws_res *res) { visit_res((uintptr_t)res, [](auto *r) { r->close(); }); }
 
 }

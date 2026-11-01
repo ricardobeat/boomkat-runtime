@@ -84,9 +84,13 @@ export function serve(opts, fetch) {
     }
     const hostname = opts.hostname === undefined ? "0.0.0.0" : String(opts.hostname);
     const port = opts.port === undefined ? 8080 : opts.port | 0;
+    const tls = opts.tls === undefined || opts.tls === null ? null : opts.tls;
+    if (tls && (typeof tls.cert !== "string" || typeof tls.key !== "string")) {
+        throw new TypeError("tls needs cert and key file paths");
+    }
     const h = { fetch, error: opts.error, server: null };
     const index = bk.addHandler(h);
-    const bound = bk.serve(index, hostname, port);
+    const bound = bk.serve(index, hostname, port, tls ? tls.cert : "", tls ? tls.key : "");
     try {
         for (const args of statics) bk.staticRoute(index, ...args);
         for (const route of routes) {
@@ -102,7 +106,7 @@ export function serve(opts, fetch) {
     const server = {
         hostname,
         port: bound,
-        url: new URL(`http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${bound}/`),
+        url: new URL(`${tls ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${bound}/`),
         finished,
         async [Symbol.asyncDispose]() { await server.stop(); },
         get workers() { return bk.httpPoolCount(index); },

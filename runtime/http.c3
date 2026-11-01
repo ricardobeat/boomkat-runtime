@@ -28,6 +28,7 @@ struct UwsHeader {
 }
 
 extern fn UwsApp* uws_app_new(UwsReqCb cb, void* user);
+extern fn UwsApp* uws_app_new_tls(UwsReqCb cb, void* user, ZString cert, ZString key);
 extern fn void uws_app_route(UwsApp* app, ZString method, ZString path, UwsReqCb cb, void* user);
 extern fn sz uws_req_parameter(UwsReq* req, ushort index, char** out);
 extern fn CInt uws_app_listen(UwsApp* app, ZString host, CInt port);
@@ -1182,18 +1183,26 @@ fn void js_http_static_route(JsCtx ctx, void* udata) {
     };
 }
 
-// serve(index, hostname, port) -> bound port
+// serve(index, hostname, port, cert, key) -> bound port. A cert and key are
+// file paths; both or neither.
 fn void js_serve(JsCtx ctx, void* udata) {
     @pool() {
         uint index  = ctx.arg(0).id();
         String host = ctx.arg(1).as_string() ?? "0.0.0.0";
         int port    = ctx.arg(2).as_int(8080);
+        String cert = ctx.arg(3).as_string() ?? "";
+        String key  = ctx.arg(4).as_string() ?? "";
+        bool use_tls = cert.len > 0;
+        if (use_tls != (key.len > 0)) return ctx.throw_error(TYPE, "tls needs both a cert and a key file");
         Server* parent = g_runtime.worker ? g_runtime.worker.http_server : null;
         if ((parent || g_runtime.http_workers > 1 || g_runtime.http_processes) && g_runtime.servers.len()) {
             return ctx.throw_error(TYPE, "HTTP worker mode supports one serve() per entry module");
         }
         if (parent && (host != parent.hostname || port != parent.requested_port)) {
             return ctx.throw_error(TYPE, "HTTP worker listener configuration differs from its parent");
+        }
+        if (use_tls && (parent || g_runtime.http_workers > 1 || g_runtime.http_processes)) {
+            return ctx.throw_error(TYPE, "TLS serve() runs on a single HTTP thread only");
         }
         if (!check_net(host, port)) {
             ctx.throw_coded(
@@ -1202,13 +1211,20 @@ fn void js_serve(JsCtx ctx, void* udata) {
             );
             return;
         }
+        if (use_tls && (!check_path(READ, cert) || !check_path(READ, key))) {
+            ctx.throw_coded("PERMISSION_DENIED", "read access to the TLS cert or key denied");
+            return;
+        }
         Server* s = mem::new(Server);
         s.index = index;
         // serve may run inside an async completion scope; the ID outlives it.
         s.index_value = ctx.persist(ctx.number(index))!!;
         s.statics.init(mem);
         s.routes.init(mem);
-        s.app = uws_app_new(&on_request, s);
+        s.app = use_tls
+            ? uws_app_new_tls(&on_request, s, cert.zstr_tcopy(), key.zstr_tcopy())
+            : uws_app_new(&on_request, s);
+        if (s.app == null) return ctx.throw_error(TYPE, "could not load the TLS cert or key");
         s.hostname = host.copy(mem);
         s.requested_port = port;
         CInt bound = parent ? parent.port : uws_app_listen(s.app, host.zstr_tcopy(), port);
@@ -1291,7 +1307,7 @@ const Native[] HTTP_NATIVES = {
     { "httpPoolCount", &js_http_pool_count, 1 },
     { "httpPoolPending", &js_http_pool_pending, 1 },
     { "httpPoolTarget", &js_http_pool_target, 0 },
-    { "serve", &js_serve, 3 },
+    { "serve", &js_serve, 5 },
     { "staticRoute", &js_static_route, 6 },
     { "httpRoute", &js_http_route, 5 },
     { "httpStaticRoute", &js_http_static_route, 7 },
