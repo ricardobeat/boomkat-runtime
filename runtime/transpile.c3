@@ -5,12 +5,186 @@ module bkr;
 import boomkat;
 import boomkat::ast;
 import boomkat::lexer;
+import std::collections::list;
+
+// One source map segment: where the output is and the source position it came from.
+// Columns are UTF-16 code units, as the source map format counts them.
+struct MapSegment {
+    uint gen_line;
+    uint gen_col;
+    uint src_line;
+    uint src_col;
+}
 
 struct SourceWriter {
     Ast* ast;
     DString out;
     uint depth;
     bool failed;
+    // Source map state. Only used when `mapping` is set.
+    bool mapping;
+    List{MapSegment} segments;
+    // Output cursor: how far `out` has been scanned for lines and columns.
+    usz gen_scanned;
+    uint gen_line;
+    uint gen_col;
+    // Source cursor: the last offset converted, so a run of nearby marks
+    // does not rescan its line from the start.
+    uint src_offset;
+    uint src_line_start;
+    uint src_line;
+    uint src_col;
+}
+
+// Number of UTF-16 code units a UTF-8 sequence starting with `b` contributes,
+// counted on its lead byte (continuation bytes add nothing).
+fn uint utf16_units(char b) {
+    if ((b & 0xC0) == 0x80) return 0;
+    return b >= 0xF0 ? 2 : 1;
+}
+
+// Advance the output cursor to the end of `out`. Line breaks are the ones
+// JavaScript engines count: LF, CR, CRLF, U+2028 and U+2029.
+fn void SourceWriter.scan_output(&self) {
+    char[] bytes = self.out.str_view();
+    usz end      = bytes.len;
+    for (usz i = self.gen_scanned; i < end; i++) {
+        char b = bytes[i];
+        if (b == '\n' || b == '\r') {
+            if (b == '\r' && i + 1 < end && bytes[i + 1] == '\n') i++;
+            self.gen_line++;
+            self.gen_col = 0;
+        } else if (b == 0xE2 && i + 2 < end && bytes[i + 1] == 0x80 && (bytes[i + 2] == 0xA8 || bytes[i + 2] == 0xA9)) {
+            i += 2;
+            self.gen_line++;
+            self.gen_col = 0;
+        } else {
+            self.gen_col += utf16_units(b);
+        }
+    }
+    self.gen_scanned = end;
+}
+
+// Source line and UTF-16 column (both 0-based) of a byte offset.
+fn void SourceWriter.source_position(&self, uint offset, uint* line, uint* col) {
+    SourcePos pos = self.ast.position(offset);
+    uint line_start = self.ast.line_starts[pos.line - 1];
+    uint from;
+    uint units;
+    if (self.src_line_start == line_start && self.src_offset <= offset && self.src_line == pos.line - 1) {
+        from  = self.src_offset;
+        units = self.src_col;
+    } else {
+        from  = line_start;
+        units = 0;
+    }
+    char[] src = self.ast.source;
+    for (uint i = from; i < offset && i < src.len; i++) units += utf16_units(src[i]);
+    self.src_offset     = offset;
+    self.src_line_start = line_start;
+    self.src_line       = pos.line - 1;
+    self.src_col        = units;
+    *line = pos.line - 1;
+    *col  = units;
+}
+
+// Record that the output written next came from node `n`. A later mark at the
+// same output position replaces an earlier one, so an expression whose own
+// token is an operator ends up pointing at its leftmost operand.
+fn void SourceWriter.mark(&self, uint n) {
+    if (!self.mapping) return;
+    self.scan_output();
+    MapSegment seg = { .gen_line = self.gen_line, .gen_col = self.gen_col };
+    self.source_position(self.ast.tok(n), &seg.src_line, &seg.src_col);
+    sz count = (sz)self.segments.len();
+    if (count) {
+        MapSegment* last = &self.segments[count - 1];
+        if (last.gen_line == seg.gen_line && last.gen_col == seg.gen_col) {
+            *last = seg;
+            return;
+        }
+        // Same source position on the same line as the previous segment: the
+        // lookup already lands there, so the extra segment adds nothing.
+        if (last.gen_line == seg.gen_line && last.src_line == seg.src_line && last.src_col == seg.src_col) return;
+    }
+    self.segments.push(seg);
+}
+
+const String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn void vlq(DString* out, int value) {
+    uint v = value < 0 ? (((uint)-value) << 1) | 1 : ((uint)value) << 1;
+    do {
+        uint digit = v & 31;
+        v >>= 5;
+        if (v) digit |= 32;
+        out.append_char(BASE64[digit]);
+    } while (v);
+}
+
+// The "mappings" string: segments grouped by output line, each field a VLQ
+// delta from the previous one (output column resets on every line).
+fn void SourceWriter.encode_mappings(&self, DString* out) {
+    uint line = 0;
+    uint prev_col, prev_src_line, prev_src_col;
+    bool first_on_line = true;
+    foreach (seg : self.segments) {
+        while (line < seg.gen_line) {
+            out.append_char(';');
+            line++;
+            prev_col      = 0;
+            first_on_line = true;
+        }
+        if (!first_on_line) out.append_char(',');
+        first_on_line = false;
+        vlq(out, (int)seg.gen_col - (int)prev_col);
+        vlq(out, 0); // single source file
+        vlq(out, (int)seg.src_line - (int)prev_src_line);
+        vlq(out, (int)seg.src_col - (int)prev_src_col);
+        prev_col      = seg.gen_col;
+        prev_src_line = seg.src_line;
+        prev_src_col  = seg.src_col;
+    }
+}
+
+// JSON string literal for the map's file name and embedded source.
+fn void json_string(DString* out, char[] s) {
+    out.append_char('"');
+    foreach (c : s) {
+        switch {
+            case c == '"' || c == '\\': out.appendf("\\%c", c);
+            case c == '\n': out.append("\\n");
+            case c == '\r': out.append("\\r");
+            case c == '\t': out.append("\\t");
+            case c < 32: out.appendf("\\u%04x", c);
+            default: out.append_char(c);
+        }
+    }
+    out.append_char('"');
+}
+
+// Standard base64 with padding, for the inline data URL.
+fn void base64_append(DString* out, char[] data) {
+    usz i;
+    for (; i + 2 < data.len; i += 3) {
+        uint v = ((uint)data[i] << 16) | ((uint)data[i + 1] << 8) | data[i + 2];
+        out.append_char(BASE64[(v >> 18) & 63]);
+        out.append_char(BASE64[(v >> 12) & 63]);
+        out.append_char(BASE64[(v >> 6) & 63]);
+        out.append_char(BASE64[v & 63]);
+    }
+    if (i + 1 == data.len) {
+        uint v = (uint)data[i] << 16;
+        out.append_char(BASE64[(v >> 18) & 63]);
+        out.append_char(BASE64[(v >> 12) & 63]);
+        out.append("==");
+    } else if (i + 2 == data.len) {
+        uint v = ((uint)data[i] << 16) | ((uint)data[i + 1] << 8);
+        out.append_char(BASE64[(v >> 18) & 63]);
+        out.append_char(BASE64[(v >> 12) & 63]);
+        out.append_char(BASE64[(v >> 6) & 63]);
+        out.append_char('=');
+    }
 }
 
 fn void SourceWriter.text(&self, String s) => self.out.append(s);
@@ -243,6 +417,7 @@ fn void SourceWriter.node(&self, uint n) {
         default: break;
     }
     if (parens) self.text("(");
+    self.mark(n);
     switch (tag) {
         case NONE: self.failed = true;
         case NUMBER:
@@ -580,9 +755,11 @@ fn void js_transpile(JsCtx ctx, void* udata) {
             ctx.throw_error(SYNTAX, (String)index.parser.err_msg[:index.parser.err_len]);
             return;
         }
-        SourceWriter writer = { .ast = &index.tree };
+        SourceWriter writer = { .ast = &index.tree, .mapping = (ctx.arg(8).as_int(0)) != 0 };
         writer.out.init(mem);
         defer writer.out.free();
+        writer.segments.init(mem);
+        defer writer.segments.free();
         writer.node(index.tree.node_count() - 1);
         if (writer.failed) {
             ctx.throw_error(SYNTAX, "source cannot be emitted as browser JavaScript");
@@ -600,8 +777,29 @@ fn void js_transpile(JsCtx ctx, void* udata) {
             );
             return;
         }
+        if (!writer.mapping) {
+            ctx.ret_string(writer.out.str_view());
+            return;
+        }
+        // The map rides on the end of the code as an inline data URL; the JS
+        // wrapper splits it off again for transpileWithMap.
+        String name = ctx.arg(7).as_string() ?? "module.ts";
+        DString map;
+        map.init(mem);
+        defer map.free();
+        map.append("{\"version\":3,\"file\":");
+        json_string(&map, name);
+        map.append(",\"sources\":[");
+        json_string(&map, name);
+        map.append("],\"sourcesContent\":[");
+        json_string(&map, index.tree.source);
+        map.append("],\"names\":[],\"mappings\":\"");
+        writer.encode_mappings(&map);
+        map.append("\"}");
+        writer.out.append("\n//# sourceMappingURL=data:application/json;base64,");
+        base64_append(&writer.out, map.str_view());
         ctx.ret_string(writer.out.str_view());
     };
 }
 
-const Native[] TRANSPILE_NATIVES = { { "transpile", &js_transpile, 7 } };
+const Native[] TRANSPILE_NATIVES = { { "transpile", &js_transpile, 9 } };

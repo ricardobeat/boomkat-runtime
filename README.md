@@ -52,7 +52,7 @@ built-in or an error, and remote imports are not supported.
 | `permissions` | `query`, `request`, `revoke` |
 | `sqlite` (optional) | `Database`, `Statement`, `version`; synchronous prepared statements and transactions |
 | `crypto` | `randomBytes`, `sha256`, `hex`, `timingSafeEqual`, async `hashPassword` / `verifyPassword`, `subtle` |
-| `typescript` | `transpile(source, options)`; native TS type erasure and JSX lowering to JavaScript source |
+| `typescript` | `transpile(source, options)`, `transpileWithMap(source, options)`; native TS type erasure and JSX lowering to JavaScript source, with source maps |
 | `test` | `test`, `describe`, hooks and assertions for `bkr test` |
 
 HTTP servers implement `Symbol.asyncDispose`: inside an async scope,
@@ -86,8 +86,17 @@ Options: `filename` (default `module.ts`, `.tsx`/`.jsx` enables JSX), `module`
 Automatic JSX inserts imports from `<jsxImportSource>/jsx-runtime`; browsers
 need an import map or resolvable specifiers. Existing imports are preserved:
 this API does not bundle or rewrite import paths. It does not type-check,
-downlevel JavaScript, preserve comments/formatting, or generate source maps.
+downlevel JavaScript or preserve comments/formatting.
 Enums and other syntax requiring unsupported TS runtime transforms throw.
+
+Source maps: `transpile(source, { sourceMap: "inline" })` ends the output with a
+`//# sourceMappingURL=data:` comment, and `transpileWithMap(source, options)`
+returns `{ code, map }`, where `map` is a version 3 map as JSON text and `code`
+has no `sourceMappingURL` comment (add one that points at wherever you serve the
+map). The map names `filename` as its only source and embeds the original in
+`sourcesContent`. Mappings are per node (identifiers, calls, statements,
+literals), so a property name in `a.b` maps to the start of `a.b`. Columns are
+UTF-16 code units. Validation: `bkr test tests/typescript-map.test.js`.
 
 The [Taskboard sample](examples/taskboard/README.md) serves a Preact TSX UI this
 way, with accounts, shared teams, boards and SQLite BLOB image attachments.
