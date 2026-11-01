@@ -45,7 +45,7 @@ Web APIs:
 - [x] Compression: `CompressionStream`/`DecompressionStream` and gzip/deflate decoding in `fetch`.
 - [ ] Automatic response compression in `serve` (opt-in, negotiating `accept-encoding`).
 - [x] Source maps for TypeScript stacks: not needed. The engine parses TS and TSX natively, so stack positions are already in the original source. Uncaught errors now print their stack.
-- [ ] Engine: a module's SyntaxError has no file, line or stack (`SyntaxError: unexpected token` only). The engine records line/col (`err_line`/`err_col`) but neither the error object nor the embedding API carries the file.
+- [x] A module's SyntaxError now carries file, line and column (`at file.js:2:11`), for static and dynamic imports: fixed on engine main (`7533520f`).
 - [ ] `typescript.transpile()` source maps for browser devtools: needs position tracking in the engine's printer.
 - [x] `crypto.subtle`: digest, HMAC, AES-GCM/CBC/CTR, PBKDF2, HKDF with raw and JWK secret keys. Open: RSA, ECDSA, ECDH, Ed25519, X25519, AES-KW, `wrapKey`/`unwrapKey`, `spki`/`pkcs8`, and global `CryptoKey`/`SubtleCrypto`.
 - [ ] Confirm `Intl` coverage from the engine.
@@ -55,7 +55,7 @@ Tooling:
 - [x] `bkr test` with the `test` module. Files share one runtime; per-file isolation in workers would need the worker entry to load through `read_module`.
 - [x] Move the Python wrappers that only drive bkr to `bkr test`: `tests/modules.test.js` and `tests/workers.test.js` replace `run_modules.py` and `run_workers.py`.
 - [ ] `run_sqlite.py` and `run_crypto.py` stay in Python: they also drive `sqlite3`, `cc` or `openssl`.
-- [ ] Engine: arrow functions are missing from stack traces (`() => inner()` shows only `inner` and the module frame).
+- [ ] Engine: arrow frames are mostly kept now (`d2e66985`), but an arrow called by another arrow drops the caller's frame: `const outer = () => { const r = inner(); return r }; const mid = () => { const r = outer(); return r }; mid()` shows `inner`, `outer` and the module, not `mid`.
 - [x] REPL: `bkr` or `bkr repl` with no script. Declarations persist, entries may use `await`, and `_` holds the last result.
 - [ ] REPL regression test and a README section. `process.run` cannot pass stdin to the child yet, so the test needs that first.
 - [x] `--watch`: `bkr test --watch` reruns after any file under the paths changes (250 ms poll, fresh process per run).
