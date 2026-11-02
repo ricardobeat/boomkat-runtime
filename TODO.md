@@ -48,9 +48,7 @@ Web APIs:
 - [x] A module's SyntaxError now carries file, line and column (`at file.js:2:11`), for static and dynamic imports: fixed on engine main (`7533520f`).
 - [x] `typescript.transpile()` source maps: `sourceMap: "inline"` and `transpileWithMap()`, built in `runtime/transpile.c3` from the engine's node offsets. Open: property names in `a.b`, JSX attributes and the injected JSX import have no mapping of their own.
 - [x] `crypto.subtle`: digest, HMAC, AES-GCM/CBC/CTR, PBKDF2, HKDF with raw and JWK secret keys. Open: RSA, ECDSA, ECDH, Ed25519, X25519, AES-KW, `wrapKey`/`unwrapKey`, `spki`/`pkcs8`, and global `CryptoKey`/`SubtleCrypto`.
-- [x] `Intl` coverage checked against Node 24 (ICU 77.1, CLDR 47). bkr has no `Intl` today: `project.json` builds the engine without `INTL`, so there is no global, `toLocale*` is English-only, `timeZone` throws and `localeCompare` is code-point order.
-- [ ] Enable `Intl` in bkr: add `INTL`, `INTL_FULL`, `INTL_COLLATOR` and `TEMPORAL` to the `bkr` target features (the engine's `boomkat-full-icu` set). The binary grows 3.6 to 6.2 MiB (English-only `INTL` + `INTL_COLLATOR`: 4.9 MiB); startup is unchanged at about 14 ms.
-- [ ] Engine `Intl` gaps seen with the full set, on a 30-locale matrix. No data for cs, da, el, fi, id, nb, nl, uk, vi, he and es-MX (they print English). `dateStyle: "short"` and default numeric dates are wrong for most bundled locales; en-GB comes out month-first (`3/5/2024`, Node `05/03/2024`). Non-English `DisplayNames`, and `RelativeTimeFormat` for pt-PT and ar-EG, print English. Non-Gregorian calendars format as Gregorian (japanese, buddhist, islamic, hebrew). `Segmenter` has no ja/th/zh word dictionary (documented as excluded). `formatRange` does not collapse shared parts. Plural forms of unit names are wrong for pl and ru (`50 kilometra`). Matching Node: numbers, currency, percent, scientific, plural and ordinal rules, collation, `Intl.Locale`, time zone names, `DurationFormat`.
+- [ ] `Intl`: not in the bkr build. Enable with the engine's `boomkat-full-icu` features (+2.6 MiB).
 - [ ] TypeScript enums and other syntax needing runtime transforms.
 
 Tooling:
