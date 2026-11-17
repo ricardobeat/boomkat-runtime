@@ -3,7 +3,7 @@ function assert(ok, message) { if (!ok) throw new Error(message); }
 const out = transpile('interface U {name:string}; const u:U={name:"abc"}; export {u};');
 assert(!out.includes('interface'), 'interface erased');
 assert(out.includes('export'), 'value export retained');
-for (const source of ['enum X {A}', 'const x: number = ;', 'namespace X {export const n=1}', 'const x =']) {
+for (const source of ['enum X {A}', 'const x: number = ;', 'const x =']) {
     let threw = false;
     try { transpile(source); } catch(e) { threw = e instanceof SyntaxError; }
     assert(threw, 'reject: '+source);

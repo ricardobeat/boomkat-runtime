@@ -68,7 +68,7 @@ fn void SourceWriter.scan_output(&self) {
 // Source line and UTF-16 column (both 0-based) of a byte offset.
 fn void SourceWriter.source_position(&self, uint offset, uint* line, uint* col) {
     SourcePos pos = self.ast.position(offset);
-    uint line_start = self.ast.line_starts[pos.line - 1];
+    uint line_start = self.ast.line_starts[(sz)(pos.line - 1)];
     uint from;
     uint units;
     if (self.src_line_start == line_start && self.src_offset <= offset && self.src_line == pos.line - 1) {
@@ -194,7 +194,7 @@ fn void SourceWriter.identifier(&self, uint id) {
     char[] name = self.ast.atoms.get(id);
     Lexer lex   = lexer::lexer_init(name, null);
     defer lex.free_arena();
-    if (try tok = lex.next_token()) {
+    if (try tok = lex.scan_token()) {
         if (tok.end == name.len && (tok.type == TokenType.IDENTIFIER || lexer::keyword_to_string(tok.type).len)) {
             self.out.append_bytes(name);
             return;
@@ -208,7 +208,7 @@ fn void SourceWriter.number(&self, uint n) {
     uint pos  = self.ast.main_tok[n];
     Lexer lex = lexer::lexer_init(self.ast.source[pos..], null);
     defer lex.free_arena();
-    if (try tok = lex.next_token()) {
+    if (try tok = lex.scan_token()) {
         self.out.append_bytes(self.ast.source[pos:tok.end]);
     } else {
         self.failed = true;
@@ -495,7 +495,7 @@ fn void SourceWriter.node(&self, uint n) {
             self.text("?");
             self.node(a.extra[r]);
             self.text(":");
-            self.node(a.extra[r + 1]);
+            self.node(a.extra[(sz)(r + 1)]);
         case SEQUENCE: self.list(l);
         case SPREAD:
         case REST:
@@ -591,19 +591,19 @@ fn void SourceWriter.node(&self, uint n) {
             self.node(l);
             self.text(")");
             self.control_body(a.extra[r]);
-            if (a.extra[r + 1]) {
+            if (a.extra[(sz)(r + 1)]) {
                 self.text("else ");
-                self.control_body(a.extra[r + 1]);
+                self.control_body(a.extra[(sz)(r + 1)]);
             }
         case FOR:
             self.text("for(");
             self.for_init(a.extra[l]);
             self.text(";");
-            self.node(a.extra[l + 1]);
+            self.node(a.extra[(sz)(l + 1)]);
             self.text(";");
-            self.node(a.extra[l + 2]);
+            self.node(a.extra[(sz)(l + 2)]);
             self.text(")");
-            self.control_body(a.extra[l + 3]);
+            self.control_body(a.extra[(sz)(l + 3)]);
         case FOR_IN:
         case FOR_OF:
             self.text(flags & ast::FOR_AWAIT ? "for await(" : "for(");
@@ -611,7 +611,7 @@ fn void SourceWriter.node(&self, uint n) {
             self.text(tag == NodeTag.FOR_IN ? " in " : " of ");
             self.node(a.extra[r]);
             self.text(")");
-            self.control_body(a.extra[r + 1]);
+            self.control_body(a.extra[(sz)(r + 1)]);
         case WHILE:
             self.text("while(");
             self.node(l);
@@ -633,18 +633,18 @@ fn void SourceWriter.node(&self, uint n) {
         case TRY:
             self.text("try ");
             self.node(l);
-            if (a.extra[r + 1]) {
+            if (a.extra[(sz)(r + 1)]) {
                 self.text("catch");
                 if (a.extra[r]) {
                     self.text("(");
                     self.node(a.extra[r]);
                     self.text(")");
                 }
-                self.node(a.extra[r + 1]);
+                self.node(a.extra[(sz)(r + 1)]);
             }
-            if (a.extra[r + 2]) {
+            if (a.extra[(sz)(r + 2)]) {
                 self.text("finally ");
-                self.node(a.extra[r + 2]);
+                self.node(a.extra[(sz)(r + 2)]);
             }
         case SWITCH:
             self.text("switch(");

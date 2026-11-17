@@ -762,7 +762,7 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 			&iterator
 		) || (!iterator.is_undefined() && !iterator.is_null())) return;
 		HString*[] keys = mem::temp_array(HString*, record.prop_count);
-		uint count      = builtins::collect_own_enum_string_keys(h, record, keys.ptr);
+		uint count      = builtins::collect_own_string_keys(h, record, keys.ptr);
 		// Validate before touching the receiver, so fallback preserves getters
 		// and coercions in the original constructor's order.
 		for (uint i = 0; i < count; i++)
