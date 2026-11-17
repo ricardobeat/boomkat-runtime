@@ -300,12 +300,24 @@ fn char[]? read_module(String name, void* udata) {
 
 faultdef MODULE_NOT_FOUND, USAGE;
 
+// Set by --jit; only an engine built with the SLJIT feature accepts it.
+bool g_jit;
+
 fn JsValue? bk_get(String name) => g_runtime.rt.get(g_runtime.bk, name);
 
 fn void? boot() {
     g_runtime.loop = uws_loop();
     g_runtime.engine.set_module_reader(&read_module);
     g_runtime.engine.create()!;
+    if (g_jit) {
+        $if $feat(SLJIT):
+            g_runtime.engine.set_jit();
+            g_runtime.engine.set_jit_opt();
+        $else
+            io::eprintn("error: --jit needs an engine built with the JIT");
+            return USAGE~;
+        $endif
+    }
     g_runtime.rt.create(&g_runtime.engine)!;
     install_natives(CORE_NATIVES)!;
     install_natives(WEB_NATIVES)!;
@@ -360,6 +372,7 @@ fn void usage() {
     );
     io::eprintn("permissions: net read write env run ffi sys import");
     io::eprintn("--http-processes=1..64 runs isolated HTTP processes behind a native socket dispatcher");
+    io::eprintn("--jit compiles hot functions to native code (JIT-enabled builds only)");
 }
 
 fn void? parse_args(String[] argv) {
@@ -374,6 +387,10 @@ fn void? parse_args(String[] argv) {
         }
         if (a == "--no-sandbox") {
             g_sandbox = false;
+            continue;
+        }
+        if (a == "--jit") {
+            g_jit = true;
             continue;
         }
         if (a.starts_with("--time-limit=")) {
