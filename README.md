@@ -499,8 +499,9 @@ When prompting is off the grants are fixed for the run, and bkr also applies a
 Seatbelt sandbox (macOS only) that denies the network, exec and writes the grants do
 not cover (`--no-sandbox` turns that off).
 
-`--time-limit=ms` interrupts JavaScript that runs longer than the limit; a
-request that trips it gets a 500 and the server keeps serving.
+`--time-limit=ms` interrupts JavaScript that runs longer than the limit,
+including the main module's top level; a request that trips it gets a 500
+and the server keeps serving, and anything else ends the process with status 1.
 
 ## Layout
 

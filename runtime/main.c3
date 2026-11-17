@@ -472,17 +472,20 @@ fn int main(String[] argv) {
         return 1;
     }
     apply_sandbox();
+    // The main module's evaluation is a turn like any other: the limit covers it.
+    if (g_runtime.time_limit_ms) start_watchdog(g_runtime.time_limit_ms);
     g_runtime.depth++;
+    bool started = begin_dispatch();
     JsValue? ns = g_runtime.rt.eval_module((String)src, g_runtime.main);
+    end_dispatch(started);
     g_runtime.depth--;
     if (catch err = ns) {
-        io::eprintfn("error: %s", uncaught_text());
+        (void)dispatch_error(err);
         return 1;
     }
     g_runtime.rt.release(ns);
-    if (catch checkpoint()) report_uncaught();
+    if (catch err = checkpoint()) (void)dispatch_error(err);
     flush_rejections();
-    if (g_runtime.time_limit_ms) start_watchdog(g_runtime.time_limit_ms);
     uws_loop_run();
     return g_runtime.exit_code;
 }

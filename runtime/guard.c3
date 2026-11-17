@@ -133,6 +133,12 @@ fn fault dispatch_error(fault err) {
         g_runtime.engine.clear_interrupt();
         if (g_runtime.worker) { worker_report_error("Worker script time limit exceeded"); worker_stop(); }
         io::eprintfn("error: script ran past the %d ms time limit", g_runtime.time_limit_ns / 1_000_000);
+        // Outside a request (which call_catch answers with a 500), a runaway
+        // turn ends the process as an uncaught exception does.
+        if (!g_runtime.worker) {
+            g_runtime.exit_code = 1;
+            exit_now();
+        }
         return TIMED_OUT;
     }
     report_uncaught();
