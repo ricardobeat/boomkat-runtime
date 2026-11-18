@@ -28,6 +28,9 @@ struct NativeWebClass {
     JsValue[5] keys;
     JsValue[4] keep;
     ShapePath[3] shapes;
+    WebSlot[3] slots;
+    WebChain[2] chains;
+    WebGet[2] gets;
 }
 
 
@@ -88,6 +91,169 @@ fn bool shape_path_put(ShapePath* path, HObject* obj, HString*[] keys, TVal[] va
     return true;
 }
 
+// ---- guard caches ----
+//
+// The per-request guards ask the same questions of the same long-lived objects
+// on every request: whether a prototype has gained a setter, whether a global
+// constructor or String.prototype.slice is still the original. Each cache
+// below keeps an answer while Heap.prototype_epoch holds. The long-lived
+// objects it read are marked observed (HObject.observe_prototype), and adding,
+// removing or re-flagging a property of an observed object, or changing its
+// prototype, advances the epoch, as the engine's own read caches rely on. A
+// value can change without advancing it, so a cache keeps the slot and reads
+// the value again. Per-request objects are never observed, since freeing an
+// observed object advances the epoch too; their layout is matched by shape.
+
+// A property's slot in one long-lived object.
+struct WebSlot {
+    ulong epoch;
+    HObject* obj;
+    int slot;
+    bool accessor;
+    bool ok;
+}
+
+fn int web_slot(WebSlot* c, HObject* obj, HString* key, Heap* h, bool* accessor) {
+    if (c.ok && c.obj == obj && c.epoch == h.prototype_epoch) {
+        *accessor = c.accessor;
+        return c.slot;
+    }
+    int slot  = obj.find_prop_idx(key, h);
+    *accessor = slot >= 0 && obj.get_prop_flags((uint)slot, h).is_accessor;
+    if (obj.flags.exotic_proxyobj) return slot;
+    obj.observe_prototype();
+    *c = { .epoch = h.prototype_epoch, .obj = obj, .slot = slot, .accessor = *accessor, .ok = true };
+    return slot;
+}
+
+// web_own_data of a long-lived object.
+fn bool web_own_data_at(WebSlot* c, HObject* obj, HString* key, Heap* h, TVal* value) {
+    if (!obj || obj.flags.exotic_proxyobj) return false;
+    bool accessor;
+    int slot = web_slot(c, obj, key, h, &accessor);
+    if (slot < 0 || accessor) return false;
+    *value = obj.prop_values()[slot].get();
+    return true;
+}
+
+// Mark the prototype chain from `first` observed. False, having marked nothing,
+// when a proxy or a chain longer than the guards walk can change an answer
+// without advancing the epoch.
+fn bool web_observe_chain(HObject* first) {
+    uint depth;
+    for (HObject* p = first; p; p = p.prototype) {
+        if (p.flags.exotic_proxyobj || ++depth > 32) return false;
+    }
+    for (HObject* p = first; p; p = p.prototype) p.observe_prototype();
+    return true;
+}
+
+// web_can_assign's walk of a prototype chain, by its first link.
+struct WebChain {
+    ulong epoch;
+    HObject* first;
+    bool result;
+    bool ok;
+}
+
+// web_can_assign for a receiver that has no own properties, as a constructor's
+// fresh `this` has: the answer is its prototype chain's.
+fn bool web_can_assign_at(WebChain* c, HObject* obj, HString* key, Heap* h) {
+    if (!hobject::plain_property_object(obj) || obj.prop_count != 0) return web_can_assign(obj, key, h);
+    HObject* first = obj.prototype;
+    if (c.ok && c.first == first && c.epoch == h.prototype_epoch) return c.result;
+    bool result = web_can_assign(first, key, h);
+    if (web_observe_chain(first)) *c = { .epoch = h.prototype_epoch, .first = first, .result = result, .ok = true };
+    return result;
+}
+
+// Where a key of a per-request receiver lives, by the receiver's shape: in the
+// receiver itself, valid while its shape id names the same shape
+// (shape_recycle_epoch), or on its prototype chain, which is observed. A
+// dictionary or private receiver shape is never recorded: keys join a
+// dictionary shape in place, and a private shape's flags change in place.
+struct WebGet {
+    ulong epoch;
+    uint recycle;
+    uint shape;
+    HObject* first;
+    HObject* owner;
+    int slot;
+    bool accessor;
+    bool ok;
+}
+
+// The slot of `key` as get_prop_proto finds it, and its owner; -1 when no
+// object on the chain has it. -2 when the receiver or its chain is not one the
+// cache can describe; the caller then asks get_prop_proto.
+fn int web_find_at(WebGet* c, HObject* o, HString* key, Heap* h, HObject** owner, bool* accessor) {
+    if (c.ok && o.shape_id == c.shape && c.recycle == h.shape_recycle_epoch
+        && (c.owner == null || (o.prototype == c.first && c.epoch == h.prototype_epoch))) {
+        *owner = c.owner ? c.owner : o;
+        *accessor = c.accessor;
+        return c.slot;
+    }
+    if (!hobject::plain_property_object(o)) return -2;
+    // Only a transition table shape: a private one can change its flags in place.
+    hobject::Shape* sh = h.get_shape(o.shape_id);
+    if (sh == null || sh.dict || (o.shape_id != 0 && sh.parent == hobject::PRIVATE_SHAPE_PARENT)) return -2;
+    int slot = o.find_prop_idx(key, h);
+    HObject* found = o;
+    if (slot < 0) {
+        found = null;
+        uint depth;
+        for (HObject* p = o.prototype; p; p = p.prototype) {
+            if (!hobject::plain_property_object(p) || ++depth > 32) return -2;
+            slot = p.find_prop_idx(key, h);
+            if (slot >= 0) {
+                found = p;
+                break;
+            }
+        }
+        if (!web_observe_chain(o.prototype)) return -2;
+    }
+    *owner = found;
+    *accessor = slot >= 0 && found.get_prop_flags((uint)slot, h).is_accessor;
+    *c = { .epoch = h.prototype_epoch, .recycle = h.shape_recycle_epoch, .shape = o.shape_id,
+           .first = o.prototype, .owner = found == o ? null : found, .slot = slot,
+           .accessor = *accessor, .ok = true };
+    // An absent key is recorded as found on the chain, so the epoch check guards it.
+    if (slot < 0) c.owner = o.prototype ? o.prototype : o;
+    return slot;
+}
+
+// fast_get through a cache: the raw value get_prop_proto returns, undefined
+// when absent.
+fn TVal web_get_at(WebGet* c, HObject* o, HString* key, Heap* h) {
+    HObject* owner;
+    bool accessor;
+    int slot = web_find_at(c, o, key, h, &owner, &accessor);
+    if (slot == -2) return o.get_prop_proto(key, h) ?? (TVal) { };
+    if (slot < 0) return (TVal) { };
+    return owner.prop_values()[slot].get();
+}
+
+// web_own_data of a per-request receiver.
+fn bool web_own_data_get(WebGet* c, HObject* o, HString* key, Heap* h, TVal* value) {
+    HObject* owner;
+    bool accessor;
+    int slot = web_find_at(c, o, key, h, &owner, &accessor);
+    if (slot == -2) return web_own_data(o, key, h, value);
+    if (slot < 0 || owner != o || accessor) return false;
+    *value = o.prop_values()[slot].get();
+    return true;
+}
+
+// web_method_is of a per-request receiver.
+fn bool web_method_is_at(WebGet* c, HObject* o, HString* key, TVal expected, Heap* h) {
+    HObject* owner;
+    bool accessor;
+    int slot = web_find_at(c, o, key, h, &owner, &accessor);
+    if (slot == -2) return web_method_is(o, key, expected, h);
+    if (slot < 0 || accessor) return false;
+    return owner.prop_values()[slot].get().get_raw_bits() == expected.get_raw_bits();
+}
+
 fn bool web_can_assign(HObject* obj, HString* key, Heap* h) {
     for (uint depth = 0; obj && depth < 32; depth++, obj = obj.prototype) {
         if (obj.flags.exotic_proxyobj) return false;
@@ -113,18 +279,13 @@ fn void native_url_construct(BuiltinContext* raw, void* user) {
     TVal input   = ctx.arg(0).tv;
     HObject* obj = ctx.this_value().tv.get_heapptr();
     TVal string_ctor, url_fast;
-    if (!input.is_string() || obj.prototype != cls.prototype || !web_own_data(
-        raw.global_env.bindings,
-        cls.k_string,
-        h,
-        &string_ctor
-    ) || string_ctor.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_runtime.bk)
-        .tv.get_heapptr(), cls.k_url_fast, h, &url_fast) || url_fast.get_raw_bits()
-            != cls.url_fast.get_raw_bits() || !web_can_assign(
-            obj,
-            cls.k_raw,
-            h
-        ) || !web_can_assign(obj, cls.k_flags, h)) {
+    if (!input.is_string() || obj.prototype != cls.prototype
+        || !web_own_data_at(&cls.slots[0], raw.global_env.bindings, cls.k_string, h, &string_ctor)
+        || string_ctor.get_raw_bits() != cls.dependency.get_raw_bits()
+        || !web_own_data_at(&cls.slots[1], ctx.value(g_runtime.bk).tv.get_heapptr(), cls.k_url_fast, h, &url_fast)
+        || url_fast.get_raw_bits() != cls.url_fast.get_raw_bits()
+        || !web_can_assign_at(&cls.chains[0], obj, cls.k_raw, h)
+        || !web_can_assign_at(&cls.chains[1], obj, cls.k_flags, h)) {
         return web_initialize(ctx, cls);
     }
     HString* str = input.get_heapptr();
@@ -146,12 +307,8 @@ fn void native_url_pathname(BuiltinContext* raw, void* user) {
     TVal input, parts;
     if (receiver.is_object()) {
         HObject* obj = receiver.get_heapptr();
-        if (web_own_data(
-            obj,
-            cls.k_raw,
-            raw.heap,
-            &input
-        ) && input.is_string() && web_own_data(obj, cls.k_flags, raw.heap, &parts) && parts.is_numeric()) {
+        if (web_own_data_get(&cls.gets[0], obj, cls.k_raw, raw.heap, &input) && input.is_string()
+            && web_own_data_get(&cls.gets[1], obj, cls.k_flags, raw.heap, &parts) && parts.is_numeric()) {
             HString* str  = input.get_heapptr();
             double number = parts.is_fastint() ? (double)parts.get_fastint() : parts.get_number();
             // User writes to these public fields can make JS slice coercion
@@ -165,12 +322,8 @@ fn void native_url_pathname(BuiltinContext* raw, void* user) {
                     && (query == 0xFFFF || (query >= slash && query <= text.len))) {
                     if (slash == text.len) return ctx.ret_string("/");
                     TVal slice;
-                    if (web_own_data(
-                        raw.heap.string_proto,
-                        cls.k_slice,
-                        raw.heap,
-                        &slice
-                    ) && slice.get_raw_bits() == cls.slice.get_raw_bits()) {
+                    if (web_own_data_at(&cls.slots[2], raw.heap.string_proto, cls.k_slice, raw.heap, &slice)
+                        && slice.get_raw_bits() == cls.slice.get_raw_bits()) {
                         usz end = query == 0xFFFF ? text.len : query;
                         return ctx.ret_string(text[slash:end - slash]);
                     }
@@ -181,23 +334,63 @@ fn void native_url_pathname(BuiltinContext* raw, void* user) {
     if (try result = ctx.call(ctx.value(cls.getter), { }, ctx.this_value())) ctx.ret(result);
 }
 
+// What web_instanceof learns from a constructor alone: where its
+// Symbol.hasInstance method is, if any object on its chain has one, and the
+// slot of its own `prototype`. Kept for a few constructors at once.
+struct WebCtor {
+    ulong epoch;
+    HObject* ctor;
+    HObject* method_owner;
+    int method_slot;
+    int proto_slot;
+}
+
+tlocal WebCtor[4] web_ctors;
+tlocal uint web_ctor_next;
+
+// The constructor's checks, from web_ctors when they hold. False when the JS
+// path has to decide.
+fn bool web_ctor_lookup(Heap* h, HObject* fn_obj, WebCtor** out) {
+    foreach (&c : web_ctors) {
+        if (c.ctor == fn_obj && c.epoch == h.prototype_epoch) {
+            *out = c;
+            return true;
+        }
+    }
+    if (!fn_obj.is_callable() || fn_obj.flags.exotic_proxyobj
+        || fn_obj.callable_kind() == hobject::CallableKind.BOUND_FN) return false;
+    HObject* owner = fn_obj;
+    int method_slot = -1;
+    for (uint depth = 0; owner && depth < 32; depth++, owner = owner.prototype) {
+        if (owner.flags.exotic_proxyobj) return false;
+        method_slot = owner.find_prop_idx(h.hasinstance_symbol, h);
+        if (method_slot < 0) continue;
+        if (owner.get_prop_flags((uint)method_slot, h).is_accessor) return false;
+        break;
+    }
+    if (owner && method_slot < 0) return false;
+    int proto_slot = fn_obj.find_prop_idx(h.str(PROTOTYPE), h);
+    if (proto_slot < 0 || fn_obj.get_prop_flags((uint)proto_slot, h).is_accessor) return false;
+    // The hasInstance walk read every object up to the method's owner, or the
+    // whole chain; observing all of it covers both.
+    if (!web_observe_chain(fn_obj)) return false;
+    WebCtor* c = &web_ctors[web_ctor_next++ % web_ctors.len];
+    *c = { .epoch = h.prototype_epoch, .ctor = fn_obj, .method_owner = owner, .method_slot = method_slot,
+           .proto_slot = proto_slot };
+    *out = c;
+    return true;
+}
+
 // OrdinaryHasInstance is pure for an ordinary constructor with the intrinsic
 // hasInstance method. Other methods, accessors and proxies use the JS path.
 fn bool web_instanceof(Heap* h, TVal value, TVal ctor, bool* result) {
     *result = false;
     if (!ctor.is_object()) return false;
     HObject* fn_obj = ctor.get_heapptr();
-    if (!fn_obj.is_callable() || fn_obj.flags.exotic_proxyobj
-        || fn_obj.callable_kind() == hobject::CallableKind.BOUND_FN) return false;
-    HObject* owner    = fn_obj;
-    bool found_method = false;
-    for (uint depth = 0; owner && depth < 32; depth++, owner = owner.prototype) {
-        if (owner.flags.exotic_proxyobj) return false;
-        int slot = owner.find_prop_idx(h.hasinstance_symbol, h);
-        if (slot < 0) continue;
-        if (owner.get_prop_flags((uint)slot, h).is_accessor) return false;
-        found_method = true;
-        TVal method = owner.prop_values()[slot].get();
+    WebCtor* c;
+    if (!web_ctor_lookup(h, fn_obj, &c)) return false;
+    if (c.method_owner) {
+        TVal method = c.method_owner.prop_values()[c.method_slot].get();
         if (!method.is_null() && !method.is_undefined()) {
             uint index;
             if (method.is_lightfunc()) {
@@ -211,12 +404,10 @@ fn bool web_instanceof(Heap* h, TVal value, TVal ctor, bool* result) {
             }
             if (index != builtins::Builtin.FUNCTION_PROTO_HASINSTANCE.ordinal) return false;
         }
-        break;
     }
-    if (owner && !found_method) return false;
     if (!value.is_object()) return !value.is_lightfunc();
-    TVal prototype;
-    if (!web_own_data(fn_obj, h.str(PROTOTYPE), h, &prototype) || !prototype.is_object()) return false;
+    TVal prototype = fn_obj.prop_values()[c.proto_slot].get();
+    if (!prototype.is_object()) return false;
     HObject* obj = value.get_heapptr();
     for (uint depth = 0; obj && depth < 32; depth++, obj = obj.prototype) {
         if (obj.flags.exotic_proxyobj) return false;
@@ -243,17 +434,10 @@ fn void native_response_construct(BuiltinContext* raw, void* user) {
     bool native_body = false;
     if (init.is_undefined()) {
         TVal u8, file;
-        if (!web_own_data(
-            raw.global_env.bindings,
-            cls.k_u8,
-            h,
-            &u8
-        ) || u8.get_raw_bits() != cls.dependency.get_raw_bits() || !web_own_data(ctx.value(g_runtime.bk)
-            .tv.get_heapptr(), cls.k_file, h, &file) || file.get_raw_bits()
-                != cls.file_ctor.get_raw_bits()) return web_initialize(
-                ctx,
-                cls
-            );
+        if (!web_own_data_at(&cls.slots[0], raw.global_env.bindings, cls.k_u8, h, &u8)
+            || u8.get_raw_bits() != cls.dependency.get_raw_bits()
+            || !web_own_data_at(&cls.slots[1], ctx.value(g_runtime.bk).tv.get_heapptr(), cls.k_file, h, &file)
+            || file.get_raw_bits() != cls.file_ctor.get_raw_bits()) return web_initialize(ctx, cls);
         bool match;
         if (!web_instanceof(h, body, u8, &match)) return web_initialize(ctx, cls);
         native_body = match;
@@ -268,11 +452,9 @@ fn void native_response_construct(BuiltinContext* raw, void* user) {
     }
     bool string_body = body.is_string() && init.is_undefined();
     bool empty_body  = body.is_undefined() || body.is_null();
-    if ((!native_body && !string_body && !empty_body) || ((native_body || string_body) && !web_can_assign(
-        obj,
-        cls.k_body,
-        h
-    )) || (!string_body && !web_can_assign(obj, cls.k_ct, h))) return web_initialize(ctx, cls);
+    if ((!native_body && !string_body && !empty_body)
+        || ((native_body || string_body) && !web_can_assign_at(&cls.chains[0], obj, cls.k_body, h))
+        || (!string_body && !web_can_assign_at(&cls.chains[1], obj, cls.k_ct, h))) return web_initialize(ctx, cls);
     HString*[2] keys;
     TVal[2] vals;
     uint n;

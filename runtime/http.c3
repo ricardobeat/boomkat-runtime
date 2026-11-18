@@ -156,6 +156,7 @@ struct FastTypes {
     TVal blob_method;
     TVal response_ctor;
     ShapePath[4] request_shapes;
+    WebGet[6] gets;
     JsValue[14] keep;
 }
 
@@ -373,16 +374,16 @@ fn bool respond_fast(Conn* c, JsValue result) {
     if (!g_runtime.rt.load(result, &rv) || !rv.is_object()) return false;
     HObject* o = (HObject*)rv.get_heapptr();
     if (o.prototype != g_runtime.fast.response_proto) return false;
-    if (!web_method_is(o, g_runtime.fast.k_blob, g_runtime.fast.blob_method, g_runtime.rt.rt.heap)) return false;
-    TVal headers = fast_get(o, g_runtime.fast.k_headers);
+    if (!web_method_is_at(&g_runtime.fast.gets[0], o, g_runtime.fast.k_blob, g_runtime.fast.blob_method, g_runtime.rt.rt.heap)) return false;
+    TVal headers = web_get_at(&g_runtime.fast.gets[1], o, g_runtime.fast.k_headers, g_runtime.rt.rt.heap);
     builtins::StrBuf header_blob;
     header_blob.init(g_runtime.rt.rt.heap);
     defer header_blob.free();
-    TVal used = fast_get(o, g_runtime.fast.k_used);
+    TVal used = web_get_at(&g_runtime.fast.gets[2], o, g_runtime.fast.k_used, g_runtime.rt.rt.heap);
     if (!used.is_boolean() || used.get_boolean()) return false;
-    TVal status = fast_get(o, g_runtime.fast.k_status);
+    TVal status = web_get_at(&g_runtime.fast.gets[3], o, g_runtime.fast.k_status, g_runtime.rt.rt.heap);
     if (!status.is_fastint() || status.get_fastint() != 200) return false;
-    TVal ct = fast_get(o, g_runtime.fast.k_ct);
+    TVal ct = web_get_at(&g_runtime.fast.gets[4], o, g_runtime.fast.k_ct, g_runtime.rt.rt.heap);
     String blob;
     if (!headers.is_null()) {
         bool match;
@@ -403,7 +404,7 @@ fn bool respond_fast(Conn* c, JsValue result) {
     } else {
         return false;
     }
-    TVal b     = fast_get(o, g_runtime.fast.k_body);
+    TVal b     = web_get_at(&g_runtime.fast.gets[5], o, g_runtime.fast.k_body, g_runtime.rt.rt.heap);
     JsArg body = { .tv = b };
     bool file  = b.is_object() && ((HObject*)b.get_heapptr()).prototype == g_runtime.fast.file_proto;
     bool stream;
