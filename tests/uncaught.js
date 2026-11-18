@@ -27,6 +27,19 @@ area({ size: 1 } as Shape);`,
         source: `throw "plain";`,
         expect: [/^error: plain\n?$/],
     },
+    // The main module's eval has returned by the time these throw.
+    {
+        name: "throw after a top-level await",
+        file: "js",
+        source: `await null;\nthrow new Error("after await");`,
+        expect: [/^error: Uncaught \(in promise\) Error: after await$/m, /\.js:2:7\)/],
+    },
+    {
+        name: "throw after awaiting a timer",
+        file: "js",
+        source: `await new Promise((r) => setTimeout(r, 1));\nthrow new RangeError("after timer");`,
+        expect: [/^error: Uncaught \(in promise\) RangeError: after timer$/m],
+    },
 ];
 
 const failures = [];

@@ -636,8 +636,12 @@ fn bool web_headers_blob(Heap* h, HObject* obj, builtins::StrBuf* output, bool a
             TVal key = map.array_part()[i].get();
             if (key.is_deleted()) continue;
             TVal value = map.array_part()[i + 1].get();
+            // A lone surrogate has no UTF-8 form: the copy would turn it into
+            // U+FFFD where the JS method keeps it, so that string declines.
             if (!key.is_string() || !value.is_string() || ((HString*)key.get_heapptr()).is_symbol()
                 || ((HString*)value.get_heapptr()).is_symbol()
+                || !((HString*)key.get_heapptr()).is_well_formed()
+                || !((HString*)value.get_heapptr()).is_well_formed()
                 || (ascii_only
                     && (!((HString*)key.get_heapptr()).is_ascii() || !((HString*)value.get_heapptr()).is_ascii()))) {
                 fast = false;
