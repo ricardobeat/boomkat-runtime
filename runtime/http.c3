@@ -155,6 +155,7 @@ struct FastTypes {
     HString* k_blob;
     TVal blob_method;
     TVal response_ctor;
+    ShapePath[4] request_shapes;
     JsValue[14] keep;
 }
 
@@ -330,30 +331,30 @@ fn void js_fetch_for(JsCtx ctx, void* udata) {
 
 fn JsValue? new_request(Conn* c, JsValue method, char[] body, bool has_body) {
     Heap* h      = g_runtime.rt.rt.heap;
-    HObject* req = h.alloc_object(OBJECT)!;
+    bool params  = !c.params.is_empty();
+    HObject* req = h.alloc_plain_object(4 + (params ? 1 : 0) + (has_body ? 1 : 0))!;
     h.set_prototype(req, g_runtime.fast.request_proto);
-    TVal m;
-    g_runtime.rt.load(method, &m);
-    TVal id;
-    id.set_number((double)c.id);
-    req.put_prop(g_runtime.fast.k_method, m, hobject::PROP_FLAGS_WEC, h);
-    req.put_prop(g_runtime.fast.k_id, id, hobject::PROP_FLAGS_WEC, h);
+    HString*[6] keys = { g_runtime.fast.k_method, g_runtime.fast.k_id, g_runtime.fast.k_url,
+                         g_runtime.fast.k_header_blob, null, null };
+    TVal[6] vals;
+    g_runtime.rt.load(method, &vals[0]);
+    vals[1].set_number((double)c.id);
     // Metadata belongs to the Request even when the response has ended.
     JsValue url  = g_runtime.rt.string(c.url_now())!;
     JsValue blob = g_runtime.rt.string(c.blob_now())!;
-    TVal metadata;
-    g_runtime.rt.load(url, &metadata);
-    req.put_prop(g_runtime.fast.k_url, metadata, hobject::PROP_FLAGS_WEC, h);
-    g_runtime.rt.load(blob, &metadata);
-    req.put_prop(g_runtime.fast.k_header_blob, metadata, hobject::PROP_FLAGS_WEC, h);
-    if (!c.params.is_empty()) {
-        g_runtime.rt.load(c.params, &metadata);
-        req.put_prop(g_runtime.fast.k_params, metadata, hobject::PROP_FLAGS_WEC, h);
+    g_runtime.rt.load(url, &vals[2]);
+    g_runtime.rt.load(blob, &vals[3]);
+    uint n = 4;
+    if (params) {
+        keys[n] = g_runtime.fast.k_params;
+        g_runtime.rt.load(c.params, &vals[n++]);
     }
     if (has_body) {
-        TVal b;
-        b.set_object(new_u8(copy_bytes(body))!);
-        req.put_prop(g_runtime.fast.k_body, b, hobject::PROP_FLAGS_WEC, h);
+        keys[n] = g_runtime.fast.k_body;
+        vals[n++].set_object(new_u8(copy_bytes(body))!);
+    }
+    if (!shape_path_put(&g_runtime.fast.request_shapes[(params ? 1 : 0) + (has_body ? 2 : 0)], req, keys[:n], vals[:n], h)) {
+        return heap::HEAP_ALLOC_FAULT~;
     }
     TVal rv;
     rv.set_object(req);

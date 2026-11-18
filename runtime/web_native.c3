@@ -27,6 +27,7 @@ struct NativeWebClass {
     HString* k_file;
     JsValue[5] keys;
     JsValue[4] keep;
+    ShapePath[3] shapes;
 }
 
 
@@ -37,6 +38,53 @@ fn bool web_own_data(HObject* obj, HString* key, Heap* h, TVal* value) {
     int slot = obj.find_prop_idx(key, h);
     if (slot < 0 || obj.get_prop_flags((uint)slot, h).is_accessor) return false;
     *value = obj.prop_values()[slot].get();
+    return true;
+}
+
+// The shapes a fresh object passes through when the runtime gives it the same
+// keys in the same order, as it does for every Request, URL and Response. Once
+// each step is a transition another object already took, the path is in the
+// heap's transition table, where a shape stays valid while
+// shape_recycle_epoch does. A later object starting on the same shape then
+// takes all the values at once and moves straight to the last shape, as a
+// cached store (HObject.append_cached_prop) moves one key.
+struct ShapePath {
+    uint epoch;
+    uint start;
+    uint end;
+    bool ready;
+}
+
+// Put `vals` under `keys` with default flags on `obj`, which has none of the
+// keys. False when the object could not take a key.
+fn bool shape_path_put(ShapePath* path, HObject* obj, HString*[] keys, TVal[] vals, Heap* h) {
+    uint n = (uint)keys.len;
+    if (path.ready && obj.shape_id == path.start && path.epoch == h.shape_recycle_epoch
+        && obj.prop_count == 0 && obj.prop_capacity >= n && obj.prop_hash == null
+        && !obj.gc.prototype_observed && !obj.flags.exotic_array) {
+        hobject::PropValue* slots = obj.prop_values();
+        for (uint i = 0; i < n; i++) {
+            mem::clear(&slots[i], (sz)hobject::PropValue::size);
+            h.store_slot(obj, &slots[i], vals[i]);
+            vals[i].incref_if_heap();
+        }
+        obj.prop_count = n;
+        obj.shape_id = path.end;
+        return true;
+    }
+    uint start = obj.shape_id;
+    bool shared = obj.prop_count == 0;
+    for (uint i = 0; i < n; i++) {
+        uint next = h.lookup_transition(obj.shape_id, keys[i], (char)hobject::PROP_FLAGS_WEC);
+        if (!obj.put_prop(keys[i], vals[i], hobject::PROP_FLAGS_WEC, h)) return false;
+        if (next == heap::SHAPE_NONE || obj.shape_id != next) shared = false;
+    }
+    if (shared) {
+        path.start = start;
+        path.end = obj.shape_id;
+        path.epoch = h.shape_recycle_epoch;
+        path.ready = true;
+    }
     return true;
 }
 
@@ -82,14 +130,10 @@ fn void native_url_construct(BuiltinContext* raw, void* user) {
     HString* str = input.get_heapptr();
     long flags   = str.is_ascii() ? url_fast_flags((String)str.ascii_bytes()) : -1;
     if (flags < 0) return web_initialize(ctx, cls);
-    TVal parts;
-    parts.set_number((double)flags);
-    if (!obj.put_prop(
-        cls.k_raw,
-        input,
-        hobject::PROP_FLAGS_WEC,
-        h
-    ) || !obj.put_prop(cls.k_flags, parts, hobject::PROP_FLAGS_WEC, h)) {
+    HString*[2] keys = { cls.k_raw, cls.k_flags };
+    TVal[2] vals     = { input, { } };
+    vals[1].set_number((double)flags);
+    if (!shape_path_put(&cls.shapes[0], obj, keys[..], vals[..], h)) {
         return ctx.throw_error(JsErrorKind.ERROR, "URL allocation failed");
     }
     ctx.ret(ctx.this_value());
@@ -229,14 +273,19 @@ fn void native_response_construct(BuiltinContext* raw, void* user) {
         cls.k_body,
         h
     )) || (!string_body && !web_can_assign(obj, cls.k_ct, h))) return web_initialize(ctx, cls);
+    HString*[2] keys;
+    TVal[2] vals;
+    uint n;
     if (!string_body) {
-        TVal null_value;
-        null_value.set_null();
-        if (!obj.put_prop(cls.k_ct, null_value, hobject::PROP_FLAGS_WEC, h)) {
-            return ctx.throw_error(JsErrorKind.ERROR, "Response allocation failed");
-        }
+        keys[n] = cls.k_ct;
+        vals[n++].set_null();
     }
-    if ((native_body || string_body) && !obj.put_prop(cls.k_body, body, hobject::PROP_FLAGS_WEC, h)) {
+    if (native_body || string_body) {
+        keys[n] = cls.k_body;
+        vals[n++] = body;
+    }
+    // One path per key list: body alone, _ct alone, or _ct then body.
+    if (!shape_path_put(&cls.shapes[string_body ? 0 : n], obj, keys[:n], vals[:n], h)) {
         return ctx.throw_error(JsErrorKind.ERROR, "Response allocation failed");
     }
     ctx.ret(ctx.this_value());
