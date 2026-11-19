@@ -18,3 +18,6 @@ vendor/libwebsockets.c3l
 
 # Sample app databases and SQLite sidecars.
 examples/taskboard/data/
+
+# Uploads from examples/upload
+examples/upload/uploads/
