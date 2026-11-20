@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>boomkat runtime · tomasi.studio</title>
+  <meta name="description" content="bkr is a small JavaScript runtime built on the boomkat engine, with web-standard APIs and permissions denied by default.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f6f6f6">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="boomkat runtime">
+  <meta property="og:description" content="bkr is a small JavaScript runtime built on the boomkat engine, with web-standard APIs and permissions denied by default.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../">
+      <svg class="mark" viewBox="0 0 7 7" width="14" height="14" shape-rendering="crispEdges" aria-hidden="true"><rect width="7" height="7" fill="#3d3d3d"/><g fill="#f6f6f6"><rect x="1" y="1" width="5" height="1"/><rect x="3" y="2" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="3" y="5" width="1" height="1"/></g></svg>
+      <span>tomasi.studio</span>
+    </a>
+  </header>
+
+  <main class="wrap" id="top">
+    <section class="hero">
+      <div class="hero-text">
+        <h1 class="title">boomkat runtime</h1>
+        <p class="lede">A small JavaScript runtime on the <a href="../boomkat/">boomkat</a> engine, uWebSockets and OpenSSL, with fine-grained permission control.</p>
+      </div>
+    </section>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">features</h2></div>
+      <dl class="facts">
+        <dt>permissions</dt><dd>--allow-net, --allow-read and --allow-write, scoped to hosts or paths</dd>
+        <dt>http</dt><dd>standards-based server with routes, TLS and WebSockets</dd>
+        <dt>TSX serving</dt><dd>transpiles TSX to browser JavaScript, with source maps</dd>
+        <dt>sqlite</dt><dd>optional built-in with prepared statements and transactions</dd>
+        <dt>workers</dt><dd>module workers that inherit the parent's permissions</dd>
+        <dt>packages</dt><dd>plain ESM - clean break from npm</dd>
+      </dl>
+    </section>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">benchmarks</h2></div>
+      <table class="bench">
+        <thead><tr><th scope="col">req/s</th><th scope="col">bkr</th><th scope="col">node</th><th scope="col">bun</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">hello</th><td>262,286</td><td>123,270</td><td>219,579</td></tr>
+          <tr><th scope="row">JSON</th><td>226,768</td><td>121,041</td><td>201,530</td></tr>
+          <tr><th scope="row">async immediate</th><td>185,002</td><td>143,194</td><td>181,451</td></tr>
+          <tr><th scope="row">async timer</th><td>117,869</td><td>75,852</td><td>114,169</td></tr>
+          <tr><th scope="row">echo 1 KB</th><td>174,470</td><td>95,804</td><td>167,456</td></tr>
+          <tr><th scope="row">stream 8 KB</th><td>93,613</td><td>85,327</td><td>109,454</td></tr>
+          <tr><th scope="row">file 4 KB</th><td>91,155</td><td>55,548</td><td>47,984</td></tr>
+        </tbody>
+      </table>
+      <p class="note">wrk -t2 -c128 on one machine, median of three runs. Each server runs the same workloads with its own HTTP API.</p>
+    </section>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">built-in modules</h2></div>
+      <dl class="facts">
+        <dt>http</dt><dd>serve, upgradeWebSocket</dd>
+        <dt>net</dt><dd>TCP and TLS connect, listen, DNS resolve</dd>
+        <dt>file</dt><dd>read, write, open, stat, list, mkdir, copy</dd>
+        <dt>process</dt><dd>args, env, stdio, spawn, run</dd>
+        <dt>path</dt><dd>join, resolve, relative, file URLs</dd>
+        <dt>crypto</dt><dd>random bytes, sha256, password hashing, subtle</dd>
+        <dt>typescript</dt><dd>type erasure and JSX lowering with source maps</dd>
+        <dt>test</dt><dd>test, describe, hooks and assertions</dd>
+      </dl>
+    </section>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">example</h2></div>
+      <pre class="code"><code><span class="c">// hello.js</span>
+<span class="k">import</span> { serve } <span class="k">from</span> <span class="s">"http"</span>;
+
+serve({
+  port: <span class="n">8080</span>,
+  fetch(req) {
+    <span class="k">return new</span> Response(<span class="s">"hello"</span>);
+  },
+});</code></pre>
+      <pre class="code shell"><code><span class="c">$</span> bkr --allow-net hello.js</code></pre>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span>&copy; 2026 tomasi.studio</span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
