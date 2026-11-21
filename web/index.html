@@ -15,6 +15,29 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="../styles.css">
+  <style>
+    .chart { --bkr: var(--ink); --bun: conic-gradient(var(--ink) 0 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0) 0 0 / 2px 2px; --node: conic-gradient(#a8a8a8 0 25%, transparent 0 50%, #a8a8a8 0 75%, transparent 0) 0 0 / 2px 2px; margin-bottom: 28px; font-variant-numeric: tabular-nums; }
+    .chart .s-bkr { --c: var(--bkr); } .chart .s-bun { --c: var(--bun); } .chart .s-node { --c: var(--node); }
+    .chart-key { display: flex; gap: 18px; margin: 0 0 14px calc(8rem + 8px); font-size: 10px; letter-spacing: 0.12em; color: var(--ink-2); }
+    .chart-key span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: -1px; border-radius: 1px; background: var(--c); }
+    .chart-key .unit { margin-left: auto; }
+    .chart-key .unit::before { display: none; }
+    .chart-row { display: grid; grid-template-columns: 8rem minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 9px 0; }
+    .chart-label { font-size: 12px; }
+    .chart-bars { display: grid; row-gap: 3px; padding-right: 6rem; }
+    .bar { display: flex; align-items: center; gap: 6px; height: 8px; }
+    .bar i { flex: none; height: 100%; background: var(--c); border-radius: 1px; }
+    .bar b { white-space: nowrap; font-weight: 400; font-size: 10px; line-height: 1; color: var(--ink-2); display: none; }
+    .chart-row:hover .bar b { display: inline; }
+    .bar em { white-space: nowrap; font-style: normal; font-size: 10px; line-height: 1; color: var(--ink-2); }
+    .bar.s-bkr b { font-weight: 500; color: var(--ink); }
+    .site-foot { margin-top: 160px; }
+    @media (max-width: 620px) { .site-foot { margin-top: 96px; } }
+    @media (max-width: 620px) {
+      .chart-key { margin-left: 0; }
+      .chart-row { grid-template-columns: 1fr; row-gap: 6px; }
+    }
+  </style>
 </head>
 <body>
   <header class="site-head">
@@ -47,23 +70,6 @@
     </section>
 
     <section class="work">
-      <div class="sec-head"><h2 class="label">benchmarks</h2></div>
-      <table class="bench">
-        <thead><tr><th scope="col">req/s</th><th scope="col">bkr</th><th scope="col">node</th><th scope="col">bun</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">hello</th><td>262,286</td><td>123,270</td><td>219,579</td></tr>
-          <tr><th scope="row">JSON</th><td>226,768</td><td>121,041</td><td>201,530</td></tr>
-          <tr><th scope="row">async immediate</th><td>185,002</td><td>143,194</td><td>181,451</td></tr>
-          <tr><th scope="row">async timer</th><td>117,869</td><td>75,852</td><td>114,169</td></tr>
-          <tr><th scope="row">echo 1 KB</th><td>174,470</td><td>95,804</td><td>167,456</td></tr>
-          <tr><th scope="row">stream 8 KB</th><td>93,613</td><td>85,327</td><td>109,454</td></tr>
-          <tr><th scope="row">file 4 KB</th><td>91,155</td><td>55,548</td><td>47,984</td></tr>
-        </tbody>
-      </table>
-      <p class="note">wrk -t2 -c128 on one machine, median of three runs. Each server runs the same workloads with its own HTTP API.</p>
-    </section>
-
-    <section class="work">
       <div class="sec-head"><h2 class="label">built-in modules</h2></div>
       <dl class="facts">
         <dt>http</dt><dd>serve, upgradeWebSocket</dd>
@@ -89,6 +95,104 @@ serve({
   },
 });</code></pre>
       <pre class="code shell"><code><span class="c">$</span> bkr --allow-net hello.js</code></pre>
+    </section>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">benchmarks</h2></div>
+      <div class="chart" role="img" aria-label="Requests per second for bkr, bun and node across six HTTP workloads; exact values in the table below">
+        <div class="chart-key" aria-hidden="true"><span class="s-bkr">bkr</span><span class="s-bun">bun</span><span class="s-node">node</span><span class="unit">req/s · ratio vs node</span></div>
+        <div class="chart-row"><span class="chart-label">hello</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 262k req/s"><i style="width:100.00%"></i><b>262k</b><em>2.1x</em></div>
+          <div class="bar s-bun" title="bun 220k req/s"><i style="width:83.72%"></i><b>220k</b></div>
+          <div class="bar s-node" title="node 123k req/s"><i style="width:47.00%"></i><b>123k</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">JSON</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 227k req/s"><i style="width:86.46%"></i><b>227k</b><em>1.9x</em></div>
+          <div class="bar s-bun" title="bun 202k req/s"><i style="width:76.84%"></i><b>202k</b></div>
+          <div class="bar s-node" title="node 121k req/s"><i style="width:46.15%"></i><b>121k</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">async</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 185k req/s"><i style="width:70.53%"></i><b>185k</b><em>1.3x</em></div>
+          <div class="bar s-bun" title="bun 181k req/s"><i style="width:69.18%"></i><b>181k</b></div>
+          <div class="bar s-node" title="node 143k req/s"><i style="width:54.59%"></i><b>143k</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">echo 1&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 174k req/s"><i style="width:66.52%"></i><b>174k</b><em>1.8x</em></div>
+          <div class="bar s-bun" title="bun 167k req/s"><i style="width:63.84%"></i><b>167k</b></div>
+          <div class="bar s-node" title="node 96k req/s"><i style="width:36.53%"></i><b>96k</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">stream 8&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 94k req/s"><i style="width:35.69%"></i><b>94k</b><em>1.1x</em></div>
+          <div class="bar s-bun" title="bun 109k req/s"><i style="width:41.73%"></i><b>109k</b></div>
+          <div class="bar s-node" title="node 85k req/s"><i style="width:32.53%"></i><b>85k</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">file 4&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 91k req/s"><i style="width:34.75%"></i><b>91k</b><em>1.6x</em></div>
+          <div class="bar s-bun" title="bun 48k req/s"><i style="width:18.29%"></i><b>48k</b></div>
+          <div class="bar s-node" title="node 56k req/s"><i style="width:21.18%"></i><b>56k</b></div>
+        </div></div>
+      </div>
+      <table class="bench">
+        <thead><tr><th scope="col">req/s</th><th scope="col">bkr</th><th scope="col">bun</th><th scope="col">node</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">hello</th><td>262,286</td><td>219,579</td><td>123,270</td></tr>
+          <tr><th scope="row">JSON</th><td>226,768</td><td>201,530</td><td>121,041</td></tr>
+          <tr><th scope="row">async</th><td>185,002</td><td>181,451</td><td>143,194</td></tr>
+          <tr><th scope="row">echo 1 KB</th><td>174,470</td><td>167,456</td><td>95,804</td></tr>
+          <tr><th scope="row">stream 8 KB</th><td>93,613</td><td>109,454</td><td>85,327</td></tr>
+          <tr><th scope="row">file 4 KB</th><td>91,155</td><td>47,984</td><td>55,548</td></tr>
+        </tbody>
+      </table>
+      <p class="note">wrk -t2 -c128 on one machine, median of three runs. Each server runs the same workloads with its own HTTP API.</p>
+    </section>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">memory</h2></div>
+      <div class="chart" role="img" aria-label="Peak memory in MB for bkr, bun and node across six HTTP workloads; exact values in the table below">
+        <div class="chart-key" aria-hidden="true"><span class="s-bkr">bkr</span><span class="s-bun">bun</span><span class="s-node">node</span><span class="unit">MB · ratio vs node</span></div>
+        <div class="chart-row"><span class="chart-label">hello</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 12 MB"><i style="width:5.70%"></i><b>12</b><em>89% less</em></div>
+          <div class="bar s-bun" title="bun 45 MB"><i style="width:21.64%"></i><b>45</b></div>
+          <div class="bar s-node" title="node 109 MB"><i style="width:52.03%"></i><b>109</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">JSON</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 12 MB"><i style="width:5.72%"></i><b>12</b><em>89% less</em></div>
+          <div class="bar s-bun" title="bun 45 MB"><i style="width:21.48%"></i><b>45</b></div>
+          <div class="bar s-node" title="node 109 MB"><i style="width:52.03%"></i><b>109</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">async</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 12 MB"><i style="width:5.95%"></i><b>12</b><em>94% less</em></div>
+          <div class="bar s-bun" title="bun 57 MB"><i style="width:27.18%"></i><b>57</b></div>
+          <div class="bar s-node" title="node 195 MB"><i style="width:93.54%"></i><b>195</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">echo 1&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 13 MB"><i style="width:6.39%"></i><b>13</b><em>89% less</em></div>
+          <div class="bar s-bun" title="bun 51 MB"><i style="width:24.31%"></i><b>51</b></div>
+          <div class="bar s-node" title="node 119 MB"><i style="width:56.94%"></i><b>119</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">stream 8&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 12 MB"><i style="width:5.77%"></i><b>12</b><em>89% less</em></div>
+          <div class="bar s-bun" title="bun 78 MB"><i style="width:37.39%"></i><b>78</b></div>
+          <div class="bar s-node" title="node 108 MB"><i style="width:51.80%"></i><b>108</b></div>
+        </div></div>
+        <div class="chart-row"><span class="chart-label">file 4&nbsp;KB</span><div class="chart-bars">
+          <div class="bar s-bkr" title="bkr 13 MB"><i style="width:6.22%"></i><b>13</b><em>94% less</em></div>
+          <div class="bar s-bun" title="bun 39 MB"><i style="width:18.83%"></i><b>39</b></div>
+          <div class="bar s-node" title="node 209 MB"><i style="width:100.00%"></i><b>209</b></div>
+        </div></div>
+      </div>
+      <table class="bench">
+        <thead><tr><th scope="col">MB</th><th scope="col">bkr</th><th scope="col">bun</th><th scope="col">node</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">hello</th><td>11.9 MB</td><td>45.2 MB</td><td>108.6 MB</td></tr>
+          <tr><th scope="row">JSON</th><td>11.9 MB</td><td>44.8 MB</td><td>108.6 MB</td></tr>
+          <tr><th scope="row">async</th><td>12.4 MB</td><td>56.7 MB</td><td>195.3 MB</td></tr>
+          <tr><th scope="row">echo 1 KB</th><td>13.3 MB</td><td>50.7 MB</td><td>118.9 MB</td></tr>
+          <tr><th scope="row">stream 8 KB</th><td>12.0 MB</td><td>78.1 MB</td><td>108.1 MB</td></tr>
+          <tr><th scope="row">file 4 KB</th><td>13.0 MB</td><td>39.3 MB</td><td>208.8 MB</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Peak server RSS, sampled every 100 ms during the wrk runs. Lower is better.</p>
     </section>
   </main>
 
