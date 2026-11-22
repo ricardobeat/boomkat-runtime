@@ -888,6 +888,7 @@ struct NativeHeadersRecord
 	HString* keys_key;
 	HString* symbol_key;
 	HString* iterator_key;
+	WebGet[12] gets;
 	JsValue[11] roots;
 }
 
@@ -1060,6 +1061,128 @@ fn void native_headers_record(BuiltinContext* raw, void* user)
 	};
 }
 
+// The intrinsics `new Headers(record)` calls: Object.keys, the string methods
+// it normalizes with, array iteration and Symbol.iterator. Native record
+// handling is only equivalent while all of them are the originals.
+fn bool web_record_intrinsics(BuiltinContext* raw)
+{
+	NativeHeadersRecord* cls   = &g_runtime.native_headers_record;
+	NativeHeadersBlob* headers = &g_runtime.native_headers_blob;
+	NativeHeadersParse* parse  = &g_runtime.native_headers_parse;
+	Heap* h = raw.heap;
+	WebGet* g = &cls.gets[0];
+	HObject* global = raw.global_env.bindings;
+	TVal object_ctor, string_ctor, symbol_ctor, symbol_iterator;
+	// Cached by shape: each lookup reads the live value, so patching any of
+	// these still declines.
+	return web_own_data_get(&g[0], global, cls.object_key, h, &object_ctor)
+		&& object_ctor.get_raw_bits() == cls.dependencies[1].get_raw_bits()
+		&& web_method_is_at(&g[1], object_ctor.get_heapptr(), cls.keys_key, cls.dependencies[2], h)
+		&& web_own_data_get(&g[2], global, parse.keys[1], h, &string_ctor)
+		&& string_ctor.get_raw_bits() == parse.dependencies[2].get_raw_bits()
+		&& web_method_is_at(&g[3], h.string_proto, parse.keys[3], parse.dependencies[4], h)
+		&& web_method_is_at(&g[4], h.string_proto, parse.keys[4], parse.dependencies[5], h)
+		&& web_method_is_at(&g[5], h.array_proto, builtins::ensure_iterator_symbol(h), cls.dependencies[3], h)
+		&& web_method_is_at(&g[6], h.array_iterator_proto, headers.next_key, cls.dependencies[4], h)
+		&& web_own_data_get(&g[7], global, cls.symbol_key, h, &symbol_ctor)
+		&& symbol_ctor.get_raw_bits() == cls.dependencies[5].get_raw_bits()
+		&& web_own_data_get(&g[8], symbol_ctor.get_heapptr(), cls.iterator_key, h, &symbol_iterator)
+		&& symbol_iterator.get_raw_bits() == cls.dependencies[6].get_raw_bits();
+}
+
+const uint WEB_RECORD_BLOB_MAX = 32;
+
+// recordBlob(record, implied): the header blob `new Headers(record)` would
+// serialize to ("name\nvalue\n" per entry, lowercase names, trimmed values),
+// followed by `implied` when the record has no content-type. Returns undefined
+// whenever the JS constructor could do something native cannot reproduce:
+// accessors, proxies, non-ASCII or non-string entries, set-cookie, names that
+// collide once lowercased, or text that would corrupt the blob framing.
+fn void native_record_blob(BuiltinContext* raw, void* user)
+{
+	@pool()
+	{
+		JsCtx ctx                = { .ctx = raw };
+		NativeHeadersRecord* cls = &g_runtime.native_headers_record;
+		TVal input               = ctx.arg(0).tv;
+		TVal implied             = ctx.arg(1).tv;
+		Heap* h                  = raw.heap;
+		if (!input.is_object() || !implied.is_string() || !((HString*)implied.get_heapptr()).is_ascii()) return;
+		if (!web_record_intrinsics(raw)) return;
+		HObject* record = input.get_heapptr();
+		if (record.get_class() != OBJECT || record.flags.exotic_proxyobj || record.array_used
+			|| (record.prototype && record.prototype != h.object_proto) || record.prop_count > WEB_RECORD_BLOB_MAX) return;
+		TVal iterator;
+		bool instance;
+		if (!web_instanceof(h, input, cls.dependencies[0], &instance) || instance
+			|| !web_data_or_missing(record, builtins::ensure_iterator_symbol(h), h, &iterator)
+			|| (!iterator.is_undefined() && !iterator.is_null())) return;
+		HString*[] keys = mem::temp_array(HString*, record.prop_count);
+		uint count      = builtins::collect_own_string_keys(h, record, keys.ptr);
+		if (count > WEB_RECORD_BLOB_MAX) return;
+		char[] implied_bytes = ((HString*)implied.get_heapptr()).ascii_bytes();
+		usz total = implied_bytes.len;
+		char[][WEB_RECORD_BLOB_MAX] names @noinit;
+		char[][WEB_RECORD_BLOB_MAX] values @noinit;
+		bool has_ct;
+		for (uint i = 0; i < count; i++)
+		{
+			TVal value;
+			if (!keys[i].is_ascii() || !web_own_data(record, keys[i], h, &value) || !value.is_string()
+				|| ((HString*)value.get_heapptr()).is_symbol() || !((HString*)value.get_heapptr()).is_ascii()) return;
+			char[] name  = keys[i].ascii_bytes();
+			char[] bytes = ((HString*)value.get_heapptr()).ascii_bytes();
+			usz start    = 0;
+			usz end      = bytes.len;
+			while (start < end && web_header_ascii_space(bytes[start])) start++;
+			while (end > start && web_header_ascii_space(bytes[end - 1])) end--;
+			char[] trimmed = bytes[start:end - start];
+			char[] lowered = mem::temp_array(char, name.len);
+			foreach (n, c : name)
+			{
+				if (c < 0x20 || c == 0x7f || c == ':') return;
+				lowered[n] = c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+			}
+			foreach (c : trimmed) if (c < 0x20 || c == 0x7f) return;
+			if (lowered.len == 0) return;
+			if ((String)lowered == "set-cookie") return;
+			for (uint j = 0; j < i; j++) if ((String)names[j] == (String)lowered) return;
+			if ((String)lowered == "content-type") has_ct = true;
+			names[i]  = lowered;
+			values[i] = trimmed;
+			total += lowered.len + trimmed.len + 2;
+		}
+		if (has_ct) total -= implied_bytes.len;
+		char[] out = mem::temp_array(char, (sz)total);
+		usz at = 0;
+		for (uint i = 0; i < count; i++)
+		{
+			out[at:names[i].len][..] = names[i][..];
+			at += names[i].len;
+			out[at++] = '\n';
+			out[at:values[i].len][..] = values[i][..];
+			at += values[i].len;
+			out[at++] = '\n';
+		}
+		if (!has_ct)
+		{
+			out[at:implied_bytes.len][..] = implied_bytes[..];
+			at += implied_bytes.len;
+		}
+		ctx.ret_string((String)out[:at]);
+	};
+}
+
+fn void js_native_record_blob(JsCtx ctx, void* user)
+{
+	if (g_runtime.native_headers_record.roots[0].is_empty()) return ctx.throw_error(TYPE, "Headers record initializer not installed");
+	HObject*? made = web_host_function(ctx.ctx.heap, "_recordBlob", &native_record_blob, null, 2, false);
+	if (catch made) return ctx.throw_error(ERROR, "recordBlob allocation failed");
+	JsArg result;
+	result.tv.set_object(made);
+	ctx.ret(result);
+}
+
 fn void js_native_headers_record(JsCtx ctx, void* user)
 {
 	NativeHeadersRecord* cls = &g_runtime.native_headers_record;
@@ -1093,4 +1216,5 @@ const Native[] WEB_NATIVES = {
     { "nativeHeadersBlob", &js_native_headers_blob, 4 },
     { "nativeHeadersFromBlob", &js_native_headers_from_blob, 9 },
     { "nativeHeadersRecord", &js_native_headers_record, 7 },
+    { "nativeRecordBlob", &js_native_record_blob, 0 },
 };

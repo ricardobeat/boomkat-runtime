@@ -873,6 +873,7 @@ def("URLSearchParams", URLSearchParams);
 // ---- Headers ----
 
 let initHeaderRecord;
+let recordBlob;
 class Headers {
     constructor(init) {
         this._map = new Map();
@@ -969,6 +970,7 @@ Object.defineProperty(Headers, "_fromBlob", {
 initHeaderRecord = bk.nativeHeadersRecord(Headers, Object, Object.keys,
     Array.prototype[Symbol.iterator], Object.getPrototypeOf([][Symbol.iterator]()).next,
     Symbol, Symbol.iterator);
+recordBlob = bk.nativeRecordBlob();
 hidden(Headers, { INTERNAL });
 def("Headers", Headers);
 
@@ -1128,9 +1130,29 @@ function initResponse(body, init) {
         if (status < 200 || status > 599) throw new RangeError("Invalid status: " + init.status);
         this.status = status;
         if (init.statusText !== undefined) this._statusText = String(init.statusText);
-        if (init.headers !== undefined) this._headers = init.headers instanceof Headers && init[INTERNAL] ? init.headers : new Headers(init.headers);
+        const given = init.headers;
+        if (given !== undefined) {
+            // A string body with a plain header record is snapshotted to its wire
+            // blob natively and kept in _headers as a string; the Headers object is
+            // only built if someone reads .headers.
+            const blob = typeof body === "string" && typeof given === "object" && given !== null ? recordBlob(given, BLOB_TEXT) : undefined;
+            if (blob !== undefined) {
+                this._headers = blob;
+                this._ct = null;
+                this._body = body;
+                return;
+            }
+            this._headers = given instanceof Headers && init[INTERNAL] ? given : new Headers(given);
+        }
     }
     if (typeof body === "string" && this._headers === null) {
+        this._body = body;
+    } else if (typeof body === "string") {
+        // String body with headers: the common handler shape. bodyInit would
+        // allocate a closure and go through the headers getter for one lookup.
+        this._ct = null;
+        const h = this._headers;
+        if (!h.has("content-type")) h.set("content-type", CT_TEXT);
         this._body = body;
     } else {
         this._ct = null;
@@ -1141,16 +1163,21 @@ function initResponse(body, init) {
 
 class ResponseFallback {
     get headers() {
-        if (this._headers === null) {
+        const h = this._headers;
+        if (h === null) {
             this._headers = new Headers(INTERNAL);
             if (this._ct !== null) this._headers.set("content-type", this._ct);
+        } else if (typeof h === "string") {
+            // The record's snapshot (see initResponse) becomes a Headers on first read.
+            this._headers = Headers._fromBlob(h);
         }
         return this._headers;
     }
     get statusText() { return this._statusText !== null ? this._statusText : (STATUS_TEXT[this.status] || ""); }
     get ok() { return this.status >= 200 && this.status < 300; }
     _blob() {
-        if (this._headers !== null) return this._headers._blob();
+        const h = this._headers;
+        if (h !== null) return typeof h === "string" ? h : h._blob();
         return this._ct === CT_TEXT ? BLOB_TEXT : this._ct === CT_JSON ? BLOB_JSON : "";
     }
     clone() {

@@ -400,7 +400,14 @@ fn bool respond_fast(Conn* c, JsValue result) {
     if (!status.is_fastint() || status.get_fastint() != 200) return false;
     TVal ct = web_get_at(&g_runtime.fast.gets[4], o, g_runtime.fast.k_ct, g_runtime.rt.rt.heap);
     String blob;
-    if (!headers.is_null()) {
+    if (headers.is_string()) {
+        // A header record snapshotted at construction (initResponse keeps it in
+        // _headers until .headers is read): already ASCII, framed and
+        // normalized, so it goes to the wire as is.
+        HString* snapshot = headers.get_heapptr();
+        if (!snapshot.is_ascii() || !ct.is_null()) return false;
+        blob = (String)snapshot.ascii_bytes();
+    } else if (!headers.is_null()) {
         bool match;
         if (!web_instanceof(g_runtime.rt.rt.heap, rv, g_runtime.fast.response_ctor, &match) || !match) return false;
         if (!headers.is_object() || !web_headers_blob(

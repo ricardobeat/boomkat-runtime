@@ -398,6 +398,74 @@ observe("Headers record receiver setter",()=>{
     finally{if(saved)Object.defineProperty(Headers.prototype,"_map",saved);else delete Headers.prototype._map;}
 });
 
+// A Response with a string body and a plain header record snapshots the record
+// natively and builds its Headers only when read. Everything observable must
+// match building the Headers eagerly.
+function recordView(r){return [[...r.headers],r._blob(),r.status,r.statusText,Object.keys(r)];}
+function recordLazyView(r){return [r._blob(),[...r.headers],r._blob(),Object.keys(r)];}
+for (const [name, record] of [
+    ["plain", {"Content-Type":"text/html","Server":"bkr"}],
+    ["implied content-type", {Server:" bkr "}],
+    ["empty", {}],
+    ["trimmed", {"X-A":"\t a b \n"}],
+    ["number value", {"x-n":5}],
+    ["set-cookie", {"Set-Cookie":"a=b",x:"y"}],
+    ["case collision", {A:"1",a:"2"}],
+    ["newline value", {a:"1\nb: 2"}],
+    ["non-ascii value", {a:"caf\u00e9"}],
+    ["colon name", {"a:b":"1"}],
+    ["getter", {get a(){return "g";}}],
+    ["array pairs", [["a","1"]]],
+    ["Headers", new Headers({a:"1"})],
+]) {
+    observe("Response record "+name,()=>recordView(new Response("x",{headers:record})));
+    observe("Response record lazy "+name,()=>recordLazyView(new Response("x",{headers:record})));
+}
+observe("Response record init",()=>recordView(new Response("x",{status:201,statusText:"Made",headers:{a:"1"}})));
+observe("Response record non-string body",()=>recordView(new Response(new Uint8Array(2),{headers:{a:"1"}})));
+observe("Response record snapshot",()=>{
+    const record={a:"1"},r=new Response("x",{headers:record});record.a="2";record.b="3";
+    return [[...r.headers],r._blob()];
+});
+observe("Response record mutation",()=>{
+    const r=new Response("x",{headers:{a:"1"}});r.headers.set("b","2");r.headers.delete("a");
+    return [r._blob(),[...r.headers]];
+});
+observe("Response record clone",()=>{
+    const r=new Response("x",{headers:{a:"1"}}),c=r.clone();
+    return [r._blob(),c._blob(),[...c.headers]];
+});
+observe("Response record reuse",()=>{
+    const record={"content-type":"text/plain",server:"bkr"};
+    const blobs=[0,1,2].map(()=>new Response("x",{headers:record})._blob());
+    return [blobs,JSON.stringify(record)];
+});
+for (const [what, target, key] of [["String.prototype","trim"],["String.prototype","toLowerCase"],["Object","keys"]].map(([w,k])=>[w,w==="Object"?Object:String.prototype,k])) {
+    observe("Response record patched "+what+"."+key,()=>{
+        const saved=Object.getOwnPropertyDescriptor(target,key);let calls=0;
+        try {
+            Object.defineProperty(target,key,{configurable:true,get(){calls++;return saved.value;}});
+            const r=new Response("x",{headers:{A:" 1 "}});
+            return [r._blob(),calls>0];
+        } finally {Object.defineProperty(target,key,saved);}
+    });
+}
+observe("Response record patched trim result",()=>{
+    const saved=String.prototype.trim;
+    try {String.prototype.trim=function(){return "patched";};return recordView(new Response("x",{headers:{a:" 1 "}}));}
+    finally {String.prototype.trim=saved;}
+});
+observe("Response record iterator on record",()=>{
+    const record={a:"1"};Object.defineProperty(record,Symbol.iterator,{value:function*(){yield ["z","9"];}});
+    return recordView(new Response("x",{headers:record}));
+});
+observe("Response record Array iterator patched",()=>{
+    const saved=Array.prototype[Symbol.iterator];let calls=0;
+    try {Array.prototype[Symbol.iterator]=function(){calls++;return saved.call(this);};
+        const r=new Response("x",{headers:{a:"1"}});return [r._blob(),calls];}
+    finally {Array.prototype[Symbol.iterator]=saved;}
+});
+
 const actual = rows.map(row => JSON.stringify(row));
 if (args[0] === "update") {
     await write(import.meta.url.replace(/\.js$/, ".expected.json"), "[\n" + actual.join(",\n") + "\n]\n");
