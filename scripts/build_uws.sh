@@ -88,6 +88,37 @@ PY
 
 # A TLS peer that sends close_notify right behind its last records made
 # uSockets drop the data decoded in that same call. Emit it before closing.
+# Read gate: the runtime bounds JS work per loop iteration. Deferring a request
+# after uWS has parsed it breaks pipelining (uWS closes a socket that parses a
+# second request while the first response is pending), so the budget is
+# enforced here instead: while the gate returns nonzero a readable socket is
+# skipped, and its data waits in the kernel (polling is level-triggered) for
+# the next iteration. Every request in one read is then dispatched in order.
+python3 - "$UWS/uSockets/src/loop.c" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+s = p.read_text()
+decl = """/* Runtime-owned gate: nonzero postpones reading a socket to the next loop iteration. */
+int (*us_runtime_read_gate)(void) = 0;
+void us_runtime_set_read_gate(int (*gate)(void)) { us_runtime_read_gate = gate; }
+
+"""
+fn = "void us_internal_dispatch_ready_poll(struct us_poll_t *p, int error, int events) {"
+use = """            if (events & LIBUS_SOCKET_READABLE) {
+                if (us_runtime_read_gate && us_runtime_read_gate()) {
+                    return;
+                }
+"""
+old = "            if (events & LIBUS_SOCKET_READABLE) {\n"
+if decl not in s:
+    if fn not in s or s.count(old) != 1:
+        raise SystemExit('unrecognized uSockets readable dispatch')
+    s = s.replace(fn, decl + fn, 1)
+    s = s.replace(old, use, 1)
+p.write_text(s)
+PY
+
 python3 - "$UWS/uSockets/src/crypto/openssl.c" <<'PY'
 import sys
 p = sys.argv[1]

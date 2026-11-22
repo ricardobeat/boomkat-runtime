@@ -53,6 +53,8 @@ extern fn void uws_res_end_static(UwsRes* res, char* status, sz status_len,
     char* headers, sz headers_len, char* body, sz body_len, bool empty);
 extern fn void uws_res_cork(UwsRes* res, Callback cb, void* user);
 extern fn void uws_loop_on_pre(Callback cb, void* user);
+alias ReadGate = fn CInt();
+extern fn void us_runtime_set_read_gate(ReadGate gate);
 
 const sz MAX_REQUEST_BODY = 16 * 1024 * 1024;
 const int MAX_HEADERS     = 64;
@@ -129,7 +131,13 @@ struct Conn {
     String ws_ext;
 }
 
-const ulong HTTP_TURN_NS = 2_000_000;
+// Soft budget per loop iteration: once spent, the uSockets read gate skips
+// readable sockets until the next iteration. It acts between reads, so every
+// request parsed from one read still dispatches synchronously, which uWS
+// requires of pipelined requests. The hard budget bounds a single read: past
+// it, requests are queued, and uWS closes a connection that pipelined more.
+const ulong HTTP_TURN_NS = 5_000_000;
+const ulong HTTP_HARD_TURN_NS = 100_000_000;
 
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
 
@@ -168,6 +176,7 @@ fn void? init_http() {
     g_runtime.spare.init(mem, 256);
     g_runtime.http_queue.init(mem, 256);
     uws_loop_on_pre(&http_turn_reset, &g_runtime.http_queue);
+    us_runtime_set_read_gate(&http_read_gate);
     foreach (i, m : METHODS) g_runtime.methods[i] = g_runtime.rt.string(m)!;
     g_runtime.http_fulfilled = bk_get("httpFulfilled")!;
     g_runtime.http_rejected = bk_get("httpRejected")!;
@@ -907,6 +916,11 @@ fn void js_req_remote(JsCtx ctx, void* udata) {
 
 fn void http_turn_reset(void* user) => g_runtime.http_turn_ns = 0;
 
+fn CInt http_read_gate() {
+    ulong started = g_runtime.http_turn_ns;
+    return (started && now_ns() - started >= HTTP_TURN_NS) ? 1 : 0;
+}
+
 fn void http_queue_arm() {
     if (g_runtime.http_queue_armed) return;
     g_runtime.http_queue_armed = true;
@@ -948,7 +962,7 @@ fn void http_queue_drain(void* user) {
 fn void http_dispatch_ready(Conn* c, String method, char[] body, bool has_body) {
     ulong now = now_ns();
     if (!g_runtime.http_turn_ns) g_runtime.http_turn_ns = now;
-    if (g_runtime.http_queue.len() || now - g_runtime.http_turn_ns >= HTTP_TURN_NS) {
+    if (g_runtime.http_queue.len() || now - g_runtime.http_turn_ns >= HTTP_HARD_TURN_NS) {
         c.capture(method);
         g_runtime.http_queue.push(c.id);
         http_queue_arm();
