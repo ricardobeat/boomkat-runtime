@@ -54,6 +54,8 @@ extern fn void uws_res_end_static(UwsRes* res, char* status, sz status_len,
 extern fn void uws_res_cork(UwsRes* res, Callback cb, void* user);
 extern fn void uws_loop_on_pre(Callback cb, void* user);
 alias ReadGate = fn CInt();
+extern fn CInt us_poll_fd(void* poll);
+extern fn sz recv(CInt fd, void* buf, usz len, CInt flags);
 extern fn void us_runtime_set_read_gate(ReadGate gate);
 
 const sz MAX_REQUEST_BODY = 16 * 1024 * 1024;
@@ -138,6 +140,10 @@ struct Conn {
 // it, requests are queued, and uWS closes a connection that pipelined more.
 const ulong HTTP_TURN_NS = 5_000_000;
 const ulong HTTP_HARD_TURN_NS = 100_000_000;
+// When the time since the previous request began is at least this long, the
+// handlers are expensive enough that a request is first checked for a departed
+// client (see peer_gone). Cheap handlers never pay the syscall.
+const ulong HTTP_PEER_GAP_NS = 100_000;
 
 const String[] METHODS = { "GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS", "PATCH" };
 
@@ -914,11 +920,25 @@ fn void js_req_remote(JsCtx ctx, void* udata) {
 
 // ---- uWS callbacks ----
 
-fn void http_turn_reset(void* user) => g_runtime.http_turn_ns = 0;
+fn void http_turn_reset(void* user) {
+    g_runtime.http_turn_ns = 0;
+    g_runtime.http_prev_ns = 0;
+}
 
 fn CInt http_read_gate() {
     ulong started = g_runtime.http_turn_ns;
     return (started && now_ns() - started >= HTTP_TURN_NS) ? 1 : 0;
+}
+
+// True when the client has already closed its end: uWS treats a FIN as a close
+// and drops the response, so running the handler is wasted work. Without this,
+// the unread backlog of a client that disconnected mid-burst runs one handler
+// per connection before its EOF is read, stalling the loop for the next burst.
+fn bool peer_gone(UwsRes* res) {
+    char probe;
+    CInt peek = 0x2;                       // MSG_PEEK
+    CInt nowait = env::DARWIN ? 0x80 : 0x40; // MSG_DONTWAIT
+    return recv(us_poll_fd(res), &probe, 1, peek | nowait) == 0;
 }
 
 fn void http_queue_arm() {
@@ -962,6 +982,11 @@ fn void http_queue_drain(void* user) {
 fn void http_dispatch_ready(Conn* c, String method, char[] body, bool has_body) {
     ulong now = now_ns();
     if (!g_runtime.http_turn_ns) g_runtime.http_turn_ns = now;
+    // Only a request that actually runs advances the timestamp, so a run of
+    // departed clients keeps being checked after the first slow handler.
+    ulong prev = g_runtime.http_prev_ns;
+    if (prev && now - prev >= HTTP_PEER_GAP_NS && c.res && peer_gone(c.res)) return;
+    g_runtime.http_prev_ns = now;
     if (g_runtime.http_queue.len() || now - g_runtime.http_turn_ns >= HTTP_HARD_TURN_NS) {
         c.capture(method);
         g_runtime.http_queue.push(c.id);

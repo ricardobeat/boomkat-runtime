@@ -50,6 +50,7 @@ struct RuntimeState {
     sz http_queue_at;
     bool http_queue_armed;
     ulong http_turn_ns;
+    ulong http_prev_ns;
     JsValue[METHODS.len] methods;
     JsValue dispatch;
     JsValue handled;
