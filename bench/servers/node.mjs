@@ -14,12 +14,10 @@ http.createServer(async (req, res) => {
             res.setHeader("content-type", "application/json");
             return res.end(json);
         case "/async":
-            await Promise.resolve();
             await new Promise((r) => setImmediate(r));
             res.setHeader("content-type", "application/json");
             return res.end('{"ok":true}');
         case "/timer":
-            await Promise.resolve();
             await new Promise((r) => setTimeout(r, 0));
             res.setHeader("content-type", "application/json");
             return res.end('{"ok":true}');

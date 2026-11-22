@@ -10,11 +10,9 @@ Bun.serve({
             case "/hello": return new Response("hello world");
             case "/json": return Response.json(data);
             case "/async":
-                await Promise.resolve();
                 await new Promise((r) => setImmediate(r));
                 return Response.json({ ok: true });
             case "/timer":
-                await Promise.resolve();
                 await new Promise((r) => setTimeout(r, 0));
                 return Response.json({ ok: true });
             case "/echo": return new Response(await req.bytes());
