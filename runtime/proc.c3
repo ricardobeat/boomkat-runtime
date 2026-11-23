@@ -92,7 +92,7 @@ fn void js_main(JsCtx ctx, void* udata) => ctx.ret_string(g_runtime.main);
 
 fn void js_pid(JsCtx ctx, void* udata) => ctx.ret_number(getpid());
 
-extern fn CInt ns_get_executable_path(char* buf, uint* size) @cname("_NSGetExecutablePath") @if(env::DARWIN);
+extern fn CInt ns_get_executable_path(char* buf, uint* size) @cname("_NSGetExecutablePath") @feat(DARWIN);
 
 // The running binary, so scripts can start another bkr.
 fn void js_exec_path(JsCtx ctx, void* udata) {

@@ -4,18 +4,18 @@ module bkr;
 
 import libc;
 
-extern fn ulong clock_gettime_nsec_np(CInt clock) @if(env::DARWIN);
-extern fn ZString** ns_environ() @cname("_NSGetEnviron") @if(env::DARWIN);
-const CInt CLOCK_MONOTONIC_RAW @if(env::DARWIN) = 4;
+extern fn ulong clock_gettime_nsec_np(CInt clock) @feat(DARWIN);
+extern fn ZString** ns_environ() @cname("_NSGetEnviron") @feat(DARWIN);
+const CInt CLOCK_MONOTONIC_RAW @feat(DARWIN) = 4;
 const CInt EHOSTUNREACH_CODE = env::DARWIN ? 65 : 113;
 
-struct ClockTimespec @if(!env::DARWIN) {
+struct ClockTimespec @feat(!DARWIN) {
     long sec;
     long nsec;
 }
-extern fn CInt clock_gettime(CInt clock, ClockTimespec* ts) @if(!env::DARWIN);
-extern ZString* environ @if(!env::DARWIN);
-const CInt CLOCK_MONOTONIC @if(!env::DARWIN) = 1;
+extern fn CInt clock_gettime(CInt clock, ClockTimespec* ts) @feat(!DARWIN);
+extern ZString* environ @feat(!DARWIN);
+const CInt CLOCK_MONOTONIC @feat(!DARWIN) = 1;
 
 // open(2) flags and address families. Darwin and Linux number them
 // differently; O_NOFOLLOW_ANY refuses a symlink in any path component on

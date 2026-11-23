@@ -5,14 +5,14 @@ module bkr;
 
 import std::io;
 
-extern fn CInt sandbox_init(ZString profile, ulong flags, char** error) @if(env::DARWIN);
-extern fn void sandbox_free_error(char* error) @if(env::DARWIN);
+extern fn CInt sandbox_init(ZString profile, ulong flags, char** error) @feat(DARWIN);
+extern fn void sandbox_free_error(char* error) @feat(DARWIN);
 
 bool g_sandbox = true;
 
 fn bool any_grant(Perm p) => grant(p).all || grant(p).allow.len() > 0;
 
-fn String sandbox_profile() @if(env::DARWIN) {
+fn String sandbox_profile() @feat(DARWIN) {
     DString s = dstring::temp();
     s.append("(version 1)(allow default)");
     if (!any_grant(NET)) s.append("(deny network*)");
