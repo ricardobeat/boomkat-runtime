@@ -16,8 +16,9 @@ vendor/uws.c3l/*/
 # scripts/setup_vendor.sh re-applies the one edit this project needs to it.
 vendor/libwebsockets.c3l
 
-# Sample app databases and SQLite sidecars.
+# Sample app data
 examples/taskboard/data/
+examples/upload/uploads/
 
 # Staging dir for `just publish-site`
 .site/

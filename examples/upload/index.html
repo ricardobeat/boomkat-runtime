@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f4; --fg: #1d1d1b; --muted: #77756f; --card: #ffffff;
+    --line: #d9d7d0; --accent: #2d6cdf; --accent-fg: #ffffff; --bad: #c0392b; --ok: #1e8449;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --fg: #ecebe7; --muted: #9a978f; --card: #1f1f1c;
+      --line: #3a3934; --accent: #5b8ff0; --accent-fg: #0b0b0a; --bad: #ff7b6b; --ok: #6fcf97;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --fg: #ecebe7; --muted: #9a978f; --card: #1f1f1c;
+    --line: #3a3934; --accent: #5b8ff0; --accent-fg: #0b0b0a; --bad: #ff7b6b; --ok: #6fcf97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .drop {
+    border: 2px dashed var(--line); border-radius: 10px; padding: 32px 16px; text-align: center;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .drop p { margin: 0 0 12px; color: var(--muted); }
+  button {
+    font: inherit; border-radius: 7px; border: 1px solid var(--line); background: var(--card);
+    color: var(--fg); padding: 7px 14px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  button.link { border: none; background: none; color: var(--muted); padding: 2px 6px; }
+  button.link:hover:not(:disabled) { color: var(--bad); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: none; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .size { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .bar { grid-column: 1 / -1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+  .status { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+  .status.err { color: var(--bad); }
+  .status.ok { color: var(--ok); }
+  .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+  .actions .hint { color: var(--muted); font-size: 13px; }
+  a { color: var(--accent); }
+  .empty { color: var(--muted); padding: 8px 0; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Upload files</h1>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <p>Drag files here, or</p>
+      <button id="browse" type="button">Browse…</button>
+      <input id="picker" type="file" multiple>
+    </div>
+
+    <ul id="pending"></ul>
+
+    <div class="actions">
+      <span class="hint" id="hint">No files selected</span>
+      <button id="upload" class="primary" type="button" disabled>Upload</button>
+    </div>
+  </div>
+
+  <h2>Uploaded</h2>
+  <div class="card">
+    <ul id="uploaded"><li class="empty">Loading…</li></ul>
+  </div>
+</main>
+
+<script>
+(() => {
+  const MAX_BYTES = 200 * 1024 * 1024;
+  const $ = (id) => document.getElementById(id);
+  const drop = $("drop"), picker = $("picker"), browse = $("browse");
+  const pendingEl = $("pending"), uploadedEl = $("uploaded"), uploadBtn = $("upload"), hint = $("hint");
+
+  let staged = [];   // { file, row, bar, status, state }
+  let busy = false;
+
+  const fmt = (n) => {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KiB";
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MiB";
+    return (n / 1024 / 1024 / 1024).toFixed(2) + " GiB";
+  };
+
+  function el(tag, props = {}, children = []) {
+    const node = document.createElement(tag);
+    Object.assign(node, props);
+    for (const c of children) node.append(c);
+    return node;
+  }
+
+  function stage(files) {
+    for (const file of Array.from(files)) {
+      if (staged.some((s) => s.file.name === file.name && s.file.size === file.size)) continue;
+      const entry = { file, state: "ready" };
+      const remove = el("button", { type: "button", className: "link", textContent: "Remove" });
+      remove.onclick = () => unstage(entry);
+      const bar = el("i");
+      entry.bar = bar;
+      entry.status = el("div", { className: "status", textContent: file.size > MAX_BYTES ? "Too large (max 200 MiB)" : "Ready" });
+      if (file.size > MAX_BYTES) { entry.state = "error"; entry.status.classList.add("err"); }
+      entry.row = el("li", {}, [
+        el("span", { className: "name", textContent: file.name, title: file.name }),
+        el("span", { className: "size", textContent: fmt(file.size) }),
+        remove,
+        el("div", { className: "bar" }, [bar]),
+        entry.status,
+      ]);
+      staged.push(entry);
+      pendingEl.append(entry.row);
+    }
+    refresh();
+  }
+
+  function unstage(entry) {
+    if (busy) return;
+    staged = staged.filter((s) => s !== entry);
+    entry.row.remove();
+    refresh();
+  }
+
+  function refresh() {
+    const ready = staged.filter((s) => s.state !== "error" && s.state !== "done");
+    uploadBtn.disabled = busy || ready.length === 0;
+    hint.textContent = staged.length === 0
+      ? "No files selected"
+      : `${staged.length} file${staged.length === 1 ? "" : "s"} selected`;
+    if (ready.length === 0 && staged.length > 0 && !busy) hint.textContent = "Nothing left to upload";
+  }
+
+  function send(entry) {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload?name=" + encodeURIComponent(entry.file.name));
+      xhr.setRequestHeader("content-type", "application/octet-stream");
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) entry.bar.style.width = (e.loaded / e.total * 100) + "%";
+      };
+      xhr.onload = () => {
+        let message = "";
+        try { message = JSON.parse(xhr.responseText).error || ""; } catch {}
+        if (xhr.status === 201) {
+          entry.bar.style.width = "100%";
+          entry.state = "done";
+          entry.status.textContent = "Uploaded";
+          entry.status.className = "status ok";
+          resolve(true);
+        } else {
+          entry.state = "error";
+          entry.status.textContent = "Failed: " + (message || "HTTP " + xhr.status);
+          entry.status.className = "status err";
+          resolve(false);
+        }
+      };
+      xhr.onerror = () => {
+        entry.state = "error";
+        entry.status.textContent = "Failed: network error";
+        entry.status.className = "status err";
+        resolve(false);
+      };
+      xhr.send(entry.file);
+    });
+  }
+
+  async function uploadAll() {
+    if (busy) return;
+    busy = true;
+    uploadBtn.textContent = "Uploading…";
+    refresh();
+    const queue = staged.filter((s) => s.state === "ready");
+    let ok = 0;
+    for (const entry of queue) {
+      entry.state = "uploading";
+      entry.status.textContent = "Uploading…";
+      if (await send(entry)) ok++;
+    }
+    busy = false;
+    uploadBtn.textContent = "Upload";
+    hint.textContent = `${ok} of ${queue.length} uploaded`;
+    // Keep finished rows visible briefly, then drop them from the staging list.
+    staged = staged.filter((s) => s.state === "error" || s.state === "ready");
+    for (const s of [...pendingEl.children]) {
+      const owner = [...staged].find((s2) => s2.row === s);
+      if (!owner) setTimeout(() => s.remove(), 1500);
+    }
+    refresh();
+    loadUploaded();
+  }
+
+  async function loadUploaded() {
+    const res = await fetch("/api/files");
+    const files = res.ok ? await res.json() : [];
+    uploadedEl.replaceChildren();
+    if (files.length === 0) {
+      uploadedEl.append(el("li", { className: "empty", textContent: "No files yet" }));
+      return;
+    }
+    for (const f of files) {
+      const link = el("a", { href: "/files/" + encodeURIComponent(f.name), textContent: f.name, title: f.name, className: "name" });
+      uploadedEl.append(el("li", {}, [link, el("span", { className: "size", textContent: fmt(f.size) })]));
+    }
+  }
+
+  // Drag and drop
+  let depth = 0;
+  drop.addEventListener("dragenter", (e) => { e.preventDefault(); depth++; drop.classList.add("over"); });
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  drop.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; drop.classList.remove("over"); } });
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    depth = 0;
+    drop.classList.remove("over");
+    if (e.dataTransfer.files.length) stage(e.dataTransfer.files);
+  });
+  // Stop a miss outside the drop zone from navigating the page away.
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+
+  // Browse
+  browse.onclick = () => picker.click();
+  picker.onchange = () => { stage(picker.files); picker.value = ""; };
+
+  uploadBtn.onclick = uploadAll;
+  refresh();
+  loadUploaded();
+})();
+</script>
+</body>
+</html>
