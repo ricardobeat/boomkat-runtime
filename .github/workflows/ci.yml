@@ -1,0 +1,141 @@
+name: CI
+
+# Builds bkr on macOS arm64, Linux x86-64 and Linux arm64. A v* tag also
+# packages the binaries and publishes a GitHub release, which is what
+# web/install.sh downloads.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  C3C_VERSION: '0.8.6'
+  UWS_VERSION: v20.80.0
+  # The engine is compiled from source (project.json reads ../boomkat), so
+  # builds track its main branch. Override with a branch, tag or sha via
+  # workflow_dispatch if needed; the sha used is printed in the build log.
+  ENGINE_REPO: ricardobeat/boomkat
+  ENGINE_REF: main
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-aarch64
+            runner: macos-26
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      # project.json refers to the engine as ../boomkat, so both repos sit side
+      # by side under the workspace.
+      - uses: actions/checkout@v5
+        with:
+          path: boomkat-runtime
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          ref: ${{ env.ENGINE_REF }}
+          path: boomkat
+
+      # The engine repo's toolchain action installs c3c, cached per platform,
+      # and builds it from source on linux-arm64, where upstream ships no binary.
+      - uses: ./boomkat/.github/actions/toolchain
+        with:
+          c3c-version: ${{ env.C3C_VERSION }}
+
+      - name: Install system packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libssl-dev zlib1g-dev
+
+      - name: Install system packages (macOS)
+        if: runner.os == 'macOS'
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+
+      - name: Fetch uWebSockets
+        working-directory: boomkat-runtime
+        run: |
+          git clone --depth 1 --branch "$UWS_VERSION" --recurse-submodules \
+            --shallow-submodules -j4 \
+            https://github.com/uNetworking/uWebSockets.git vendor/uWebSockets
+
+      - name: Build native shim
+        working-directory: boomkat-runtime
+        run: bash scripts/build_uws.sh
+
+      - name: Build bkr
+        working-directory: boomkat-runtime
+        run: |
+          echo "engine: $(git -C ../boomkat rev-parse HEAD)"
+          c3c build bkr
+          file out/bkr
+
+      - name: Smoke test
+        working-directory: boomkat-runtime
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/smoke.js" <<'JS'
+          import { serve } from "http";
+          const server = serve({ port: 18080, fetch: () => new Response("hello") });
+          const res = await fetch("http://127.0.0.1:18080/");
+          console.log(await res.text());
+          await server.stop();
+          JS
+          out=$(out/bkr --allow-net --no-sandbox "$RUNNER_TEMP/smoke.js")
+          echo "$out"
+          test "$out" = hello
+
+      - name: Package
+        working-directory: boomkat-runtime
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          name=bkr-${{ matrix.target }}
+          tar -czf "dist/$name.tar.gz" -C out bkr
+          (cd dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
+          cat "dist/$name.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bkr-${{ matrix.target }}
+          path: boomkat-runtime/dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bkr-*
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes

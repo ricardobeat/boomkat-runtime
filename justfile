@@ -4,7 +4,7 @@ default:
 # Publish web/ to https://tomasi.studio/boomkat-runtime/ (goes live immediately)
 publish-site:
     rm -rf .site && mkdir -p .site/boomkat-runtime
-    cp web/index.html .site/boomkat-runtime/
+    cp web/index.html web/install.sh .site/boomkat-runtime/
     scripts/publish-site.sh boomkat-runtime boomkat-runtime .site
     rm -rf .site
 
