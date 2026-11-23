@@ -66,6 +66,27 @@ The `typescript` module uses Boomkat's parser to erase types, lower JSX, validat
 syntax and print browser JavaScript. It neither executes the source nor resolves
 its imports. No external compiler or package manager is involved.
 
+Serve a client directory with a directory route. The path must end in `/*`;
+requesting `/app/main.js` tries `main.js`, then `main.tsx`, `main.ts`,
+`main.jsx`, `main.mts` and `main.cts`, transpiles the source and serves it as
+`text/javascript` with a linked source map at `/app/main.js.map`:
+
+```js
+import { serve } from "http";
+
+serve({
+    port: 8080,
+    routes: { "/app/*": { dir: "./client", transpile: true } },
+});
+```
+
+Transpiled output is cached in memory and re-checked by mtime and size, so an
+edit is picked up on the next request. `sourceMaps: "inline"` embeds the map and
+`false` omits it. Other files are served as-is with an extension-based
+`Content-Type`; every response carries a weak `ETag`.
+
+To transpile a single entry yourself and attach it as a static response:
+
 ```ts
 import { transpile } from "typescript";
 import { readText } from "file";
@@ -344,6 +365,14 @@ PATCH, DELETE, OPTIONS, TRACE and CONNECT; GET supplies HEAD when HEAD is absent
 A route set to `false` delegates to the fallback handler. Static responses must
 have unused, buffered bodies; stream and file bodies belong in handlers. The
 existing `static` option remains available for fixed GET/HEAD assets.
+
+A route path ending in `/*` can instead map to `{ dir, transpile, sourceMaps }`
+to serve a directory. `.js` requests fall back to TypeScript and JSX sources,
+which are transpiled and cached in memory until their mtime or size changes;
+`sourceMaps` is `"linked"` (default, served at `<path>.map`), `"inline"` or
+`false`. Responses use an extension-based `Content-Type` and a weak `ETag`, and
+the bare prefix redirects to the trailing-slash form. Validation:
+`python3 tests/run_http_dir.py`.
 
 ### Optional SQLite
 

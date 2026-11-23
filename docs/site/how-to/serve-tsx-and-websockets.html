@@ -27,7 +27,7 @@
     <p class="label">how-to guide</p>
     <h1>Serve TSX, HTTPS, and WebSockets</h1>
     <p class="lede">
-      Transpile browser TypeScript and JSX at startup with source maps, upgrade HTTP requests to WebSockets, and serve HTTPS with PEM certificates.
+      Transpile browser TypeScript and JSX with source maps, upgrade HTTP requests to WebSockets, and serve HTTPS with PEM certificates.
     </p>
 
     <div class="band" aria-hidden="true"></div>
@@ -35,7 +35,24 @@
     <h2>Transpile TypeScript and TSX for the browser</h2>
     <p>
       The built-in <code>typescript</code> module uses Boomkat's parser to strip types and lower JSX to JavaScript without an external build step.
-      Compile your client entry at startup and attach it as a static buffered <code>Response</code> in <code>routes</code> so it is served directly from native memory without entering JavaScript on each request:
+      Serve a whole client directory with one route. The path must end in <code>/*</code>; requesting <code>/app/main.js</code> tries <code>main.js</code>, then <code>main.tsx</code>, <code>main.ts</code>, <code>main.jsx</code>, <code>main.mts</code> and <code>main.cts</code>, transpiles the source, and serves it as <code>text/javascript</code>:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">serve</span> } <span class="ink-s2">from</span> <span class="ink-s9">"http"</span>;
+
+<span class="ink-s5">serve</span>({
+  <span class="ink-s2">port</span>: <span class="ink-s5">8080</span>,
+  <span class="ink-s2">routes</span>: {
+    <span class="ink-s9">"/app/*"</span>: { <span class="ink-s2">dir</span>: <span class="ink-s9">"./client"</span>, <span class="ink-s2">transpile</span>: <span class="ink-s5">true</span> },
+  },
+});</code></pre>
+    <p>
+      Transpiled output is cached in memory and re-checked by mtime and size, so an edit is picked up on the next request without restarting.
+      Linked source maps are served at <code>/app/main.js.map</code>; pass <code>sourceMaps: "inline"</code> to embed the map, or <code>false</code> to omit it.
+      Other files are served as-is with an extension-based <code>Content-Type</code>, and every response carries a weak <code>ETag</code>.
+      Automatic JSX emits imports from <code>&lt;jsxImportSource&gt;/jsx-runtime</code>; include an <code>importmap</code> in your HTML so the browser resolves bare specifiers to your served vendor routes.
+    </p>
+    <p>
+      To transpile a single entry at startup and attach it as a static buffered <code>Response</code> instead:
     </p>
     <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">serve</span> } <span class="ink-s2">from</span> <span class="ink-s9">"http"</span>;
 <span class="ink-s2">import</span> { <span class="ink-s2">readText</span> } <span class="ink-s2">from</span> <span class="ink-s9">"file"</span>;
@@ -60,7 +77,6 @@
 });</code></pre>
     <p>
       For a single self-contained file during development, pass <code>{ sourceMap: "inline" }</code> to <code>transpile(source, options)</code> instead.
-      Automatic JSX emits imports from <code>&lt;jsxImportSource&gt;/jsx-runtime</code>; include an <code>importmap</code> in your HTML so the browser resolves bare specifiers to your served vendor routes.
     </p>
 
     <h2>Upgrade HTTP requests to WebSockets</h2>

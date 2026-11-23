@@ -124,6 +124,13 @@
           <code>routes</code> maps paths (exact, <code>:param</code>, or terminal <code>/*</code>) to a handler function, a buffered <code>Response</code> snapshot, a per-method map (<code>GET</code>, <code>HEAD</code>, <code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>, <code>OPTIONS</code>, <code>TRACE</code>, <code>CONNECT</code>), or <code>false</code> to delegate to <code>fetch</code>.
           The returned <code>Server</code> exposes <code>hostname</code>, <code>port</code>, <code>url</code> (<code>URL</code>), <code>workers</code>, <code>ready</code> (<code>Promise&lt;Server&gt;</code>), <code>finished</code> (<code>Promise&lt;void&gt;</code>), <code>stop(force = false)</code>, and <code>[Symbol.asyncDispose]()</code>.
         </p>
+        <p class="api-desc">
+          A route path ending in <code>/*</code> may also map to <code>{ dir, transpile, sourceMaps }</code> to serve a directory.
+          Requests resolve by extension, with <code>.js</code> falling back to <code>.tsx</code>, <code>.ts</code>, <code>.jsx</code>, <code>.mts</code> and <code>.cts</code>.
+          With <code>transpile: true</code>, TypeScript and JSX sources are transpiled and cached in memory until their mtime or size changes;
+          <code>sourceMaps</code> is <code>"linked"</code> (default, served at <code>&lt;path&gt;.map</code>), <code>"inline"</code>, or <code>false</code>.
+          Responses carry an extension-based <code>Content-Type</code> and a weak <code>ETag</code> (honoring <code>If-None-Match</code>); <code>GET</code> and <code>HEAD</code> are registered, and the bare prefix redirects to the trailing-slash form.
+        </p>
       </div>
       <div class="api-item" id="http-upgradeWebSocket">
         <p class="api-sig"><code>upgradeWebSocket(request, options?) -&gt; { socket: WebSocket, response: Response }</code></p>

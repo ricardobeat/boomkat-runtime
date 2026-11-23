@@ -163,7 +163,14 @@ h3 {
 
 p {
   margin: 12px 0;
-  max-width: 68ch;
+  max-width: 80ch;
+}
+
+@supports (text-wrap: balance) {
+  h1, h2, h3, p {
+    text-wrap: balance;
+    max-width: none;
+  }
 }
 
 .lede {
@@ -186,6 +193,15 @@ code {
   font-size: 0.94em;
   background: var(--dither-soft);
   padding: 1px 5px;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+code::-webkit-scrollbar {
+  display: none;
 }
 
 pre {
@@ -201,13 +217,17 @@ pre {
 pre code {
   background: none;
   padding: 0;
+  white-space: pre;
+  display: inline;
+  max-width: none;
+  overflow: visible;
 }
 
 /* Lists & cards */
 ul, ol {
   margin: 12px 0;
   padding-left: 20px;
-  max-width: 68ch;
+  max-width: 80ch;
 }
 
 li {
@@ -310,11 +330,17 @@ thead th {
   color: var(--accent);
 }
 
+.api-sig code {
+  display: inline;
+  white-space: normal;
+  overflow: visible;
+}
+
 .api-desc {
   margin: 0;
   font-size: 12px;
   color: var(--ink-2);
-  max-width: 68ch;
+  max-width: 80ch;
 }
 
 .api-item pre {
@@ -339,7 +365,7 @@ thead th {
   border-left: 2px solid var(--ink);
   font-size: 12px;
   color: var(--ink-2);
-  max-width: 68ch;
+  max-width: 80ch;
 }
 
 /* Reference layout with sidebar */
