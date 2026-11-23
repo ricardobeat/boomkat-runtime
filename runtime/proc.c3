@@ -4,19 +4,11 @@ module bkr;
 import boomkat;
 import std::io;
 import std::collections::list;
+import std::os::posix;
+import std::os::darwin;
 import libc;
 
-extern fn CInt pipe(CInt* fds);
-extern fn CInt fcntl(CInt fd, CInt cmd, ...);
-extern fn CInt posix_spawn_file_actions_init(void** actions);
-extern fn CInt posix_spawn_file_actions_destroy(void** actions);
-extern fn CInt posix_spawn_file_actions_adddup2(void** actions, CInt fd, CInt target);
-extern fn CInt posix_spawn_file_actions_addopen(void** actions, CInt fd, ZString path, CInt flags, ushort mode);
-extern fn CInt posix_spawn_file_actions_addchdir_np(void** actions, ZString path);
-extern fn CInt posix_spawnp(CInt* pid, ZString file, void** actions, void* attr, ZString* argv, ZString* envp);
-extern fn CInt waitpid(CInt pid, CInt* status, CInt options);
-extern fn CInt kill(CInt pid, CInt sig);
-extern fn CInt getpid();
+extern fn CInt bkr_spawn(CInt* pid, ZString* argv, ZString* envp, ZString cwd, CInt* child, CUInt null_mask);
 
 const CInt F_SETFD    = 2;
 const CInt FD_CLOEXEC = 1;
@@ -90,16 +82,14 @@ fn void js_args(JsCtx ctx, void* udata) {
 
 fn void js_main(JsCtx ctx, void* udata) => ctx.ret_string(g_runtime.main);
 
-fn void js_pid(JsCtx ctx, void* udata) => ctx.ret_number(getpid());
-
-extern fn CInt ns_get_executable_path(char* buf, uint* size) @cname("_NSGetExecutablePath") @feat(DARWIN);
+fn void js_pid(JsCtx ctx, void* udata) => ctx.ret_number(posix::getpid());
 
 // The running binary, so scripts can start another bkr.
 fn void js_exec_path(JsCtx ctx, void* udata) {
     char[1024] raw;
     $if env::DARWIN:
         uint size = raw.len;
-        if (ns_get_executable_path(&raw, &size) != 0) raw[0] = 0;
+        if (darwin::darwin_NSGetExecutablePath(&raw, &size) != 0) raw[0] = 0;
     $else
         raw[..] = 0;
         mem::copy(&raw, "/proc/self/exe", 14);
@@ -129,7 +119,7 @@ struct WaitTask {
 
 fn void wait_work(Task* t) {
     WaitTask* w = (WaitTask*)t;
-    while (waitpid(w.pid, &w.status, 0) < 0) {
+    while (posix::waitpid(w.pid, &w.status, 0) < 0) {
         if (libc::errno() == Errno.EINTR) continue;
         w.err = libc::errno();
         return;
@@ -144,16 +134,13 @@ fn void run_inherit(String[] argv) {
         list.tinit();
         foreach (a : argv) list.push(a.zstr_tcopy());
         list.push(null);
-        void* actions;
-        posix_spawn_file_actions_init(&actions);
-        defer posix_spawn_file_actions_destroy(&actions);
         CInt pid;
-        if (posix_spawnp(&pid, argv[0].zstr_tcopy(), &actions, null, list.entries, environment())) {
+        if (posix::spawnp(&pid, (char*)list.entries[0], null, null, list.entries, environment())) {
             io::eprintfn("error: cannot run %s", argv[0]);
             return;
         }
         CInt status;
-        while (waitpid(pid, &status, 0) < 0) {
+        while (posix::waitpid(pid, &status, 0) < 0) {
             if (libc::errno() != Errno.EINTR) return;
         }
     };
@@ -166,7 +153,7 @@ fn void wait_done(Task* t) {
         reject_errno(w.op, w.err, "wait");
         return;
     }
-    int code = (w.status & 0x7f) == 0 ? (w.status >> 8) & 0xff : -(w.status & 0x7f);
+    int code = posix::wIFEXITED(w.status) ? posix::wEXITSTATUS(w.status) : -posix::wTERMSIG(w.status);
     resolve_number(w.op, code);
 }
 
@@ -177,7 +164,7 @@ fn void js_wait(JsCtx ctx, void* udata) {
     submit(w);
 }
 
-fn void js_kill(JsCtx ctx, void* udata) => (void)kill(ctx.arg(0).as_int(0), ctx.arg(1).as_int(15));
+fn void js_kill(JsCtx ctx, void* udata) => (void)posix::kill(ctx.arg(0).as_int(0), ctx.arg(1).as_int(15));
 
 // spawn(command, "arg\narg", "K=V\nK=V" or "", cwd or "", "ppp") -> "pid in out err"
 // stdio is one char per stream: p piped, i inherited, n null.
@@ -206,46 +193,45 @@ fn void js_spawn(JsCtx ctx, void* udata) {
             foreach (e : env.tsplit("\n")) envp.push(e.zstr_tcopy());
             envp.push(null);
         }
-        void* actions;
-        posix_spawn_file_actions_init(&actions);
-        defer posix_spawn_file_actions_destroy(&actions);
-        if (cwd.len) posix_spawn_file_actions_addchdir_np(&actions, cwd.zstr_tcopy());
         CInt[3] parent = { -1, -1, -1 };
         CInt[3] child  = { -1, -1, -1 };
+        CUInt null_mask = 0;
+        defer {
+            for (int i = 0; i < 3; i++) {
+                if (child[i] >= 0) libc::close(child[i]);
+                if (parent[i] >= 0) libc::close(parent[i]);
+            }
+        }
         for (int i = 0; i < 3; i++) {
             char mode = i < stdio.len ? stdio[i] : 'i';
             if (mode == 'i') continue;
             if (mode == 'n') {
-                posix_spawn_file_actions_addopen(&actions, i, "/dev/null", i == 0 ? O_RDONLY : O_WRONLY, 0);
+                null_mask |= (CUInt)1 << i;
                 continue;
             }
             CInt[2] fds;
-            if (pipe(&fds) != 0) {
+            if (posix::pipe(&fds) != 0) {
                 ctx.throw_coded(errno_code(libc::errno()), "pipe");
                 return;
             }
             parent[i] = i == 0 ? fds[1] : fds[0];
             child[i] = i == 0 ? fds[0] : fds[1];
-            fcntl(parent[i], F_SETFD, FD_CLOEXEC);
-            fcntl(child[i], F_SETFD, FD_CLOEXEC);
-            posix_spawn_file_actions_adddup2(&actions, child[i], i);
+            if (libc::fcntl(parent[i], F_SETFD, FD_CLOEXEC) < 0 ||
+                libc::fcntl(child[i], F_SETFD, FD_CLOEXEC) < 0) {
+                ctx.throw_coded(errno_code(libc::errno()), "fcntl");
+                return;
+            }
         }
         CInt pid;
-        CInt rc = posix_spawnp(
+        CInt rc = bkr_spawn(
             &pid,
-            cmd.zstr_tcopy(),
-            &actions,
-            null,
             argv.entries,
-            env.len ? envp.entries : environment()
+            env.len ? envp.entries : environment(),
+            cwd.len ? cwd.zstr_tcopy() : null,
+            &child,
+            null_mask
         );
-        for (int i = 0; i < 3; i++) {
-            if (child[i] >= 0) libc::close(child[i]);
-        }
         if (rc) {
-            for (int i = 0; i < 3; i++) {
-                if (parent[i] >= 0) libc::close(parent[i]);
-            }
             ctx.throw_coded(errno_code(rc), string::tformat("%s: %s", cmd, errno_text(rc)));
             return;
         }
@@ -258,6 +244,7 @@ fn void js_spawn(JsCtx ctx, void* udata) {
             }
             Res* r = res_new(PIPE);
             r.fd = parent[i];
+            parent[i] = -1;
             r.pid = pid;
             out.appendf(" %d", r.rid);
         }

@@ -206,6 +206,7 @@ done
 "$CXX" "${CXXFLAGS[@]}" -c shim/uws_shim.cpp -o "$OBJ/uws_shim.o"
 "$CXX" "${CXXFLAGS[@]}" -c shim/process_pool.cpp -o "$OBJ/process_pool.o"
 "$CC" "${CFLAGS[@]}" -c shim/timer_shim.c -o "$OBJ/timer_shim.o"
+"$CC" "${CFLAGS[@]}" -c shim/spawn_shim.c -o "$OBJ/spawn_shim.o"
 "$CC" "${CFLAGS[@]}" -c shim/tls_probe.c -o "$OBJ/tls_probe.o"
 "$CC" "${CFLAGS[@]}" -c shim/subtle.c -o "$OBJ/subtle.o"
 

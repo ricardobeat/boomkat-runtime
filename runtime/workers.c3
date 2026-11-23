@@ -9,6 +9,7 @@ import boomkat::builtins;
 import std::thread;
 import std::collections::map;
 import std::io;
+import std::os::posix;
 
 const usz WORKER_QUEUE_BYTES   = 64 * 1024 * 1024;
 const usz WORKER_MESSAGE_BYTES = 16 * 1024 * 1024;
@@ -714,7 +715,7 @@ fn void stop_worker_resources() {
     for (sz i = 0; i < g_runtime.res.len(); i++) {
         Res* res = g_runtime.res[i];
         if (!res) continue;
-        if (res.kind == PIPE && res.pid > 0) (void)kill(res.pid, 15);
+        if (res.kind == PIPE && res.pid > 0) (void)posix::kill(res.pid, 15);
         close_resource(res);
     }
 }

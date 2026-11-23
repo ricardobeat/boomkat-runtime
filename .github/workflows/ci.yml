@@ -102,6 +102,12 @@ jobs:
           echo "$out"
           test "$out" = hello
 
+      - name: Test subprocesses
+        working-directory: boomkat-runtime
+        run: |
+          out/bkr test --no-sandbox --no-prompt --allow-run=/bin/sh tests/process.test.js
+          out/bkr --no-sandbox --no-prompt --allow-run="$PWD/out/bkr" tests/process-pipes.js
+
       - name: Package
         working-directory: boomkat-runtime
         run: |
