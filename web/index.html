@@ -16,6 +16,17 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="../styles.css">
   <style>
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 6px 11px;
+      border: 1px solid #3d3d3d; color: #3d3d3d; background: transparent;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+      text-decoration: none;
+    }
+    .btn:hover, .btn:focus-visible { color: #1a1a1a; border-color: #1a1a1a; }
+    .btn svg { display: block; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .chart { --bkr: var(--ink); --bun: conic-gradient(var(--ink) 0 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0) 0 0 / 2px 2px; --node: conic-gradient(#a8a8a8 0 25%, transparent 0 50%, #a8a8a8 0 75%, transparent 0) 0 0 / 2px 2px; margin-bottom: 28px; font-variant-numeric: tabular-nums; }
     .chart .s-bkr { --c: var(--bkr); } .chart .s-bun { --c: var(--bun); } .chart .s-node { --c: var(--node); }
     .chart-key { display: flex; gap: 18px; margin: 0 0 14px calc(8rem + 8px); font-size: 10px; letter-spacing: 0.12em; color: var(--ink-2); }
@@ -52,10 +63,19 @@
       <div class="hero-text">
         <h1 class="title">boomkat runtime</h1>
         <p class="lede">A small JavaScript runtime on the <a href="../boomkat/">boomkat</a> engine, uWebSockets and OpenSSL, with fine-grained permission control.</p>
+        <p class="actions">
+          <a class="btn" href="docs/index.html">read the docs</a>
+          <a class="btn" href="https://github.com/ricardobeat/boomkat-runtime" target="_blank" rel="noopener">open in github <svg viewBox="0 0 9 9" width="11" height="11" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="0" y="1" width="4" height="1"/><rect x="0" y="1" width="1" height="8"/><rect x="0" y="8" width="8" height="1"/><rect x="7" y="5" width="1" height="4"/><rect x="5" y="0" width="4" height="1"/><rect x="8" y="0" width="1" height="4"/><rect x="7" y="1" width="1" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="5" y="3" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/></g></svg><span class="sr-only"> (opens in a new tab)</span></a>
+        </p>
       </div>
     </section>
 
     <div class="band" aria-hidden="true"></div>
+
+    <section class="work">
+      <div class="sec-head"><h2 class="label">try it now</h2></div>
+      <pre class="code shell"><code><span class="c">$</span> curl https://boomkat.run/install | sh</code></pre>
+    </section>
 
     <section class="work">
       <div class="sec-head"><h2 class="label">features</h2></div>

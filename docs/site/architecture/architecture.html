@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtime architecture · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="../how-to/permissions-and-config.html">how-to</a>
+      <a href="../reference/modules.html">reference</a>
+      <a href="architecture.html" aria-current="page">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">architecture</p>
+    <h1>Runtime architecture</h1>
+    <p class="lede">
+      How <code>bkr</code> combines the Boomkat C3 engine, uWebSockets, a thread-local runtime state, and a native worker pool.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <h2>Engine bridge and embedded JS layer</h2>
+    <p>
+      <code>bkr</code> compiles the Boomkat engine from source alongside <code>runtime/*.c3</code> into a single executable.
+      At boot, <code>runtime/main.c3</code> creates a <code>JsRuntime</code> and <code>JsContext</code>, installs native callbacks on a hidden <code>globalThis.__bk</code> object, evaluates the embedded prelude (<code>prelude.js</code>, <code>worker.js</code>, <code>fetch.js</code>, <code>websocket.js</code>), and registers the built-in modules (<code>http</code>, <code>net</code>, <code>file</code>, <code>process</code>, <code>path</code>, <code>permissions</code>, <code>typescript</code>, <code>crypto</code>, <code>test</code>, <code>repl</code>, and optional <code>sqlite</code>).
+    </p>
+    <p>
+      Asynchronous operations cross the bridge through <code>__bk.op(nativeFn, ...args)</code> in <code>runtime/bridge.c3</code>.
+      Each call allocates a monotonic 32-bit operation ID and a rooted <code>JsDeferred</code> promise capability in <code>pending_ops</code>.
+      When the native operation finishes on the event loop, <code>settle(id, ok, value, code)</code> resolves or rejects the promise, drains the microtask queue, and flushes any unhandled promise rejections.
+    </p>
+
+    <h2>Event loop, thread pool, and resource table</h2>
+    <p>
+      Every execution thread owns a thread-local <code>RuntimeState</code> (<code>g_runtime</code> in <code>runtime/state.c3</code>) and a uSockets event loop (<code>kqueue</code> on macOS, <code>epoll</code> on Linux).
+      Non-blocking TCP, TLS, HTTP, and timer events run directly on the uSockets loop.
+      Blocking operations—filesystem calls, <code>getaddrinfo</code> DNS resolution, <code>waitpid</code>, Argon2id password hashing, and <code>crypto.subtle</code> EVP operations—are submitted to a shared 16-thread native pool (<code>runtime/loop.c3</code>) and post their completions back to the originating loop via <code>uws_loop_defer</code>.
+    </p>
+    <p>
+      Streamable OS handles (stdio, open files, TCP/TLS sockets, listeners, and child pipes) live in a per-runtime resource table (<code>runtime/res.c3</code>).
+      Each resource ID (<code>rid</code>) packs a 12-bit generation counter above a 20-bit slot index so stale IDs after <code>close()</code> never alias recycled slots.
+    </p>
+
+    <h2>HTTP fast paths</h2>
+    <p>
+      <code>runtime/http.c3</code> wraps uWebSockets via the C++ shim in <code>shim/</code>. Several paths avoid unnecessary JS allocations and VM transitions:
+    </p>
+    <ul>
+      <li><strong>Static routes:</strong> Fixed buffered <code>Response</code> objects in <code>serve({ routes, static })</code> are serialized into wire headers and body bytes at startup and answered directly from C3 without entering the VM.</li>
+      <li><strong>Lazy requests and fast 200 responses:</strong> Incoming <code>Request</code> objects allocate a pre-shaped plain object; URL and header strings are materialized from the uWebSockets buffer only if read or if the request outlives the callback. Ordinary 200 responses with string, byte, or <code>file.body()</code> payloads serialize directly from C3.</li>
+      <li><strong>Stream batching and file bodies:</strong> Untouched <code>ReadableStream</code> responses pull through a native sink in 64 KiB batches; streams that close within the first batch finish in one native <code>uws_res_end</code> call with a known content length. <code>file.body(path)</code> streams 64 KiB file chunks through the thread pool and pauses reads under socket backpressure.</li>
+    </ul>
+
+    <h2 id="concurrency">Concurrency: module workers, HTTP workers, and HTTP processes</h2>
+    <p>
+      Boomkat VMs are single-threaded and share no mutable JS heap across threads:
+    </p>
+    <ul>
+      <li><strong>Module workers (<code>new Worker</code>):</strong> Spawn a thread with a fresh <code>g_runtime</code>, VM, and uSockets loop. Messages encode value graphs into JSON metadata plus copied byte buffers.</li>
+      <li><strong>HTTP workers (<code>--http-workers=N</code>):</strong> Spawn <code>N - 1</code> sibling worker threads that re-execute the entry module and join the main server's acceptor pool; connections are dispatched round-robin.</li>
+      <li><strong>HTTP processes (<code>--http-processes=N</code>):</strong> A native supervisor process binds the TCP port before any VM starts, forks <code>N</code> child processes, and distributes accepted socket file descriptors round-robin over Unix sockets using <code>SCM_RIGHTS</code>.</li>
+    </ul>
+
+    <h2>Source layout</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>runtime/main.c3</code>, <code>state.c3</code></td><td>CLI entry point, argument parsing, bootstrap, thread-local <code>RuntimeState</code></td></tr>
+        <tr><td><code>runtime/bridge.c3</code>, <code>guard.c3</code></td><td>C3/JS byte marshalling, async op table, rejection tracker, <code>--time-limit</code> watchdog</td></tr>
+        <tr><td><code>runtime/loop.c3</code>, <code>timers.c3</code>, <code>immediates.c3</code></td><td>uSockets loop glue, nanosecond timer heap, <code>setImmediate</code> queue, 16-thread worker pool</td></tr>
+        <tr><td><code>runtime/http.c3</code>, <code>ws.c3</code>, <code>file_body.c3</code>, <code>stream_sink.c3</code></td><td>HTTP server, native route table, WebSocket upgrades, streaming file and sink fast paths</td></tr>
+        <tr><td><code>runtime/net.c3</code>, <code>tls.c3</code>, <code>res.c3</code></td><td>TCP/TLS sockets, DNS resolution, OpenSSL certificate verification, generation-tagged resource table</td></tr>
+        <tr><td><code>runtime/fs.c3</code>, <code>proc.c3</code>, <code>sqlite.c3</code></td><td>Filesystem tasks, environment and child processes, dynamic SQLite 3.31+ loader and authorizer</td></tr>
+        <tr><td><code>runtime/crypto.c3</code>, <code>subtle.c3</code>, <code>transpile.c3</code></td><td>Argon2id pool tasks, OpenSSL Web Crypto natives, TypeScript/JSX transpiler and source maps</td></tr>
+        <tr><td><code>runtime/perms.c3</code>, <code>sandbox.c3</code>, <code>toml.c3</code></td><td>Permission matching, path canonicalization, interactive prompt, macOS Seatbelt profile, <code>boomkat.toml</code> parser</td></tr>
+        <tr><td><code>runtime/js/*.js</code></td><td>Web-standard prelude and built-in ES module wrappers</td></tr>
+        <tr><td><code>shim/</code></td><td>C/C++ shim over uWebSockets, OpenSSL EVP, and multi-process <code>SCM_RIGHTS</code> socket passing</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Further reading</h2>
+    <ul>
+      <li><a href="permissions-and-isolation.html">Permission model and isolation</a></li>
+      <li><a href="../reference/modules.html">Built-in modules reference</a></li>
+    </ul>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

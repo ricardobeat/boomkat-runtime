@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="tutorials/first-server.html">tutorials</a>
+      <a href="how-to/permissions-and-config.html">how-to</a>
+      <a href="reference/modules.html">reference</a>
+      <a href="architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">documentation</p>
+    <h1>bkr</h1>
+    <p class="lede">
+      Small JavaScript and TypeScript runtime on the Boomkat engine, uWebSockets, and OpenSSL.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Tutorials</h2>
+        <p class="quadrant-role">Step-by-step lessons that end with working code.</p>
+        <ul>
+          <li><a href="tutorials/first-server.html">Your first HTTP server with bkr</a></li>
+          <li><a href="tutorials/sqlite-and-tests.html">Query SQLite and run tests</a></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>How-to guides</h2>
+        <p class="quadrant-role">Direct steps for a specific task.</p>
+        <ul>
+          <li><a href="how-to/permissions-and-config.html">Configure permissions with flags and <code>boomkat.toml</code></a></li>
+          <li><a href="how-to/serve-tsx-and-websockets.html">Serve TSX, HTTPS, and WebSockets</a></li>
+          <li><a href="how-to/scale-http-and-workers.html">Scale HTTP servers and run module workers</a></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Reference</h2>
+        <p class="quadrant-role">Factual descriptions of modules, globals, and flags.</p>
+        <ul>
+          <li><a href="reference/modules.html">Built-in modules</a></li>
+          <li><a href="reference/globals.html">Web-standard globals</a></li>
+          <li><a href="reference/cli-and-permissions.html">CLI commands, flags, and <code>boomkat.toml</code></a></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Architecture</h2>
+        <p class="quadrant-role">Design choices, architecture, and permission model.</p>
+        <ul>
+          <li><a href="architecture/architecture.html">Runtime architecture</a></li>
+          <li><a href="architecture/permissions-and-isolation.html">Permission model and isolation</a></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

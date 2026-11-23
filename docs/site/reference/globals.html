@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web-standard globals · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body class="has-sidebar">
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="../how-to/permissions-and-config.html">how-to</a>
+      <a href="modules.html" aria-current="page">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <div class="ref-layout">
+    <aside class="ref-sidebar" aria-label="Globals index">
+      <p class="label">Fetch &amp; HTTP</p>
+      <ul>
+        <li><a href="#fetch">fetch</a></li>
+        <li><a href="#Request">Request / Response</a></li>
+        <li><a href="#Headers">Headers</a></li>
+        <li><a href="#URL">URL / URLSearchParams</a></li>
+        <li><a href="#Blob">Blob / File</a></li>
+      </ul>
+
+      <p class="label">WebSockets</p>
+      <ul>
+        <li><a href="#WebSocket">WebSocket</a></li>
+        <li><a href="#CloseEvent">CloseEvent</a></li>
+      </ul>
+
+      <p class="label">Streams &amp; Compression</p>
+      <ul>
+        <li><a href="#ReadableStream">ReadableStream</a></li>
+        <li><a href="#WritableStream">WritableStream</a></li>
+        <li><a href="#TransformStream">TransformStream</a></li>
+        <li><a href="#TextEncoderStream">TextEncoderStream / TextDecoderStream</a></li>
+        <li><a href="#CompressionStream">CompressionStream / DecompressionStream</a></li>
+      </ul>
+
+      <p class="label">Crypto</p>
+      <ul>
+        <li><a href="#crypto">crypto.getRandomValues / randomUUID</a></li>
+        <li><a href="#crypto-subtle">crypto.subtle</a></li>
+      </ul>
+
+      <p class="label">Workers &amp; Cloning</p>
+      <ul>
+        <li><a href="#Worker">Worker</a></li>
+        <li><a href="#worker-scope">self / postMessage / close</a></li>
+        <li><a href="#structuredClone">structuredClone</a></li>
+      </ul>
+
+      <p class="label">Timers, Events &amp; Encoding</p>
+      <ul>
+        <li><a href="#timers">setTimeout / setInterval / setImmediate / queueMicrotask</a></li>
+        <li><a href="#performance">performance</a></li>
+        <li><a href="#events">Event / EventTarget / AbortController / AbortSignal</a></li>
+        <li><a href="#encoding">TextEncoder / TextDecoder / atob / btoa</a></li>
+        <li><a href="#errors">DOMException / SystemError / unhandledrejection</a></li>
+      </ul>
+
+      <p class="label">Other Reference</p>
+      <ul>
+        <li><a href="modules.html">Built-in Modules</a></li>
+        <li><a href="cli-and-permissions.html">CLI &amp; Permissions</a></li>
+      </ul>
+    </aside>
+
+    <main class="ref-content">
+      <p class="label">reference</p>
+      <h1>Web-standard globals</h1>
+      <p class="lede">
+        Globals installed by the runtime prelude on <code>globalThis</code> in the main thread and inside module workers.
+      </p>
+
+      <div class="band" aria-hidden="true"></div>
+
+      <h2>Fetch and HTTP primitives</h2>
+
+      <div class="api-item" id="fetch">
+        <p class="api-sig"><code>fetch(input, init?) -&gt; Promise&lt;Response&gt;</code></p>
+        <p class="api-desc">
+          HTTP/1.1 client over <code>net</code>. Requires <code>--allow-net</code> for the target host and port; every redirect target (up to 20 hops) is re-checked against the net grants and strips <code>Authorization</code> and <code>Cookie</code> across origins. Verifies TLS certificates and hostnames on <code>https:</code> requests and automatically decodes <code>gzip</code> and <code>deflate</code> response bodies. Unread response bodies are unref'd so they do not keep the event loop alive.
+        </p>
+      </div>
+      <div class="api-item" id="Request">
+        <p class="api-sig"><code>Request</code> · <code>Response</code></p>
+        <p class="api-desc">
+          Standard Fetch <code>Request</code> and <code>Response</code> classes. Both support <code>body</code> (<code>ReadableStream</code>), <code>bodyUsed</code>, <code>text()</code>, <code>bytes()</code>, <code>json()</code>, <code>arrayBuffer()</code>, <code>blob()</code>, and <code>clone()</code>. <code>Response</code> also provides <code>Response.json(data, init?)</code>, <code>Response.redirect(url, status = 302)</code>, and <code>Response.error()</code>.
+        </p>
+      </div>
+      <div class="api-item" id="Headers">
+        <p class="api-sig"><code>Headers</code></p>
+        <p class="api-desc">Case-insensitive header map with multi-value <code>Set-Cookie</code> preservation via <code>getSetCookie()</code>.</p>
+      </div>
+      <div class="api-item" id="URL">
+        <p class="api-sig"><code>URL</code> · <code>URLSearchParams</code></p>
+        <p class="api-desc">WHATWG <code>URL</code> (including <code>URL.canParse</code> and <code>URL.parse</code>) with a native fast path for plain <code>http:</code>/<code>https:</code> URLs, and <code>URLSearchParams</code>.</p>
+      </div>
+      <div class="api-item" id="Blob">
+        <p class="api-sig"><code>Blob</code> · <code>File</code></p>
+        <p class="api-desc">In-memory binary blobs with <code>size</code>, <code>type</code>, <code>slice()</code>, <code>text()</code>, <code>bytes()</code>, <code>arrayBuffer()</code>, and <code>stream()</code>. <code>File</code> extends <code>Blob</code> with <code>name</code> and <code>lastModified</code>.</p>
+      </div>
+
+      <h2>WebSockets</h2>
+
+      <div class="api-item" id="WebSocket">
+        <p class="api-sig"><code>new WebSocket(url, protocols?)</code></p>
+        <p class="api-desc">
+          WebSocket client (and the class returned by <code>upgradeWebSocket</code> on the server). Client connections ride <code>net</code> over <code>ws:</code> or <code>wss:</code> (up to 64 MiB messages) and require <code>--allow-net</code>. Properties and methods: <code>url</code>, <code>readyState</code>, <code>protocol</code>, <code>bufferedAmount</code>, <code>binaryType</code> (<code>"blob"</code> or <code>"arraybuffer"</code>), <code>send(data)</code>, <code>close(code?, reason?)</code>, and <code>open</code> / <code>message</code> / <code>error</code> / <code>close</code> events.
+        </p>
+      </div>
+      <div class="api-item" id="CloseEvent">
+        <p class="api-sig"><code>CloseEvent</code></p>
+        <p class="api-desc">Event dispatched on WebSocket close with <code>code</code>, <code>reason</code>, and <code>wasClean</code>.</p>
+      </div>
+
+      <h2>Streams and compression</h2>
+
+      <div class="api-item" id="ReadableStream">
+        <p class="api-sig"><code>ReadableStream</code> · <code>ReadableStreamDefaultReader</code></p>
+        <p class="api-desc">Standard default-controller readable streams with <code>getReader()</code>, <code>pipeTo()</code>, <code>pipeThrough()</code>, <code>tee()</code>, <code>values()</code>, <code>[Symbol.asyncIterator]()</code>, and <code>ReadableStream.from(iterable)</code>.</p>
+      </div>
+      <div class="api-item" id="WritableStream">
+        <p class="api-sig"><code>WritableStream</code> · <code>WritableStreamDefaultWriter</code></p>
+        <p class="api-desc">Writable stream and default writer with <code>ready</code>, <code>closed</code>, <code>write()</code>, <code>close()</code>, and <code>abort()</code>.</p>
+      </div>
+      <div class="api-item" id="TransformStream">
+        <p class="api-sig"><code>TransformStream</code></p>
+        <p class="api-desc"><code>{ readable, writable }</code> transform pair.</p>
+      </div>
+      <div class="api-item" id="TextEncoderStream">
+        <p class="api-sig"><code>TextEncoderStream</code> · <code>TextDecoderStream</code></p>
+        <p class="api-desc">Streaming UTF-8 encoder and decoder transforms (handling multi-byte sequences split across chunk boundaries).</p>
+      </div>
+      <div class="api-item" id="CompressionStream">
+        <p class="api-sig"><code>new CompressionStream(format)</code> · <code>new DecompressionStream(format)</code></p>
+        <p class="api-desc">Streaming compression and decompression backed by system zlib. <code>format</code> may be <code>"gzip"</code>, <code>"deflate"</code>, or <code>"deflate-raw"</code>.</p>
+      </div>
+
+      <h2>Web Crypto</h2>
+
+      <div class="api-item" id="crypto">
+        <p class="api-sig"><code>crypto.getRandomValues(typedArray)</code> · <code>crypto.randomUUID()</code></p>
+        <p class="api-desc">Fill an integer TypedArray (up to 65,536 bytes) with system randomness, or return a v4 UUID string.</p>
+      </div>
+      <div class="api-item" id="crypto-subtle">
+        <p class="api-sig"><code>crypto.subtle</code></p>
+        <p class="api-desc">
+          Lazily initialized <code>SubtleCrypto</code> running on the native thread pool over OpenSSL 3.
+          Supports <code>digest</code> (<code>SHA-1</code>, <code>SHA-256</code>, <code>SHA-384</code>, <code>SHA-512</code>), <code>sign</code> / <code>verify</code> (<code>HMAC</code>), <code>encrypt</code> / <code>decrypt</code> (<code>AES-GCM</code>, <code>AES-CBC</code>, <code>AES-CTR</code>), <code>deriveBits</code> / <code>deriveKey</code> (<code>PBKDF2</code> up to 20M iterations, <code>HKDF</code>), and <code>generateKey</code> / <code>importKey</code> / <code>exportKey</code> for <code>raw</code> and <code>jwk</code> (<code>oct</code>) secret keys.
+        </p>
+      </div>
+
+      <h2 id="workers">Workers and structured cloning</h2>
+
+      <div class="api-item" id="Worker">
+        <p class="api-sig"><code>new Worker(url, { type = "module", name = "" }?)</code></p>
+        <p class="api-desc">
+          Spawn an isolated module worker thread (up to 64 live workers per process). Requires <code>--allow-read</code> for the target module path.
+          Methods and events: <code>postMessage(value, transferOrOptions?)</code>, <code>terminate()</code>, and <code>message</code>, <code>error</code>, and <code>close</code> events.
+        </p>
+      </div>
+      <div class="api-item" id="worker-scope">
+        <p class="api-sig"><code>self</code> · <code>name</code> · <code>postMessage(value, transferOrOptions?)</code> · <code>close()</code></p>
+        <p class="api-desc">Globals available inside a worker thread, alongside all built-in modules and inherited permissions.</p>
+      </div>
+      <div class="api-item" id="structuredClone">
+        <p class="api-sig"><code>structuredClone(value, { transfer }?)</code></p>
+        <p class="api-desc">
+          Deep-clone primitives, plain objects, arrays, <code>Map</code>, <code>Set</code>, <code>Date</code>, <code>RegExp</code>, standard <code>Error</code> types, <code>ArrayBuffer</code> (including resizable and immutable), and TypedArrays/DataViews while preserving cycles and shared references.
+          Limits: 16 MiB binary data per message/clone, 64 MiB queued per worker direction, and 32,768 graph nodes/entries. Listed transferable <code>ArrayBuffer</code>s are copied and detached on the sender.
+        </p>
+      </div>
+
+      <h2>Timers, events, and encoding</h2>
+
+      <div class="api-item" id="timers">
+        <p class="api-sig"><code>setTimeout(fn, ms = 0, ...args)</code> · <code>clearTimeout(id)</code> · <code>setInterval(fn, ms = 0, ...args)</code> · <code>clearInterval(id)</code> · <code>setImmediate(fn, ...args)</code> · <code>clearImmediate(id)</code> · <code>queueMicrotask(fn)</code></p>
+        <p class="api-desc">Timers backed by nanosecond native deadlines on kqueue/epoll (with a 1 ms minimum JS delay), next-turn immediates, and microtask scheduling.</p>
+      </div>
+      <div class="api-item" id="performance">
+        <p class="api-sig"><code>performance: { now(), timeOrigin }</code></p>
+        <p class="api-desc">Monotonic high-resolution millisecond clock.</p>
+      </div>
+      <div class="api-item" id="events">
+        <p class="api-sig"><code>Event</code> · <code>EventTarget</code> · <code>MessageEvent</code> · <code>ErrorEvent</code> · <code>PromiseRejectionEvent</code> · <code>AbortController</code> · <code>AbortSignal</code></p>
+        <p class="api-desc">Standard event classes, global <code>addEventListener</code> / <code>removeEventListener</code> / <code>dispatchEvent</code>, and <code>AbortSignal.abort()</code>, <code>AbortSignal.timeout(ms)</code>, and <code>AbortSignal.any(signals)</code>.</p>
+      </div>
+      <div class="api-item" id="encoding">
+        <p class="api-sig"><code>TextEncoder</code> · <code>TextDecoder</code> · <code>btoa(str)</code> · <code>atob(b64)</code></p>
+        <p class="api-desc">Native UTF-8 encoding/decoding (including <code>encodeInto</code>, <code>fatal</code>, and <code>ignoreBOM</code>) and Base64 helpers.</p>
+      </div>
+      <div class="api-item" id="errors">
+        <p class="api-sig"><code>DOMException</code> · <code>SystemError</code> · <code>onunhandledrejection</code></p>
+        <p class="api-desc">
+          Failed system and permission operations reject or throw a <code>SystemError</code> carrying an errno or runtime <code>code</code> (such as <code>"ENOENT"</code> or <code>"PERMISSION_DENIED"</code>, where <code>err.name</code> is <code>"PermissionDenied"</code>).
+          Unhandled promise rejections fire a cancelable <code>unhandledrejection</code> event on <code>globalThis</code> and exit the process with status <code>1</code> unless <code>event.preventDefault()</code> is called.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

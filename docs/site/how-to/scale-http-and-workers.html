@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scale HTTP and run workers · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="permissions-and-config.html" aria-current="page">how-to</a>
+      <a href="../reference/modules.html">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">how-to guide</p>
+    <h1>Scale HTTP servers and run module workers</h1>
+    <p class="lede">
+      Offload CPU work to isolated <code>Worker</code> threads, or scale an HTTP server across in-process VMs or multi-process worker pools.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <h2>Offload work to a module <code>Worker</code></h2>
+    <p>
+      Each <code>new Worker(url, { type: "module" })</code> starts a native thread with its own Boomkat VM, heap, and event loop.
+      The worker inherits the parent's permissions with prompting disabled.
+      Create <code>sum.ts</code>:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">onmessage</span> <span class="ink-s2">=</span> ({ <span class="ink-s2">data</span> }: <span class="ink-s2">MessageEvent</span>&lt;<span class="ink-s2">Uint32Array</span>&gt;) <span class="ink-s2">=&gt;</span> {
+  <span class="ink-s2">let</span> <span class="ink-s2">sum</span> <span class="ink-s2">=</span> <span class="ink-s5">0</span>;
+  <span class="ink-s2">for</span> (<span class="ink-s2">const</span> <span class="ink-s2">value</span> <span class="ink-s2">of</span> <span class="ink-s2">data</span>) <span class="ink-s2">sum</span> <span class="ink-s2">+=</span> <span class="ink-s2">value</span>;
+  <span class="ink-s5">postMessage</span>(<span class="ink-s2">sum</span>);
+};</code></pre>
+    <p>Spawn the worker and transfer an <code>ArrayBuffer</code> from <code>main.ts</code>:</p>
+    <pre class="ink"><code><span class="ink-s2">const</span> <span class="ink-s2">worker</span> <span class="ink-s2">=</span> <span class="ink-s2">new</span> <span class="ink-s5">Worker</span>(<span class="ink-s9">"./sum.ts"</span>, { <span class="ink-s2">type</span>: <span class="ink-s9">"module"</span>, <span class="ink-s2">name</span>: <span class="ink-s9">"sum"</span> });
+<span class="ink-s2">worker</span>.<span class="ink-s2">onmessage</span> <span class="ink-s2">=</span> ({ <span class="ink-s2">data</span> }) <span class="ink-s2">=&gt;</span> {
+  <span class="ink-s2">console</span>.<span class="ink-s5">log</span>(<span class="ink-s9">"Sum:"</span>, <span class="ink-s2">data</span>);
+  <span class="ink-s2">worker</span>.<span class="ink-s5">terminate</span>();
+};
+
+<span class="ink-s2">const</span> <span class="ink-s2">numbers</span> <span class="ink-s2">=</span> <span class="ink-s2">new</span> <span class="ink-s5">Uint32Array</span>([<span class="ink-s5">10</span>, <span class="ink-s5">20</span>, <span class="ink-s5">30</span>, <span class="ink-s5">40</span>]);
+<span class="ink-s2">worker</span>.<span class="ink-s5">postMessage</span>(<span class="ink-s2">numbers</span>, [<span class="ink-s2">numbers</span>.<span class="ink-s2">buffer</span>]);</code></pre>
+    <p>Run it with read permission for the worker directory:</p>
+    <pre class="ink"><code><span class="ink-s5">bkr</span> <span class="ink-s9">--allow-read=.</span> <span class="ink-s9">main.ts</span></code></pre>
+
+    <h2>Scale across in-process VMs with <code>--http-workers=N</code></h2>
+    <p>
+      Pass <code>--http-workers=N</code> (1–64) to run <code>N</code> server VMs in one OS process.
+      The runtime binds one listener and distributes accepted TCP connections round-robin across the VMs; HTTP keep-alive requests remain on their assigned VM:
+    </p>
+    <pre class="ink"><code><span class="ink-s5">bkr</span> <span class="ink-s9">--http-workers=4</span> <span class="ink-s9">--allow-net=127.0.0.1:8080</span> \
+  <span class="ink-s9">--allow-read=examples/taskboard</span> <span class="ink-s9">--allow-write=examples/taskboard/data</span> \
+  <span class="ink-s9">examples/taskboard/server.ts</span> <span class="ink-s9">8080</span> <span class="ink-s9">examples/taskboard/data</span></code></pre>
+    <p>
+      Each replica evaluates the entry module independently with its own globals and heap.
+      On the main server, <code>await server.ready</code> resolves once all <code>N</code> VMs have joined the listener, and <code>server.workers</code> reports the joined count.
+    </p>
+
+    <h2>Scale across OS processes with <code>--http-processes=N</code></h2>
+    <p>
+      Pass <code>--http-processes=N</code> (1–64) to spawn <code>N</code> worker processes behind a native supervisor.
+      The supervisor accepts connections and passes socket descriptors round-robin over Unix domain sockets with <code>SCM_RIGHTS</code>:
+    </p>
+    <pre class="ink"><code><span class="ink-s5">bkr</span> <span class="ink-s9">--http-processes=4</span> <span class="ink-s9">--allow-net=127.0.0.1:8080</span> \
+  <span class="ink-s9">--allow-read=examples/taskboard</span> <span class="ink-s9">--allow-write=examples/taskboard/data</span> \
+  <span class="ink-s9">examples/taskboard/server.ts</span> <span class="ink-s9">8080</span> <span class="ink-s9">examples/taskboard/data</span></code></pre>
+    <p class="note">
+      <code>--http-workers</code> and <code>--http-processes</code> each support one <code>serve()</code> call per entry module and cannot be combined with each other or with <code>serve({ tls })</code>.
+    </p>
+
+    <h2>Graceful shutdown with <code>await using</code></h2>
+    <p>
+      The server returned by <code>serve()</code> implements <code>Symbol.asyncDispose</code>.
+      Calling <code>await server.stop()</code> (or exiting an <code>await using server = serve(...)</code> block) stops accepting new connections and drains active responses before closing. Pass <code>server.stop(true)</code> to force immediate termination.
+    </p>
+
+    <h2>See also</h2>
+    <ul>
+      <li><a href="../reference/globals.html#workers"><code>Worker</code> and <code>structuredClone</code> reference</a></li>
+      <li><a href="../reference/cli-and-permissions.html#scaling">HTTP scaling flags</a></li>
+      <li><a href="../architecture/architecture.html#concurrency">Concurrency model</a></li>
+    </ul>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

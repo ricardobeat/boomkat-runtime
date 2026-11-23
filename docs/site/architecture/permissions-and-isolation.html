@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Permission model and isolation · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="../how-to/permissions-and-config.html">how-to</a>
+      <a href="../reference/modules.html">reference</a>
+      <a href="architecture.html" aria-current="page">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">architecture</p>
+    <h1>Permission model and isolation</h1>
+    <p class="lede">
+      How <code>bkr</code> enforces capability grants across DNS resolution, symlinked paths, SQLite queries, worker threads, and the OS sandbox.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <h2>Deny by default, monotonic narrowing</h2>
+    <p>
+      Permission state lives in native C3 memory (<code>runtime/perms.c3</code>) outside the JavaScript heap.
+      Every operation that touches the network, filesystem, environment, or child processes checks <code>g_runtime.perms</code> before dispatching work.
+      Deny rules are evaluated before allow rules, so <code>--deny-net=169.254.169.254</code> blocks that address even when <code>-A</code> is passed.
+    </p>
+    <p>
+      When interactive prompting is disabled (<code>--no-prompt</code>, <code>prompt = false</code> in <code>boomkat.toml</code>, non-TTY stdio, or inside a worker thread), grants are locked: scripts can narrow their own access via <code>permissions.revoke()</code>, but cannot widen it.
+    </p>
+
+    <h2>DNS rebinding and private network protection</h2>
+    <p>
+      Outbound network connections check permissions twice: first against the requested hostname and port before DNS resolution, and again against every resolved IP address returned by <code>getaddrinfo</code>.
+    </p>
+    <p>
+      A hostname grant such as <code>--allow-net=example.com</code> covers only public IP addresses that <code>example.com</code> resolves to.
+      If DNS resolves a hostname to a loopback, link-local, or private range (<code>127.0.0.0/8</code>, <code>10.0.0.0/8</code>, <code>172.16.0.0/12</code>, <code>192.168.0.0/16</code>, <code>169.254.0.0/16</code>, <code>::1</code>, <code>fe80::/10</code>, <code>fc00::/7</code>), the connection is rejected unless that internal address (or <code>localhost</code> for loopback) was explicitly granted.
+    </p>
+
+    <h2>Path canonicalization and symlink refusal</h2>
+    <p>
+      Filesystem grants and target paths are canonicalized with <code>realpath</code> before prefix matching, with a 1-second directory cache for non-symlink leaves.
+      To prevent time-of-check/time-of-use symlink swaps after the permission check, native file opens pass <code>O_NOFOLLOW_ANY</code> on macOS (refusing symlinks anywhere in the path) and <code>O_NOFOLLOW</code> on Linux (refusing a symlink at the final path component).
+    </p>
+
+    <h2>SQLite confinement</h2>
+    <p>
+      Opening a file database checks read (and, unless <code>readonly: true</code>, write) permissions for the normalized database path plus its <code>-journal</code>, <code>-wal</code>, and <code>-shm</code> sidecars.
+      Every connection installs a SQLite authorizer callback and forces <code>PRAGMA temp_store=MEMORY</code>, blocking <code>ATTACH DATABASE</code>, <code>VACUUM INTO</code>, <code>load_extension()</code>, and temporary storage directory changes so SQL queries cannot read or write files outside the checked path.
+    </p>
+
+    <h2>OS sandbox and optional dependencies</h2>
+    <p>
+      When prompting is off on macOS, <code>runtime/sandbox.c3</code> compiles a Seatbelt profile from the active grants and calls <code>sandbox_init</code> before evaluating the entry module.
+      If no network grant exists, the kernel denies all network sockets; if no <code>run</code> grant exists, <code>process-exec*</code> and <code>process-fork</code> are denied; if <code>write</code> is scoped, file writes are restricted to the canonical granted subpaths and <code>/dev/</code>.
+      Linux currently enforces permissions in the runtime only and prints a startup warning unless <code>--no-sandbox</code> is passed.
+    </p>
+    <p>
+      OpenSSL 3 and SQLite 3.31+ are optional at startup on macOS (OpenSSL is weakly linked and SQLite is loaded via <code>dlopen</code>). Plain HTTP and non-TLS scripts run without OpenSSL installed; calling <code>serve({ tls })</code>, <code>https:</code>/<code>wss:</code> connections, or <code>crypto.subtle</code> without OpenSSL 3 throws an error with an install hint.
+    </p>
+
+    <h2>Deliberate non-goals</h2>
+    <p>
+      <code>bkr</code> does not implement a Node.js compatibility layer, CommonJS <code>require</code>, <code>node_modules</code> resolution, or remote HTTP module imports.
+      Every import specifier is either a relative path, an absolute path, or one of the built-in module names.
+    </p>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

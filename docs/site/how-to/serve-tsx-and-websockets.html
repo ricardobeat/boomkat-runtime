@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Serve TSX, HTTPS, and WebSockets · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="permissions-and-config.html" aria-current="page">how-to</a>
+      <a href="../reference/modules.html">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">how-to guide</p>
+    <h1>Serve TSX, HTTPS, and WebSockets</h1>
+    <p class="lede">
+      Transpile browser TypeScript and JSX at startup with source maps, upgrade HTTP requests to WebSockets, and serve HTTPS with PEM certificates.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <h2>Transpile TypeScript and TSX for the browser</h2>
+    <p>
+      The built-in <code>typescript</code> module uses Boomkat's parser to strip types and lower JSX to JavaScript without an external build step.
+      Compile your client entry at startup and attach it as a static buffered <code>Response</code> in <code>routes</code> so it is served directly from native memory without entering JavaScript on each request:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">serve</span> } <span class="ink-s2">from</span> <span class="ink-s9">"http"</span>;
+<span class="ink-s2">import</span> { <span class="ink-s2">readText</span> } <span class="ink-s2">from</span> <span class="ink-s9">"file"</span>;
+<span class="ink-s2">import</span> { <span class="ink-s2">transpileWithMap</span> } <span class="ink-s2">from</span> <span class="ink-s9">"typescript"</span>;
+
+<span class="ink-s2">const</span> <span class="ink-s2">source</span> <span class="ink-s2">=</span> <span class="ink-s2">await</span> <span class="ink-s5">readText</span>(<span class="ink-s9">"./app.tsx"</span>);
+<span class="ink-s2">const</span> { <span class="ink-s2">code</span>, <span class="ink-s2">map</span> } <span class="ink-s2">=</span> <span class="ink-s5">transpileWithMap</span>(<span class="ink-s2">source</span>, {
+  <span class="ink-s2">filename</span>: <span class="ink-s9">"app.tsx"</span>,
+  <span class="ink-s2">jsxImportSource</span>: <span class="ink-s9">"preact"</span>,
+});
+
+<span class="ink-s5">serve</span>({
+  <span class="ink-s2">port</span>: <span class="ink-s5">8080</span>,
+  <span class="ink-s2">routes</span>: {
+    <span class="ink-s9">"/app.js"</span>: <span class="ink-s2">new</span> <span class="ink-s5">Response</span>(<span class="ink-s9">`${code}\n//# sourceMappingURL=/app.js.map`</span>, {
+      <span class="ink-s2">headers</span>: { <span class="ink-s9">"content-type"</span>: <span class="ink-s9">"text/javascript; charset=utf-8"</span> },
+    }),
+    <span class="ink-s9">"/app.js.map"</span>: <span class="ink-s2">new</span> <span class="ink-s5">Response</span>(<span class="ink-s2">map</span>, {
+      <span class="ink-s2">headers</span>: { <span class="ink-s9">"content-type"</span>: <span class="ink-s9">"application/json; charset=utf-8"</span> },
+    }),
+  },
+});</code></pre>
+    <p>
+      For a single self-contained file during development, pass <code>{ sourceMap: "inline" }</code> to <code>transpile(source, options)</code> instead.
+      Automatic JSX emits imports from <code>&lt;jsxImportSource&gt;/jsx-runtime</code>; include an <code>importmap</code> in your HTML so the browser resolves bare specifiers to your served vendor routes.
+    </p>
+
+    <h2>Upgrade HTTP requests to WebSockets</h2>
+    <p>
+      Call <code>upgradeWebSocket(req, { protocol })</code> inside any route or <code>fetch</code> handler.
+      Attach listeners to <code>socket</code> and return <code>response</code> to complete the handshake:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">serve</span>, <span class="ink-s2">upgradeWebSocket</span> } <span class="ink-s2">from</span> <span class="ink-s9">"http"</span>;
+
+<span class="ink-s5">serve</span>({
+  <span class="ink-s2">port</span>: <span class="ink-s5">8080</span>,
+  <span class="ink-s2">routes</span>: {
+    <span class="ink-s9">"/ws"</span>: (<span class="ink-s2">req</span>) <span class="ink-s2">=&gt;</span> {
+      <span class="ink-s2">if</span> (<span class="ink-s2">req</span>.<span class="ink-s2">headers</span>.<span class="ink-s5">get</span>(<span class="ink-s9">"upgrade"</span>) <span class="ink-s2">!==</span> <span class="ink-s9">"websocket"</span>) {
+        <span class="ink-s2">return</span> <span class="ink-s2">new</span> <span class="ink-s5">Response</span>(<span class="ink-s9">"upgrade required"</span>, { <span class="ink-s2">status</span>: <span class="ink-s5">426</span> });
+      }
+      <span class="ink-s2">const</span> { <span class="ink-s2">socket</span>, <span class="ink-s2">response</span> } <span class="ink-s2">=</span> <span class="ink-s5">upgradeWebSocket</span>(<span class="ink-s2">req</span>);
+      <span class="ink-s2">socket</span>.<span class="ink-s2">onmessage</span> <span class="ink-s2">=</span> (<span class="ink-s2">e</span>) <span class="ink-s2">=&gt;</span> <span class="ink-s2">socket</span>.<span class="ink-s5">send</span>(<span class="ink-s2">e</span>.<span class="ink-s2">data</span>);
+      <span class="ink-s2">return</span> <span class="ink-s2">response</span>;
+    },
+  },
+});</code></pre>
+
+    <h2>Enable HTTPS with TLS certificates</h2>
+    <p>
+      Pass <code>tls: { cert, key }</code> to <code>serve()</code> with paths to PEM-encoded certificate and private key files.
+      Both files require read permission, and OpenSSL 3 must be present at run time:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">serve</span> } <span class="ink-s2">from</span> <span class="ink-s9">"http"</span>;
+
+<span class="ink-s5">serve</span>({
+  <span class="ink-s2">port</span>: <span class="ink-s5">8443</span>,
+  <span class="ink-s2">tls</span>: { <span class="ink-s2">cert</span>: <span class="ink-s9">"./cert.pem"</span>, <span class="ink-s2">key</span>: <span class="ink-s9">"./key.pem"</span> },
+  <span class="ink-s3">fetch</span>() {
+    <span class="ink-s2">return</span> <span class="ink-s2">new</span> <span class="ink-s5">Response</span>(<span class="ink-s9">"secure"</span>);
+  },
+});</code></pre>
+    <p class="note">
+      <code>serve({ tls })</code> runs on a single HTTP thread and cannot be combined with <code>--http-workers</code> or <code>--http-processes</code>. Terminate TLS in a reverse proxy in front of multi-worker pools.
+    </p>
+
+    <h2>See also</h2>
+    <ul>
+      <li><a href="scale-http-and-workers.html">Scale HTTP servers and run module workers</a></li>
+      <li><a href="../reference/modules.html#http"><code>http</code> module reference</a></li>
+      <li><a href="../reference/modules.html#typescript"><code>typescript</code> module reference</a></li>
+    </ul>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

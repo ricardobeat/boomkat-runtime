@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Permissions &amp; boomkat.toml · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="permissions-and-config.html" aria-current="page">how-to</a>
+      <a href="../reference/modules.html">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="label">how-to guide</p>
+    <h1>Configure permissions with flags and <code>boomkat.toml</code></h1>
+    <p class="lede">
+      Scope network, filesystem, environment, and subprocess grants on the command line or in a project config file, and narrow permissions at run time.
+    </p>
+
+    <div class="band" aria-hidden="true"></div>
+
+    <h2>Grant and deny permissions with CLI flags</h2>
+    <p>
+      Pass comma-separated allowlists to <code>--allow-&lt;perm&gt;</code>, or omit the list to grant the whole category.
+      <code>--deny-&lt;perm&gt;=list</code> wins over any allow rule, including <code>-A</code> (<code>--allow-all</code>):
+    </p>
+    <pre class="ink"><code><span class="ink-s0"># Scope network to specific hosts/ports and filesystem to specific folders</span>
+<span class="ink-s5">bkr</span> <span class="ink-s9">--allow-net=api.example.com,:8080</span> <span class="ink-s9">--allow-read=./data</span> <span class="ink-s9">--allow-write=./out</span> <span class="ink-s9">app.js</span>
+
+<span class="ink-s0"># Allow everything except cloud metadata IPs</span>
+<span class="ink-s5">bkr</span> <span class="ink-s9">-A</span> <span class="ink-s9">--deny-net=169.254.169.254</span> <span class="ink-s9">app.js</span>
+
+<span class="ink-s0"># Disable interactive terminal prompts</span>
+<span class="ink-s5">bkr</span> <span class="ink-s9">--no-prompt</span> <span class="ink-s9">--allow-net=:8080</span> <span class="ink-s9">app.js</span></code></pre>
+
+    <h2>Put project defaults in <code>boomkat.toml</code></h2>
+    <p>
+      <code>bkr</code> automatically loads <code>boomkat.toml</code> from the entry script's directory (or the path given to <code>--config</code>).
+      Relative paths in the file resolve against the config file's directory. Command-line flags are applied again on top of the file so they always take precedence:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">[permissions]</span>
+<span class="ink-s2">prompt</span> <span class="ink-s2">=</span> <span class="ink-s5">false</span>
+<span class="ink-s2">net</span> <span class="ink-s2">=</span> [<span class="ink-s9">"127.0.0.1:8080"</span>, <span class="ink-s9">"api.example.com"</span>, <span class="ink-s9">"*.cdn.example.com"</span>]
+<span class="ink-s2">read</span> <span class="ink-s2">=</span> [<span class="ink-s9">"./public"</span>, <span class="ink-s9">"./data"</span>]
+<span class="ink-s2">write</span> <span class="ink-s2">=</span> [<span class="ink-s9">"./data"</span>]
+<span class="ink-s2">env</span> <span class="ink-s2">=</span> [<span class="ink-s9">"APP_*"</span>]
+<span class="ink-s2">run</span> <span class="ink-s2">=</span> [<span class="ink-s9">"git"</span>]</code></pre>
+    <p class="note">
+      When <code>prompt = false</code> (or <code>--no-prompt</code> is set), grants are fixed for the run and macOS applies a Seatbelt sandbox that blocks network, process execution, and file writes outside the grants. Pass <code>--no-sandbox</code> to disable the OS sandbox.
+    </p>
+
+    <h2>Query, request, and revoke permissions in JavaScript</h2>
+    <p>
+      Use the <code>permissions</code> module to inspect grants or drop privileges after startup initialization:
+    </p>
+    <pre class="ink"><code><span class="ink-s2">import</span> { <span class="ink-s2">query</span>, <span class="ink-s2">request</span>, <span class="ink-s2">revoke</span> } <span class="ink-s2">from</span> <span class="ink-s9">"permissions"</span>;
+<span class="ink-s2">import</span> { <span class="ink-s2">readText</span> } <span class="ink-s2">from</span> <span class="ink-s9">"file"</span>;
+
+<span class="ink-s2">const</span> <span class="ink-s2">config</span> <span class="ink-s2">=</span> <span class="ink-s2">JSON</span>.<span class="ink-s5">parse</span>(<span class="ink-s2">await</span> <span class="ink-s5">readText</span>(<span class="ink-s9">"./secrets.json"</span>));
+
+<span class="ink-s0">// Drop read access to secrets.json for the rest of the process lifetime</span>
+<span class="ink-s2">await</span> <span class="ink-s5">revoke</span>({ <span class="ink-s2">name</span>: <span class="ink-s9">"read"</span>, <span class="ink-s2">path</span>: <span class="ink-s9">"./secrets.json"</span> });
+
+<span class="ink-s2">const</span> <span class="ink-s2">status</span> <span class="ink-s2">=</span> <span class="ink-s2">await</span> <span class="ink-s5">query</span>({ <span class="ink-s2">name</span>: <span class="ink-s9">"read"</span>, <span class="ink-s2">path</span>: <span class="ink-s9">"./secrets.json"</span> });
+<span class="ink-s2">console</span>.<span class="ink-s5">log</span>(<span class="ink-s2">status</span>.<span class="ink-s2">state</span>); <span class="ink-s0">// "denied"</span></code></pre>
+
+    <h2>Bound execution time with <code>--time-limit</code></h2>
+    <p>
+      Pass <code>--time-limit=ms</code> to start a watchdog thread that interrupts JavaScript turns exceeding the budget (including top-level module evaluation and synchronous SQLite queries):
+    </p>
+    <pre class="ink"><code><span class="ink-s5">bkr</span> <span class="ink-s9">--time-limit=250</span> <span class="ink-s9">--allow-net=:8080</span> <span class="ink-s9">server.js</span></code></pre>
+    <p>
+      If an HTTP request handler exceeds the time limit, the server responds with <code>500 Internal Server Error</code> and keeps serving subsequent requests. Any other runaway turn exits the process with status <code>1</code>.
+    </p>
+
+    <h2>See also</h2>
+    <ul>
+      <li><a href="../reference/cli-and-permissions.html">CLI commands, flags, and <code>boomkat.toml</code></a></li>
+      <li><a href="../architecture/permissions-and-isolation.html">Permission model and isolation</a></li>
+    </ul>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

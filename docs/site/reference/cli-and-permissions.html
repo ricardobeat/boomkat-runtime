@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI &amp; permissions · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body class="has-sidebar">
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="../how-to/permissions-and-config.html">how-to</a>
+      <a href="modules.html" aria-current="page">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <div class="ref-layout">
+    <aside class="ref-sidebar" aria-label="CLI and permissions index">
+      <p class="label">CLI Commands</p>
+      <ul>
+        <li><a href="#cli-commands">bkr &lt;script&gt;</a></li>
+        <li><a href="#cli-commands">bkr [repl]</a></li>
+        <li><a href="#cli-commands">bkr test</a></li>
+        <li><a href="#cli-commands">bkr check</a></li>
+      </ul>
+
+      <p class="label">Permission Categories</p>
+      <ul>
+        <li><a href="#perm-categories">net</a></li>
+        <li><a href="#perm-categories">read / write</a></li>
+        <li><a href="#perm-categories">env</a></li>
+        <li><a href="#perm-categories">run</a></li>
+        <li><a href="#perm-categories">ffi / sys / import</a></li>
+      </ul>
+
+      <p class="label">Permission Flags</p>
+      <ul>
+        <li><a href="#perm-flags">--allow-&lt;perm&gt;</a></li>
+        <li><a href="#perm-flags">--deny-&lt;perm&gt;</a></li>
+        <li><a href="#perm-flags">-A / --allow-all</a></li>
+        <li><a href="#perm-flags">--prompt / --no-prompt</a></li>
+        <li><a href="#perm-flags">--no-sandbox</a></li>
+        <li><a href="#perm-flags">--config</a></li>
+      </ul>
+
+      <p class="label">Execution &amp; Scaling</p>
+      <ul>
+        <li><a href="#scaling">--time-limit</a></li>
+        <li><a href="#scaling">--http-workers</a></li>
+        <li><a href="#scaling">--http-processes</a></li>
+        <li><a href="#scaling">--jit</a></li>
+      </ul>
+
+      <p class="label">Configuration &amp; Build</p>
+      <ul>
+        <li><a href="#toml">boomkat.toml</a></li>
+        <li><a href="#build-targets">Build targets</a></li>
+      </ul>
+
+      <p class="label">Other Reference</p>
+      <ul>
+        <li><a href="modules.html">Built-in Modules</a></li>
+        <li><a href="globals.html">Web-Standard Globals</a></li>
+      </ul>
+    </aside>
+
+    <main class="ref-content">
+      <p class="label">reference</p>
+      <h1>CLI commands, flags, and <code>boomkat.toml</code></h1>
+      <p class="lede">
+        Command-line invocation modes, permission flags, scaling options, and <code>boomkat.toml</code> syntax.
+      </p>
+
+      <div class="band" aria-hidden="true"></div>
+
+      <h2 id="cli-commands">CLI commands</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Behavior</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>bkr [flags] &lt;script&gt; [args...]</code></td><td>Evaluate <code>&lt;script&gt;</code> (<code>.js</code>, <code>.mjs</code>, <code>.jsx</code>, <code>.ts</code>, <code>.mts</code>, <code>.tsx</code>) as an ES module with top-level await. Trailing arguments populate <code>args</code> in the <code>process</code> module.</td></tr>
+          <tr><td><code>bkr [flags] [repl]</code></td><td>Start an interactive REPL when no script path is given. Supports top-level <code>await</code>, <code>_</code> (last value), <code>_error</code> (last error), <code>.help</code>, <code>.clear</code>, and <code>.exit</code>.</td></tr>
+          <tr><td><code>bkr test [flags] [--watch] [--filter=text] [paths...]</code></td><td>Discover and run <code>*.test.*</code>, <code>*_test.*</code>, and <code>*.spec.*</code> files under <code>paths</code> (or <code>.</code>). Exits with status <code>1</code> on any failure or if no test files are found.</td></tr>
+          <tr><td><code>bkr check &lt;script&gt;</code></td><td>Scan the static local module graph of <code>&lt;script&gt;</code>, print imported built-in modules, and suggest the <code>--allow-*</code> flags required.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="perm-categories">Permission categories</h2>
+      <table>
+        <thead>
+          <tr><th>Category</th><th>Allowlist entry syntax</th><th>Checked by</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>net</code></td><td><code>host</code>, <code>host:port</code>, <code>*.domain</code>, <code>[ipv6]:port</code>, or <code>:port</code></td><td><code>http.serve</code>, <code>net.connect</code>, <code>net.listen</code>, <code>net.resolve</code>, <code>fetch</code>, <code>WebSocket</code></td></tr>
+          <tr><td><code>read</code></td><td>File or directory path (canonicalized via <code>realpath</code>)</td><td><code>file</code> reads/stat/list, <code>sqlite</code> open, <code>http</code> TLS cert/key files, <code>Worker</code> module loading</td></tr>
+          <tr><td><code>write</code></td><td>File or directory path (canonicalized via <code>realpath</code>)</td><td><code>file</code> writes/mkdir/remove/rename, writable <code>sqlite</code> databases</td></tr>
+          <tr><td><code>env</code></td><td>Variable name or prefix wildcard <code>PREFIX*</code></td><td><code>process.env.get</code>, <code>set</code>, <code>delete</code>, <code>toObject</code></td></tr>
+          <tr><td><code>run</code></td><td>Executable basename (e.g. <code>git</code>) or path</td><td><code>process.spawn</code>, <code>process.run</code></td></tr>
+          <tr><td><code>ffi</code>, <code>sys</code>, <code>import</code></td><td>Exact name or prefix wildcard <code>PREFIX*</code></td><td>Reserved categories queryable through the <code>permissions</code> module</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="perm-flags">Permission and sandbox flags</h2>
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>Effect</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--allow-&lt;perm&gt;[=a,b]</code></td><td>Grant an entire permission category, or restrict it to a comma-separated allowlist.</td></tr>
+          <tr><td><code>--deny-&lt;perm&gt;=a,b</code></td><td>Deny matching items. Deny rules always override allow rules and <code>-A</code>.</td></tr>
+          <tr><td><code>-A</code>, <code>--allow-all</code></td><td>Grant all permission categories.</td></tr>
+          <tr><td><code>--prompt</code> / <code>--no-prompt</code></td><td>Enable or disable interactive <code>[y/n/A]</code> prompts on <code>/dev/tty</code>. Prompting defaults to on when both stdin and stderr are TTYs.</td></tr>
+          <tr><td><code>--no-sandbox</code></td><td>Do not apply the macOS Seatbelt OS sandbox (or silence the missing-sandbox warning on Linux) when prompting is disabled.</td></tr>
+          <tr><td><code>--config &lt;file&gt;</code></td><td>Load permissions from <code>&lt;file&gt;</code> instead of looking for <code>boomkat.toml</code> beside the entry script.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="scaling">Execution and HTTP scaling flags</h2>
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>Effect</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--time-limit=&lt;ms&gt;</code></td><td>Interrupt any synchronous JavaScript turn (or SQLite query) that runs longer than <code>&lt;ms&gt;</code> milliseconds. HTTP requests return <code>500</code>; other turns exit with status <code>1</code>.</td></tr>
+          <tr><td><code>--http-workers=&lt;1..64&gt;</code></td><td>Run <code>N</code> in-process server VMs sharing one listener, distributing accepted connections round-robin.</td></tr>
+          <tr><td><code>--http-processes=&lt;1..64&gt;</code></td><td>Run <code>N</code> isolated worker processes behind a native TCP acceptor that passes sockets over <code>SCM_RIGHTS</code>.</td></tr>
+          <tr><td><code>--jit</code></td><td>Enable native JIT compilation on engines built with the <code>SLJIT</code> feature.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="toml"><code>boomkat.toml</code> format</h2>
+      <p>
+        Placed beside the entry script (or passed via <code>--config</code>). Relative paths in <code>read</code> and <code>write</code> are resolved against the directory containing the TOML file. Each permission key accepts a boolean (<code>true</code> or <code>false</code>) or an array of allowlist strings:
+      </p>
+      <pre class="ink"><code><span class="ink-s2">[permissions]</span>
+<span class="ink-s2">prompt</span> <span class="ink-s2">=</span> <span class="ink-s5">false</span>
+<span class="ink-s2">net</span> <span class="ink-s2">=</span> [<span class="ink-s9">"127.0.0.1:8080"</span>, <span class="ink-s9">"*.example.com"</span>]
+<span class="ink-s2">read</span> <span class="ink-s2">=</span> [<span class="ink-s9">"./data"</span>]
+<span class="ink-s2">write</span> <span class="ink-s2">=</span> <span class="ink-s5">false</span>
+<span class="ink-s2">env</span> <span class="ink-s2">=</span> [<span class="ink-s9">"APP_*"</span>]
+<span class="ink-s2">run</span> <span class="ink-s2">=</span> [<span class="ink-s9">"git"</span>]</code></pre>
+
+      <h2 id="build-targets">Build targets (<code>project.json</code>)</h2>
+      <table>
+        <thead>
+          <tr><th>Target</th><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>bkr</code></td><td><code>c3c build bkr</code></td><td>Default release binary (<code>O3</code>, <code>THREADED_DISPATCH</code>, <code>CONSOLE</code>), compiled against <code>../boomkat/src</code> and <code>vendor/uws.c3l</code>.</td></tr>
+          <tr><td><code>bkr-opprof</code> / <code>bkr-opprof-th</code></td><td><code>c3c build bkr-opprof</code></td><td>Builds with <code>OP_PROFILE</code> enabled to dump VM opcode counts on exit (switch or threaded dispatch).</td></tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

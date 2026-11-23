@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Built-in modules · bkr docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body class="has-sidebar">
+  <header class="site-head">
+    <a class="brand" href="../index.html">
+      <svg viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><g fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="8" y="1" width="2" height="1"/><rect x="2" y="2" width="8" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="1" y="7" width="2" height="1"/><rect x="9" y="7" width="2" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="2" y="9" width="8" height="1"/></g><g fill="currentColor" opacity=".4"><rect x="5" y="6" width="2" height="1"/></g></svg>
+      <span>bkr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="../tutorials/first-server.html">tutorials</a>
+      <a href="../how-to/permissions-and-config.html">how-to</a>
+      <a href="modules.html" aria-current="page">reference</a>
+      <a href="../architecture/architecture.html">architecture</a>
+    </nav>
+  </header>
+
+  <div class="ref-layout">
+    <aside class="ref-sidebar" aria-label="Built-in modules index">
+      <p class="label">http</p>
+      <ul>
+        <li><a href="#http-serve">serve</a></li>
+        <li><a href="#http-upgradeWebSocket">upgradeWebSocket</a></li>
+      </ul>
+
+      <p class="label">net</p>
+      <ul>
+        <li><a href="#net-connect">connect</a></li>
+        <li><a href="#net-listen">listen</a></li>
+        <li><a href="#net-resolve">resolve</a></li>
+        <li><a href="#net-Conn">Conn / Handle</a></li>
+      </ul>
+
+      <p class="label">file</p>
+      <ul>
+        <li><a href="#file-body">body</a></li>
+        <li><a href="#file-read">read / readText</a></li>
+        <li><a href="#file-write">write / writeText</a></li>
+        <li><a href="#file-open">open</a></li>
+        <li><a href="#file-stat">stat / exists / list</a></li>
+        <li><a href="#file-mkdir">mkdir / remove</a></li>
+        <li><a href="#file-rename">rename / copy</a></li>
+      </ul>
+
+      <p class="label">process</p>
+      <ul>
+        <li><a href="#process-info">args / main / execPath / pid / exit</a></li>
+        <li><a href="#process-env">env</a></li>
+        <li><a href="#process-stdio">stdin / stdout / stderr</a></li>
+        <li><a href="#process-spawn">spawn / run</a></li>
+      </ul>
+
+      <p class="label">path</p>
+      <ul>
+        <li><a href="#path-ops">join / resolve / normalize / relative</a></li>
+        <li><a href="#path-parts">dirname / basename / extname / parse / format</a></li>
+        <li><a href="#path-urls">toFileUrl / fromFileUrl</a></li>
+      </ul>
+
+      <p class="label">permissions</p>
+      <ul>
+        <li><a href="#permissions-api">query / request / revoke</a></li>
+      </ul>
+
+      <p class="label">sqlite</p>
+      <ul>
+        <li><a href="#sqlite-Database">Database</a></li>
+        <li><a href="#sqlite-Statement">Statement</a></li>
+        <li><a href="#sqlite-version">version</a></li>
+      </ul>
+
+      <p class="label">crypto</p>
+      <ul>
+        <li><a href="#crypto-randomBytes">randomBytes / sha256 / hex</a></li>
+        <li><a href="#crypto-timingSafeEqual">timingSafeEqual</a></li>
+        <li><a href="#crypto-password">hashPassword / verifyPassword</a></li>
+        <li><a href="#crypto-subtle">subtle</a></li>
+      </ul>
+
+      <p class="label">typescript</p>
+      <ul>
+        <li><a href="#typescript-transpile">transpile</a></li>
+        <li><a href="#typescript-transpileWithMap">transpileWithMap</a></li>
+      </ul>
+
+      <p class="label">test</p>
+      <ul>
+        <li><a href="#test-reg">test / it / describe</a></li>
+        <li><a href="#test-hooks">beforeAll / afterAll / beforeEach / afterEach</a></li>
+        <li><a href="#test-assertions">assertions</a></li>
+      </ul>
+
+      <p class="label">Other Reference</p>
+      <ul>
+        <li><a href="globals.html">Web-Standard Globals</a></li>
+        <li><a href="cli-and-permissions.html">CLI &amp; Permissions</a></li>
+      </ul>
+    </aside>
+
+    <main class="ref-content">
+      <p class="label">reference</p>
+      <h1>Built-in modules</h1>
+      <p class="lede">
+        Built-in modules are imported by bare specifier (for example, <code>import { serve } from "http"</code>). Any other bare specifier throws a module load error.
+      </p>
+
+      <div class="band" aria-hidden="true"></div>
+
+      <h2 id="http"><code>http</code> — HTTP, HTTPS, and WebSocket server</h2>
+      <p>Requires <code>--allow-net</code> for the bound hostname and port (plus <code>--allow-read</code> for TLS certificate and key files).</p>
+
+      <div class="api-item" id="http-serve">
+        <p class="api-sig"><code>serve(options, fetch?) -&gt; Server</code></p>
+        <p class="api-desc">
+          Start an HTTP or HTTPS server on uWebSockets. <code>options</code> accepts <code>hostname</code> (default <code>"0.0.0.0"</code>), <code>port</code> (default <code>8080</code>, or <code>0</code> for an ephemeral port), <code>tls: { cert, key }</code> (PEM file paths), <code>routes</code>, <code>static</code>, <code>fetch(req, server)</code>, <code>error(err)</code>, and <code>onListen(server)</code>.
+          <code>routes</code> maps paths (exact, <code>:param</code>, or terminal <code>/*</code>) to a handler function, a buffered <code>Response</code> snapshot, a per-method map (<code>GET</code>, <code>HEAD</code>, <code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>, <code>OPTIONS</code>, <code>TRACE</code>, <code>CONNECT</code>), or <code>false</code> to delegate to <code>fetch</code>.
+          The returned <code>Server</code> exposes <code>hostname</code>, <code>port</code>, <code>url</code> (<code>URL</code>), <code>workers</code>, <code>ready</code> (<code>Promise&lt;Server&gt;</code>), <code>finished</code> (<code>Promise&lt;void&gt;</code>), <code>stop(force = false)</code>, and <code>[Symbol.asyncDispose]()</code>.
+        </p>
+      </div>
+      <div class="api-item" id="http-upgradeWebSocket">
+        <p class="api-sig"><code>upgradeWebSocket(request, options?) -&gt; { socket: WebSocket, response: Response }</code></p>
+        <p class="api-desc">
+          Accept a WebSocket upgrade inside a route or <code>fetch</code> handler. <code>options.protocol</code> selects an offered subprotocol. Returns the server-side <code>WebSocket</code> (16 MiB message limit, 120 s idle timeout, automatic pings) and the <code>101</code> <code>Response</code> that the handler must return to complete the upgrade.
+        </p>
+      </div>
+
+      <h2 id="net"><code>net</code> — TCP, TLS, and DNS</h2>
+      <p>Requires <code>--allow-net</code>.</p>
+
+      <div class="api-item" id="net-connect">
+        <p class="api-sig"><code>connect({ hostname, port, tls = false }) -&gt; Promise&lt;Conn&gt;</code></p>
+        <p class="api-desc">Open a TCP or TLS connection. When <code>tls</code> is true, verifies the peer certificate and hostname against the system root store using OpenSSL 3.</p>
+      </div>
+      <div class="api-item" id="net-listen">
+        <p class="api-sig"><code>listen({ hostname = "0.0.0.0", port = 0 }) -&gt; Listener</code></p>
+        <p class="api-desc">Bind a TCP listener. Returns an object with <code>hostname</code>, <code>port</code>, <code>accept() -&gt; Promise&lt;Conn | null&gt;</code>, <code>close()</code>, and <code>[Symbol.asyncIterator]()</code>.</p>
+      </div>
+      <div class="api-item" id="net-resolve">
+        <p class="api-sig"><code>resolve(hostname) -&gt; Promise&lt;string[]&gt;</code></p>
+        <p class="api-desc">Resolve IPv4 and IPv6 addresses for <code>hostname</code> on the native thread pool.</p>
+      </div>
+      <div class="api-item" id="net-Conn">
+        <p class="api-sig"><code>Conn / Handle: { localPort, remoteAddress, remotePort, read(), write(data), closeWrite(), close(), readable, writable }</code></p>
+        <p class="api-desc">Resource handle for sockets, open files, and stdio pipes. <code>read()</code> resolves to a <code>Uint8Array</code> or <code>null</code> on EOF; <code>write(data)</code> accepts a <code>Uint8Array</code>, view, or string and resolves to the byte count written; <code>readable</code> and <code>writable</code> expose Web <code>ReadableStream</code> and <code>WritableStream</code> wrappers.</p>
+      </div>
+
+      <h2 id="file"><code>file</code> — Filesystem operations</h2>
+      <p>Requires <code>--allow-read</code> or <code>--allow-write</code> for the canonicalized target path. All paths accept a string or a <code>file:</code> <code>URL</code>.</p>
+
+      <div class="api-item" id="file-body">
+        <p class="api-sig"><code>body(path) -&gt; FileBody</code></p>
+        <p class="api-desc">Create a lazy file body for <code>new Response(body(path))</code>. When passed untouched to the HTTP server, streams the file in 64 KiB chunks with socket backpressure and checks read permission when sending begins.</p>
+      </div>
+      <div class="api-item" id="file-read">
+        <p class="api-sig"><code>read(path) -&gt; Promise&lt;Uint8Array&gt;</code> · <code>readText(path) -&gt; Promise&lt;string&gt;</code></p>
+        <p class="api-desc">Read an entire file on the thread pool as bytes or UTF-8 text (stripping a leading UTF-8 BOM if present).</p>
+      </div>
+      <div class="api-item" id="file-write">
+        <p class="api-sig"><code>write(path, data, { append = false }?) -&gt; Promise&lt;null&gt;</code> · <code>writeText(path, data, options?)</code></p>
+        <p class="api-desc">Write a string or byte buffer to <code>path</code>, creating or truncating the file by default, or appending when <code>append: true</code>.</p>
+      </div>
+      <div class="api-item" id="file-open">
+        <p class="api-sig"><code>open(path, mode = "r") -&gt; Promise&lt;Handle&gt;</code></p>
+        <p class="api-desc">Open a file resource handle. <code>mode</code> may be <code>"r"</code>, <code>"w"</code>, <code>"a"</code>, <code>"x"</code>, or <code>"rw"</code>.</p>
+      </div>
+      <div class="api-item" id="file-stat">
+        <p class="api-sig"><code>stat(path) -&gt; Promise&lt;{ kind, size, mtime, mode }&gt;</code> · <code>exists(path) -&gt; Promise&lt;boolean&gt;</code> · <code>list(path) -&gt; Promise&lt;Array&lt;{ kind, name }&gt;&gt;</code></p>
+        <p class="api-desc">Inspect file metadata via <code>lstat</code> (<code>kind</code> is <code>"file"</code>, <code>"dir"</code>, <code>"symlink"</code>, or <code>"other"</code>; <code>mtime</code> is a <code>Date</code>), check whether a path exists, or list directory entries.</p>
+      </div>
+      <div class="api-item" id="file-mkdir">
+        <p class="api-sig"><code>mkdir(path, { recursive = false }?) -&gt; Promise&lt;null&gt;</code> · <code>remove(path, { recursive = false }?) -&gt; Promise&lt;null&gt;</code></p>
+        <p class="api-desc">Create a directory or remove a file/directory.</p>
+      </div>
+      <div class="api-item" id="file-rename">
+        <p class="api-sig"><code>rename(from, to) -&gt; Promise&lt;null&gt;</code> · <code>copy(from, to) -&gt; Promise&lt;null&gt;</code></p>
+        <p class="api-desc">Rename a path (requires write permission on both paths) or copy file contents from <code>from</code> to <code>to</code>.</p>
+      </div>
+
+      <h2 id="process"><code>process</code> — Arguments, environment, stdio, and child processes</h2>
+
+      <div class="api-item" id="process-info">
+        <p class="api-sig"><code>args: string[]</code> · <code>main: string</code> · <code>execPath: string</code> · <code>pid: number</code> · <code>exit(code = 0)</code></p>
+        <p class="api-desc">Script arguments after the entry filename, absolute path of the entry module, path to the running <code>bkr</code> binary, current process ID, and immediate process termination.</p>
+      </div>
+      <div class="api-item" id="process-env">
+        <p class="api-sig"><code>env: { get(name), set(name, value), delete(name), toObject() }</code></p>
+        <p class="api-desc">Read or modify environment variables (requires <code>--allow-env</code> for the variable name; <code>toObject()</code> requires an unrestricted <code>--allow-env</code> grant).</p>
+      </div>
+      <div class="api-item" id="process-stdio">
+        <p class="api-sig"><code>stdin: Handle</code> · <code>stdout: Handle</code> · <code>stderr: Handle</code></p>
+        <p class="api-desc">Resource handles for file descriptors 0, 1, and 2.</p>
+      </div>
+      <div class="api-item" id="process-spawn">
+        <p class="api-sig"><code>spawn(command, options?) -&gt; Child</code> · <code>run(command, options?) -&gt; Promise&lt;{ code, stdout, stderr }&gt;</code></p>
+        <p class="api-desc">
+          Spawn a subprocess (requires <code>--allow-run</code> for <code>command</code>). <code>options</code> accepts <code>args</code> (<code>string[]</code>), <code>env</code> (<code>Record&lt;string, string&gt;</code>), <code>cwd</code>, and <code>stdin</code> / <code>stdout</code> / <code>stderr</code> (<code>"inherit"</code>, <code>"piped"</code>, or <code>"null"</code>).
+          <code>Child</code> exposes <code>pid</code>, <code>stdin</code>, <code>stdout</code>, <code>stderr</code>, <code>status</code> (<code>Promise&lt;number&gt;</code>, negative signal number if killed), and <code>kill(signal = 15)</code>.
+          <code>run()</code> pipes <code>stdout</code> and <code>stderr</code> and resolves to their <code>Uint8Array</code> buffers and exit <code>code</code>.
+        </p>
+      </div>
+
+      <h2 id="path"><code>path</code> — POSIX path utilities</h2>
+      <p>Pure path manipulation; requires no permissions except when <code>resolve()</code> reads the current working directory.</p>
+
+      <div class="api-item" id="path-ops">
+        <p class="api-sig"><code>sep = "/"</code> · <code>delimiter = ":"</code> · <code>normalize(p)</code> · <code>join(...parts)</code> · <code>resolve(...parts)</code> · <code>relative(from, to)</code> · <code>isAbsolute(p)</code></p>
+        <p class="api-desc">Normalize, join, resolve against the working directory, compute relative paths, and test whether a path starts with <code>/</code>.</p>
+      </div>
+      <div class="api-item" id="path-parts">
+        <p class="api-sig"><code>dirname(p)</code> · <code>basename(p, ext?)</code> · <code>extname(p)</code> · <code>parse(p)</code> · <code>format(obj)</code></p>
+        <p class="api-desc">Extract or reassemble <code>{ root, dir, base, ext, name }</code> components.</p>
+      </div>
+      <div class="api-item" id="path-urls">
+        <p class="api-sig"><code>toFileUrl(p) -&gt; URL</code> · <code>fromFileUrl(url) -&gt; string</code></p>
+        <p class="api-desc">Convert between filesystem paths and <code>file://</code> URLs.</p>
+      </div>
+
+      <h2 id="permissions"><code>permissions</code> — Runtime permission inspection</h2>
+
+      <div class="api-item" id="permissions-api">
+        <p class="api-sig"><code>query(desc) -&gt; Promise&lt;{ state }&gt;</code> · <code>request(desc) -&gt; Promise&lt;{ state }&gt;</code> · <code>revoke(desc) -&gt; Promise&lt;{ state }&gt;</code></p>
+        <p class="api-desc">
+          Inspect, prompt for, or revoke permissions. <code>desc</code> is a category string or an object with <code>name</code> (<code>"net"</code>, <code>"read"</code>, <code>"write"</code>, <code>"env"</code>, <code>"run"</code>, <code>"ffi"</code>, <code>"sys"</code>, <code>"import"</code>) and an optional scope field (<code>host</code>, <code>path</code>, <code>variable</code>, <code>command</code>, or <code>kind</code>).
+          <code>state</code> is <code>"granted"</code>, <code>"prompt"</code>, or <code>"denied"</code>.
+        </p>
+      </div>
+
+      <h2 id="sqlite"><code>sqlite</code> — Synchronous SQLite 3.31+ binding (optional)</h2>
+      <p>Registered when the system SQLite shared library (3.31+) can be loaded at startup. File databases require <code>--allow-read</code> (and <code>--allow-write</code> when writable) for the database file and its <code>-journal</code>, <code>-wal</code>, and <code>-shm</code> sidecars.</p>
+
+      <div class="api-item" id="sqlite-Database">
+        <p class="api-sig"><code>new Database(path = ":memory:", { readonly = false }?)</code></p>
+        <p class="api-desc">
+          Open an in-memory or file-backed database. Methods and getters: <code>exec(sql)</code>, <code>prepare(sql) -&gt; Statement</code>, <code>query(sql) -&gt; Statement</code>, <code>transaction(fn) -&gt; fn</code> (savepoint-backed synchronous wrapper), <code>inTransaction: boolean</code>, <code>close()</code>, and <code>[Symbol.dispose]()</code>.
+          <code>ATTACH</code>, <code>VACUUM INTO</code>, extension loading, and disk temp-store changes are blocked by an authorizer to enforce permission boundaries.
+        </p>
+      </div>
+      <div class="api-item" id="sqlite-Statement">
+        <p class="api-sig"><code>Statement: { all(...params), get(...params), run(...params), finalize(), [Symbol.dispose]() }</code></p>
+        <p class="api-desc">
+          Reusable prepared statement. Parameters may be passed positionally, as a single array, or as a single named-parameter object (matching bare or <code>:</code>, <code>$</code>, <code>@</code>-prefixed SQL parameters).
+          <code>all()</code> returns null-prototype row objects; <code>get()</code> returns the first row or <code>undefined</code>; <code>run()</code> returns <code>{ changes, lastInsertRowid }</code>. 64-bit integers outside the safe <code>Number</code> range are returned as <code>BigInt</code>s.
+        </p>
+      </div>
+      <div class="api-item" id="sqlite-version">
+        <p class="api-sig"><code>version: string</code></p>
+        <p class="api-desc">Loaded SQLite library version string (for example, <code>"3.46.1"</code>).</p>
+      </div>
+
+      <h2 id="crypto"><code>crypto</code> — Native hashing, Argon2id, and Web Crypto</h2>
+
+      <div class="api-item" id="crypto-randomBytes">
+        <p class="api-sig"><code>randomBytes(size) -&gt; Uint8Array</code> · <code>sha256(stringOrBytes) -&gt; Uint8Array</code> · <code>hex(bytes) -&gt; string</code></p>
+        <p class="api-desc">Generate cryptographically random bytes (0–65,536), compute a 32-byte SHA-256 digest, or format a <code>Uint8Array</code> as lowercase hexadecimal.</p>
+      </div>
+      <div class="api-item" id="crypto-timingSafeEqual">
+        <p class="api-sig"><code>timingSafeEqual(a, b) -&gt; boolean</code></p>
+        <p class="api-desc">Constant-time byte comparison via OpenSSL <code>CRYPTO_memcmp</code> for equal-length buffers; returns <code>false</code> immediately when lengths differ.</p>
+      </div>
+      <div class="api-item" id="crypto-password">
+        <p class="api-sig"><code>hashPassword(password) -&gt; Promise&lt;string&gt;</code> · <code>verifyPassword(password, encoded) -&gt; Promise&lt;boolean&gt;</code></p>
+        <p class="api-desc">
+          Asynchronous Argon2id password hashing and verification on the thread pool (<code>m=19456 KiB, t=2, p=1</code>, 32-byte random salt, 32-byte output, max 4096 UTF-8 password bytes, at most 2 concurrent jobs before rejecting with <code>code: "BUSY"</code>).
+        </p>
+      </div>
+      <div class="api-item" id="crypto-subtle">
+        <p class="api-sig"><code>subtle: SubtleCrypto</code></p>
+        <p class="api-desc">Re-export of <a href="globals.html#crypto-subtle"><code>globalThis.crypto.subtle</code></a>.</p>
+      </div>
+
+      <h2 id="typescript"><code>typescript</code> — Native type erasure, JSX lowering, and source maps</h2>
+
+      <div class="api-item" id="typescript-transpile">
+        <p class="api-sig"><code>transpile(source, options?) -&gt; string</code></p>
+        <p class="api-desc">
+          Strip TypeScript types and lower JSX to browser JavaScript using Boomkat's parser.
+          <code>options</code> accepts <code>filename</code> (default <code>"module.ts"</code>; <code>.tsx</code>/<code>.jsx</code> enables JSX), <code>module</code> (default <code>true</code>), <code>jsx</code> (<code>"automatic"</code> or <code>"classic"</code>), <code>jsxImportSource</code> (default <code>"preact"</code>), <code>jsxFactory</code> (default <code>"h"</code>), <code>jsxFragmentFactory</code> (default <code>"Fragment"</code>), and <code>sourceMap</code> (<code>"inline"</code> or <code>false</code>).
+        </p>
+      </div>
+      <div class="api-item" id="typescript-transpileWithMap">
+        <p class="api-sig"><code>transpileWithMap(source, options?) -&gt; { code: string, map: string }</code></p>
+        <p class="api-desc">Return the transpiled JavaScript <code>code</code> (without a trailing <code>sourceMappingURL</code> comment) alongside a version 3 source map as JSON text.</p>
+      </div>
+
+      <h2 id="test"><code>test</code> — Test registration, hooks, and assertions</h2>
+
+      <div class="api-item" id="test-reg">
+        <p class="api-sig"><code>test(name, fn)</code> · <code>it(name, fn)</code> · <code>describe(name, fn)</code></p>
+        <p class="api-desc">Register tests and suites for <code>bkr test</code>. Both <code>test</code>/<code>it</code> and <code>describe</code> support <code>.skip(name, fn)</code> and <code>.only(name, fn)</code>; <code>test.todo(name)</code> records a placeholder.</p>
+      </div>
+      <div class="api-item" id="test-hooks">
+        <p class="api-sig"><code>beforeAll(fn)</code> · <code>afterAll(fn)</code> · <code>beforeEach(fn)</code> · <code>afterEach(fn)</code></p>
+        <p class="api-desc">Lifecycle hooks scoped to the current file or enclosing <code>describe</code> block. Hooks may be synchronous or async.</p>
+      </div>
+      <div class="api-item" id="test-assertions">
+        <p class="api-sig"><code>assert(cond, msg?)</code> · <code>assertEquals(a, b, msg?)</code> · <code>assertNotEquals(a, b, msg?)</code> · <code>assertStrictEquals(a, b, msg?)</code> · <code>assertMatch(text, regex, msg?)</code> · <code>assertThrows(fn, ErrorClass?, includes?)</code> · <code>assertRejects(fnOrPromise, ErrorClass?, includes?)</code> · <code>fail(msg?)</code> · <code>AssertionError</code></p>
+        <p class="api-desc">Assertion helpers. <code>assertEquals</code> performs deep structural comparison across plain objects, arrays, <code>Map</code>, <code>Set</code>, <code>Date</code>, <code>RegExp</code>, <code>ArrayBuffer</code>, and typed views, handling circular references.</p>
+      </div>
+    </main>
+  </div>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-bar">
+        <span><a href="https://tomasi.studio/">&copy; 2026 tomasi.studio</a></span>
+        <span class="eof">eof</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

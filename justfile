@@ -1,10 +1,11 @@
 default:
     @just --list
 
-# Publish web/ to https://tomasi.studio/boomkat-runtime/ (goes live immediately)
+# Publish web/ and docs/site to https://tomasi.studio/boomkat-runtime/ (goes live immediately)
 publish-site:
     rm -rf .site && mkdir -p .site/boomkat-runtime
     cp web/index.html web/install.sh .site/boomkat-runtime/
+    cp -R docs/site .site/boomkat-runtime/docs
     scripts/publish-site.sh boomkat-runtime boomkat-runtime .site
     rm -rf .site
 
